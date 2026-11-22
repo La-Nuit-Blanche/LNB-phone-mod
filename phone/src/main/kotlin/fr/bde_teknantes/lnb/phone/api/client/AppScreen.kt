@@ -1,0 +1,140 @@
+package fr.bde_teknantes.lnb.phone.api.client
+
+import fr.bde_teknantes.lnb.phone.client.apps.ScreenHost
+
+/**
+ * One screen of an app: it draws the app viewport and reacts to the player. Extend it and override what you need;
+ * only [render] is required.
+ *
+ * ```kotlin
+ * class NotesScreen : AppScreen() {
+ *     override fun render(canvas: AppCanvas, mouseX: Float, mouseY: Float, partialTick: Float) {
+ *         // draw the list of notes
+ *     }
+ *
+ *     override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
+ *         phone.push(NoteScreen(noteAt(y) ?: return false))
+ *         return true
+ *     }
+ * }
+ * ```
+ *
+ * **Coordinates** are in dp, local to the app viewport: (0, 0) is its top-left corner and it measures
+ * [AppCanvas.WIDTH] x [AppCanvas.HEIGHT] dp (see [AppCanvas]).
+ *
+ * **Lifecycle.** A screen is created by your code, then given to the phone (by [PhoneApp]'s factory or [Phone.push]).
+ * From then on:
+ * - [onShown] when it becomes the screen the player sees: when it opens, when the screen above it is popped, when
+ *   the phone is opened again on it;
+ * - [onHidden] when it stops being seen but stays alive: a screen is pushed above it, or the phone is put away;
+ * - [onClosed], once, when it leaves the phone for good: popped, the player went home or disconnected, or the app
+ *   failed. A closed screen is never shown again.
+ *
+ * [onShown] and [onHidden] alternate, starting with [onShown]; a screen that is shown when it closes gets [onHidden]
+ * before [onClosed]. While a screen is shown, it gets [tick] and the player's input.
+ *
+ * **Errors.** If any of these methods throws, the phone writes the error to the log, closes every screen of your app
+ * and returns to the home screen; the rest of the phone and the game carry on, and the player can open the app again.
+ * After throwing once, a screen is never called again.
+ *
+ * Everything here runs on the client thread.
+ */
+abstract class AppScreen {
+    // Set once, when the phone takes the screen. Never cleared: a closed screen keeps a handle that ignores calls.
+    internal var host: ScreenHost? = null
+
+    // Set when one of the screen's methods threw: the phone doesn't call it again.
+    internal var failed = false
+
+    /**
+     * The phone this screen is on, to open another screen, go back, go home or put the phone away. Available once
+     * the phone has the screen (from [onShown] on, and in every input method), not in the constructor.
+     *
+     * @throws IllegalStateException when read before the screen was given to the phone.
+     */
+    protected val phone: Phone
+        get() = host ?: throw IllegalStateException(
+            "${javaClass.name} isn't on the phone yet: use `phone` from onShown or later, not in the constructor",
+        )
+
+    /** The screen became the one the player sees. Also the place to start what needs [phone] (it isn't set yet in the constructor). */
+    open fun onShown() {}
+
+    /** The screen is no longer seen, but stays alive with its state: another screen is above it, or the phone was put away. */
+    open fun onHidden() {}
+
+    /** The screen left the phone for good. Stop what it started (listeners, requests); it won't be shown again. */
+    open fun onClosed() {}
+
+    /** Called 20 times a second while the screen is shown. */
+    open fun tick() {}
+
+    /**
+     * Draws the screen, every frame while it is shown.
+     *
+     * The phone may also call it briefly while the screen is not the one shown, to draw it under or beside another
+     * one during a slide (150 ms), including just after [onClosed] when it is popped: draw from your state as it is,
+     * and don't free in [onClosed] what drawing needs. Conversely, the phone may skip it while the screen is shown,
+     * when it can't draw apps (at GUI scale 1 it shows a message instead).
+     *
+     * @param mouseX where the pointer is, in viewport dp; it can lie outside the viewport.
+     * @param mouseY see [mouseX].
+     * @param partialTick how far the game is between the last tick and the next one (0 to 1), to make animations
+     * that advance in [tick] smooth.
+     */
+    abstract fun render(canvas: AppCanvas, mouseX: Float, mouseY: Float, partialTick: Float)
+
+    /**
+     * A mouse button was pressed over the viewport.
+     *
+     * @param button 0 for the left button, 1 for the right one, 2 for the middle one.
+     * @return true if the screen used the click.
+     */
+    open fun mousePressed(x: Float, y: Float, button: Int): Boolean = false
+
+    /**
+     * A mouse button was released. The pointer may have left the viewport since the press.
+     *
+     * @return true if the screen used it.
+     */
+    open fun mouseReleased(x: Float, y: Float, button: Int): Boolean = false
+
+    /**
+     * The mouse moved with a button held down, after a press on the viewport. The pointer may be outside the viewport.
+     *
+     * @param dragX how far the pointer moved since the last call, in dp.
+     * @param dragY see [dragX].
+     * @return true if the screen used it.
+     */
+    open fun mouseDragged(x: Float, y: Float, button: Int, dragX: Float, dragY: Float): Boolean = false
+
+    /**
+     * The mouse wheel turned over the viewport.
+     *
+     * @param scrollY notches turned, positive away from the player (towards the top of a list). Lists on the phone
+     * scroll by 36 dp per notch.
+     * @param scrollX the same for horizontal scrolling, rare.
+     * @return true if the screen used it.
+     */
+    open fun mouseScrolled(x: Float, y: Float, scrollX: Float, scrollY: Float): Boolean = false
+
+    /**
+     * A key was pressed (or repeats while held). Codes are GLFW's, as everywhere in Minecraft (`GLFW.GLFW_KEY_ENTER`);
+     * `Screen.hasControlDown()` and its siblings read the modifiers.
+     *
+     * The phone's own keys reach the screen first: Esc, Backspace and the key that opens the phone. Return true to
+     * keep them, otherwise the phone does what they normally do (Esc and the phone key put the phone away, Backspace
+     * goes back one screen). So a screen with a menu open closes it on Esc and returns true, and a screen with a text
+     * field that has focus returns true for the keys it types with.
+     *
+     * @return true if the screen used the key.
+     */
+    open fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
+
+    /**
+     * A character was typed, for text input. Comes in addition to [keyPressed], for the keys that produce text.
+     *
+     * @return true if the screen used it.
+     */
+    open fun charTyped(codePoint: Char, modifiers: Int): Boolean = false
+}
