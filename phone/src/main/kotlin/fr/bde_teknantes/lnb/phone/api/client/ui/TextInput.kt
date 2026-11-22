@@ -273,12 +273,12 @@ sealed class TextInput(val state: TextState) : Widget() {
  * A single-line text field (art direction 8.7): 40 dp tall, 232 wide by default, the [placeholder] in grey until
  * something is typed. Enter calls [onSubmit]. With [error] set, a red border and the message under the field.
  *
- * Without a state of its own, it creates a single-line one; pass a [TextState] of yours (`TextState("", false)`)
+ * Without a state of its own, it creates a single-line one; pass a [TextState] of yours ([TextState.singleLine])
  * to keep what is typed.
  */
 class TextField(state: TextState) : TextInput(state) {
     /** A field with a text of its own. */
-    constructor() : this(TextState("", false))
+    constructor() : this(TextState.singleLine())
 
     private var scrollX = 0f
 
@@ -344,7 +344,7 @@ class TextField(state: TextState) : TextInput(state) {
  */
 class TextArea(state: TextState) : TextInput(state) {
     /** A text area with a text of its own. */
-    constructor() : this(TextState())
+    constructor() : this(TextState.multiline())
 
     private var scrollY = 0f
 

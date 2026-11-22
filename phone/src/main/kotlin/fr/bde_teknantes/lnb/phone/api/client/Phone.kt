@@ -1,12 +1,14 @@
 package fr.bde_teknantes.lnb.phone.api.client
 
+import fr.bde_teknantes.lnb.phone.api.client.ui.Header
+
 /**
  * The phone, as seen by one of your screens: how a screen moves to another one. Reach it with [AppScreen.phone].
  *
  * An app is a stack of screens. Its first screen (the root) comes from [PhoneApp]'s factory; [push] opens another one
- * on top, [pop] goes back to the one underneath. The phone draws the back transition and offers the usual ways back
- * (Backspace when no text field has focus); drawing a back button in your header is up to you (when [canGoBack] is
- * true, which is on every screen but the root), and it should call [pop].
+ * on top, [pop] goes back to the one underneath. The phone draws the back transition and offers the usual ways back:
+ * Backspace when no text field has focus, and the back arrow a kit [Header] shows by itself on every screen but the
+ * root. A screen drawn without the kit draws its own arrow when [canGoBack] is true, and calls [pop].
  *
  * The handle belongs to the screen it was given to. Once that screen is closed (the player went back past it, went
  * home, disconnected, or the app failed), every call on it does nothing. So a late answer from the server that calls
@@ -14,13 +16,16 @@ package fr.bde_teknantes.lnb.phone.api.client
  *
  * Call it from the client thread only (the one that runs screens and ticks): from anywhere else, it throws. To act on
  * an answer that arrives on another thread, hop over first with `Minecraft.getInstance().execute { ... }`.
+ *
+ * Only the phone makes these: later versions add to it without breaking your code. To test navigation, play your app
+ * with the phone's test support (`fr.bde_teknantes.lnb.phone.testing.PhoneTester`), whose phone is the real one.
  */
-interface Phone {
+abstract class Phone internal constructor() {
     /**
-     * Whether [pop] would lead somewhere: there is a screen under this one. Draw a back arrow in your header when it
-     * is true; it is false on the app's root screen, and once this screen is closed.
+     * Whether [pop] would lead somewhere: there is a screen under this one. A [Header] shows its back arrow then, and a
+     * screen drawn without the kit draws one. False on the app's root screen, and once this screen is closed.
      */
-    val canGoBack: Boolean
+    abstract val canGoBack: Boolean
 
     /**
      * Opens [screen] on top of this app's stack, sliding in from the right. The current screen stays underneath with
@@ -29,13 +34,13 @@ interface Phone {
      * [screen] must be a new instance: a screen that is already on the phone, or was closed, can't be pushed again
      * (it throws [IllegalArgumentException]).
      */
-    fun push(screen: AppScreen)
+    abstract fun push(screen: AppScreen)
 
     /**
      * Closes this screen and goes back to the one underneath, sliding out to the right. Screens pushed above this one
      * close with it. Does nothing on the app's root screen: to leave the app, use [home].
      */
-    fun pop()
+    abstract fun pop()
 
     /**
      * Swaps this screen for [screen], which slides in from the right and takes its place in the stack: back from
@@ -45,14 +50,14 @@ interface Phone {
      *
      * This screen is closed, so its handle does nothing afterwards. [screen] must be a new instance, as for [push].
      */
-    fun replace(screen: AppScreen)
+    abstract fun replace(screen: AppScreen)
 
     /** Leaves the app for the home screen, instantly. Every screen of the app is closed. */
-    fun home()
+    abstract fun home()
 
     /**
      * Puts the phone away. The app keeps its screens: the next time the player opens the phone (until they
      * disconnect), it reopens on the app's top screen, with its state.
      */
-    fun close()
+    abstract fun close()
 }

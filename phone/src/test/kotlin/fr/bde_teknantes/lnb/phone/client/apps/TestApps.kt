@@ -21,7 +21,7 @@ internal fun testApp(
     appId(path),
     Component.literal(path),
     AppIcon.Glyph(TileColor.AZURE, appId("textures/gui/$path.png")),
-    targets?.let { create -> AppTargetScreens { create(it) } },
+    AppTargetScreens { target -> targets?.invoke(target).orEmpty() },
 ) { root() }
 
 internal object TestCanvas : FakeCanvas()

@@ -5,7 +5,6 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 import fr.bde_teknantes.lnb.phone.api.client.Shadow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Colors
 import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
-import fr.bde_teknantes.lnb.phone.api.client.ui.TextMeasurer
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextMetrics
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
@@ -16,7 +15,13 @@ import kotlin.math.PI
  * The public [AppCanvas] over the phone's [SmoothCanvas]: adds the offset and opacity stacks, the icon and shadow
  * textures, and keeps apps away from the canvas's own settings. Valid between [AppViewport]'s begin and end.
  */
-internal class SmoothAppCanvas(private val smooth: SmoothCanvas) : AppCanvas, TextMeasurer by TextMetrics {
+internal class SmoothAppCanvas(private val smooth: SmoothCanvas) : AppCanvas() {
+    // Text measures as TextMetrics measures it, so a layout computed outside drawing holds when drawn.
+    override fun measure(text: String, style: TextStyle) = TextMetrics.measure(text, style)
+    override fun truncate(text: String, style: TextStyle, maxWidth: Float) = TextMetrics.truncate(text, style, maxWidth)
+    override fun wrap(text: String, style: TextStyle, maxWidth: Float) = TextMetrics.wrap(text, style, maxWidth)
+    override fun wrap(text: String, style: TextStyle, maxWidth: Float, maxLines: Int) = TextMetrics.wrap(text, style, maxWidth, maxLines)
+
     private var ox = 0f
     private var oy = 0f
     private var alpha = 1f

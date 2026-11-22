@@ -12,7 +12,7 @@ import net.minecraft.resources.ResourceLocation
  * A canvas that draws nothing and remembers, in viewport dp, the text and the filled shapes of a frame. It measures
  * with [TextMetrics], whose fonts the tester replaces with [MonospaceFont].
  */
-internal class TestCanvas : AppCanvas {
+internal class TestCanvas : AppCanvas() {
     val texts = ArrayList<DrawnText>()
     val shapes = ArrayList<DrawnShape>()
     private val offsets = ArrayDeque<Pair<Float, Float>>()

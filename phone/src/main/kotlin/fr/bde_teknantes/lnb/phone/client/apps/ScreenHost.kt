@@ -8,7 +8,7 @@ internal class ScreenHost(
     private val navigator: PhoneNavigator,
     val session: AppSession,
     val screen: AppScreen,
-) : Phone {
+) : Phone() {
     var closed = false
 
     override val canGoBack: Boolean get() = !closed && session.screens.indexOf(screen) > 0

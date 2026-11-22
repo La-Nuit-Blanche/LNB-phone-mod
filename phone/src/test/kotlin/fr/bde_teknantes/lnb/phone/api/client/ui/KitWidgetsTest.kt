@@ -133,4 +133,27 @@ class KitWidgetsTest {
         screen.frame()
         assertEquals(13 * 6.5f + 32f, b.width)
     }
+
+    @Test
+    fun `a dialog's buttons say Cancel and OK in the player's language until told otherwise`() {
+        val dialog = Dialog("Supprimer ce post ?")
+        // No language is loaded in tests: the labels are the phone's keys, present in both language files.
+        assertEquals("gui.lnbphone.dialog.cancel", dialog.cancelLabel)
+        assertEquals("gui.lnbphone.dialog.confirm", dialog.confirmLabel)
+        dialog.confirmLabel = "Supprimer"
+        screen.showDialog(dialog)
+        screen.frame()
+        assertTrue(screen.canvas.drew("Supprimer"))
+    }
+
+    @Test
+    fun `text states are made by kind`() {
+        val line = TextState.singleLine(maxLength = 4)
+        line.insert("ab\ncdef")
+        assertEquals("ab c", line.text)
+        val area = TextState.multiline()
+        area.insert("ab\ncd")
+        assertEquals("ab\ncd", area.text)
+        assertEquals(TextState.DEFAULT_MAX_LENGTH, TextState.singleLine().maxLength)
+    }
 }

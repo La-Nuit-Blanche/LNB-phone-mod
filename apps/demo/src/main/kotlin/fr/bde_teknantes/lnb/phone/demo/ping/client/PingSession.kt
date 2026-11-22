@@ -31,7 +31,7 @@ object PingSession {
         private set
 
     /** The unsent text for [player]: the field shows it again when the player comes back. */
-    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState("", multiline = false, maxLength = Ping.MAX_LENGTH) }
+    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState.singleLine(maxLength = Ping.MAX_LENGTH) }
 
     /** The pings exchanged with [player] since the player connected, oldest first. */
     fun conversation(player: UUID): List<Message> = conversations[player].orEmpty()

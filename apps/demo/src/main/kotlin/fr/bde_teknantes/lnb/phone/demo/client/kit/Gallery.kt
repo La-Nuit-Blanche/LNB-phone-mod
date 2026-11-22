@@ -163,7 +163,7 @@ object Gallery {
             val y = 52f + i * 92f
             page.caption(name, y)
             val filled = name.startsWith("Filled") || name.startsWith("Error") || name.startsWith("Disabled")
-            val field = TextField(TextState(if (filled) "Mika Laurent" else "", false)).apply {
+            val field = TextField(TextState.singleLine().apply { text = if (filled) "Mika Laurent" else "" }).apply {
                 placeholder = tr("reply.placeholder", "Alexandre Morel")
             }
             when {
@@ -181,7 +181,7 @@ object Gallery {
     fun textFields2() = Page("Text fields 2") { fieldStates(this, listOf("Filled", "Error: helper 4 dp under", "Disabled")) }
 
     fun textAreas() = Page("Text areas") {
-        fun area(text: String) = TextArea(TextState(text)).apply { limit = 280 }
+        fun area(text: String) = TextArea(TextState.multiline().also { it.text = text }).apply { limit = 280 }
         caption("Empty, focused: placeholder, caret, 0/280", 50f)
         add(area("").apply {
             placeholder = tr("compose.placeholder")

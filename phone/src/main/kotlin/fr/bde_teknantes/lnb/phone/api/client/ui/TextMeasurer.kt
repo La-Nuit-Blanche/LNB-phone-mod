@@ -12,34 +12,34 @@ import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
  * The [AppCanvas][fr.bde_teknantes.lnb.phone.api.client.AppCanvas] you draw on is one; outside drawing (to lay out a
  * list when data arrives, to hit-test a click) use [TextMetrics]. Code that lays text out can take a [TextMeasurer].
  *
- * Don't implement it in an app, not even for tests: later versions of the phone may add methods to it, which would
- * break your class. Lay text out through [TextMetrics] in the game, and keep what you test free of measuring.
+ * Don't implement it: only the phone can, so later versions may add methods to it. Lay text out through [TextMetrics]
+ * in the game; in tests, `fr.bde_teknantes.lnb.phone.testing.TestTextMeasurer` measures as the phone's test support does.
  */
-interface TextMeasurer {
+abstract class TextMeasurer internal constructor() {
     /** Width of [text] on one line in [style], in dp. */
-    fun measure(text: String, style: TextStyle): Float
+    abstract fun measure(text: String, style: TextStyle): Float
 
     /** [text] if it fits in [maxWidth] dp, otherwise its longest start that fits, followed by an ellipsis (…). */
-    fun truncate(text: String, style: TextStyle, maxWidth: Float): String
+    abstract fun truncate(text: String, style: TextStyle, maxWidth: Float): String
 
     /**
      * [text] broken into lines no wider than [maxWidth] dp: at spaces and line feeds, and inside a word only when the
      * word alone is wider than a line. French spaces before `!?:;` never break. An empty text is one empty line.
      */
-    fun wrap(text: String, style: TextStyle, maxWidth: Float): List<String>
+    abstract fun wrap(text: String, style: TextStyle, maxWidth: Float): List<String>
 
     /**
      * [wrap], but at most [maxLines] lines: when text is left out, the last line shown ends with an ellipsis. For
      * titles and texts that have a fixed number of lines (a dialog's title: 2).
      */
-    fun wrap(text: String, style: TextStyle, maxWidth: Float, maxLines: Int): List<String>
+    abstract fun wrap(text: String, style: TextStyle, maxWidth: Float, maxLines: Int): List<String>
 }
 
 /**
  * Measures text with the phone's fonts. Use it on the client thread, once the game has loaded its resources (any time
  * your screens run). Results are cached, so measuring the same text every frame costs next to nothing.
  */
-object TextMetrics : TextMeasurer {
+object TextMetrics : TextMeasurer() {
     private const val CACHE_SIZE = 2048
 
     // The font is part of the key: a resource reload brings new fonts, and the old entries simply age out.

@@ -57,7 +57,7 @@ class KitReviewTest {
         assertTrue(screen.key(GLFW_KEY_BACKSPACE))
         assertEquals(2, screen.backs, "under a menu, Backspace is kept and goes nowhere")
         screen.closeMenu()
-        screen.showDialog(Dialog("T", "Annuler", "OK").apply { onConfirm = {} })
+        screen.showDialog(Dialog("T").apply { onConfirm = {} })
         screen.frame()
         assertTrue(screen.key(GLFW_KEY_BACKSPACE))
         assertEquals(2, screen.backs)

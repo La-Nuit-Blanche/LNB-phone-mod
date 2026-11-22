@@ -88,8 +88,8 @@ so an answer that arrives after the player left can't drag them back into your a
 
 - Extend `AppScreen`, `KitScreen`, `Widget` and `Clickable`, and override what their KDoc calls hooks.
 - Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s last two arguments).
-- **Don't implement `Phone`, `AppCanvas` or `TextMeasurer` in your mod.** The phone gives you instances; later
-  versions will add methods to them, which would break a class of yours.
+- `Phone`, `AppCanvas` and `TextMeasurer` are the phone's: it gives you instances, only it can make them, and later
+  versions add methods to them. To test, use the phone's test support (step 9).
 - Widgets take in their constructor only what they can't exist without; everything else is a property you set with
   `apply { ... }`. New settings arrive as new properties, so your code keeps compiling against a newer phone.
 - Some enums are complete for good (`Interaction`, `Label.Align`, `Avatar.Size`: a `when` may list every value);
@@ -390,12 +390,12 @@ object PingSession {
         private set
 
     /** The unsent text for [player]: the field shows it again when the player comes back. */
-    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState("", multiline = false, maxLength = Ping.MAX_LENGTH) }
+    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState.singleLine(maxLength = Ping.MAX_LENGTH) }
 ```
 
-`TextState("", multiline = false, maxLength = Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what
-goes past is cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its
-`limit`) takes a `TextState` the same way.
+`TextState.singleLine(maxLength = Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what goes past is
+cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its `limit`) takes a
+`TextState.multiline()` the same way.
 
 Everything that keeps coming is bounded. A conversation keeps its newest 50 messages, so a talkative player (or a
 modified client) can't make the screen grow without end:
@@ -699,7 +699,7 @@ class ForgetfulNoteScreen : KitScreen() {
 
 // Right: the text lives in an object of the app, which outlives the screens; each new screen hands it to its field.
 object NoteState {
-    val draft = TextState("", false)
+    val draft = TextState.singleLine()
 }
 
 class NoteScreen : KitScreen() {
@@ -799,17 +799,11 @@ class CarelessDeleteScreen(private val post: Long) : KitScreen() {
 }
 ```
 
-**Implementing what the phone implements.** `Phone`, `AppCanvas` and `TextMeasurer` are given to you; a later phone
-adds methods to them, and a class of yours that implements them stops loading. A `when` over an enum that may grow
-needs an `else`:
+**Listing every value of an enum that grows.** A later phone may add values to `TextStyle`, `Button.Kind` or
+`Shadow` (each enum's KDoc says whether it grows); a `when` that lists them all without an `else` then breaks:
 
 <!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
 ```kotlin
-// Wrong: only the phone implements Phone (and AppCanvas). A later phone adds a method to it and this class breaks.
-class FakePhone : Phone {
-    // ...
-}
-
 // Right: TextStyle may get new values in a later phone, so a `when` over it keeps an `else`.
 fun isHeading(style: TextStyle) = when (style) {
     TextStyle.TITLE_L, TextStyle.TITLE_M -> true
