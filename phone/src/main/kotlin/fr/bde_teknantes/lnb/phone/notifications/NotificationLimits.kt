@@ -9,8 +9,8 @@ import net.minecraft.network.chat.contents.TranslatableContents
 import net.minecraft.resources.ResourceLocation
 
 /**
- * The sizes a notification may have, enforced where it is created (the server API), so that what is stored, saved and
- * sent stays small whatever an app passes on from its players.
+ * The sizes a notification may have, enforced where it is created (the server API) and again when the saved file is
+ * read, so that what is stored, saved and sent stays small whatever an app passes on from its players.
  *
  * Titles and texts are components, so that fixed wording is translated on each player's client. They are cut, never
  * refused: an app that forwards the start of a long post gets the start of the post. A banner shows about 23
@@ -26,11 +26,21 @@ object NotificationLimits {
     /** Longest app id, in characters (namespace, colon and path). */
     const val MAX_APP_ID_LENGTH = 128
 
-    /** Components nested or appended in one title or text; the rest is dropped. */
+    /**
+     * Parts of one title or text: each component (nested, appended or passed as a translation argument) and each other
+     * translation argument (a string, a number) is one. What comes after is dropped, or emptied where a translation
+     * needs the argument's place.
+     */
     const val MAX_PARTS = 32
+
+    /** Arguments one translation keeps; later ones are dropped (a translation never needs that many). */
+    const val MAX_ARGUMENTS = 16
 
     /** Longest translation key or keybind name kept; a longer one is dropped. */
     const val MAX_KEY_LENGTH = 256
+
+    /** Characters of translation keys and keybind names in one title or text, all together; past it they are dropped. */
+    const val MAX_KEY_CHARS = 512
 
     /**
      * Checks [appId] and [target], whose meaning would change if they were cut: throws [IllegalArgumentException] when
@@ -53,20 +63,23 @@ object NotificationLimits {
 
     /**
      * A copy of [component] with at most [maxChars] characters of plain text (literal parts, string arguments and
-     * fallbacks, in reading order; whatever comes after the budget is spent is cut), at most [MAX_PARTS] parts, and
-     * only content a client can show by itself: plain text, translations and keybinds. Click and hover events are
-     * dropped (a banner is clicked as a whole and never hovered for a tooltip); so are scores, selectors and NBT
-     * lookups, which only commands resolve.
+     * fallbacks, in reading order; whatever comes after the budget is spent is cut), at most [MAX_PARTS] parts and
+     * [MAX_ARGUMENTS] arguments per translation, at most [MAX_KEY_CHARS] characters of keys, and only content a client
+     * can show by itself: plain text, translations and keybinds. Scores, selectors and NBT lookups, which only commands
+     * resolve, become empty. No style is kept (colour, bold, font, click, hover...): the banner draws plain text, and a
+     * later renderer must not honour a font or an obfuscation chosen by whoever wrote the text.
+     *
+     * The result's size is bounded whatever [component] is, so a notification always fits in the login sync.
      */
     fun clamp(component: Component, maxChars: Int): Component = Budget(maxChars).copy(component)
 
     private class Budget(var chars: Int) {
         var parts = MAX_PARTS
+        var keyChars = MAX_KEY_CHARS
 
         fun copy(component: Component): MutableComponent {
             parts--
             val copy = contents(component)
-            copy.setStyle(component.style.withClickEvent(null).withHoverEvent(null).withInsertion(null))
             for (sibling in component.siblings) {
                 if (parts <= 0) break
                 copy.append(copy(sibling))
@@ -77,10 +90,10 @@ object NotificationLimits {
         private fun contents(component: Component): MutableComponent = when (val contents = component.contents) {
             is PlainTextContents -> Component.literal(take(contents.text()))
             is TranslatableContents ->
-                if (contents.key.length > MAX_KEY_LENGTH) {
+                if (!takeKey(contents.key)) {
                     Component.empty()
                 } else {
-                    val args = contents.args.map(::argument).toTypedArray()
+                    val args = contents.args.take(MAX_ARGUMENTS).map(::argument).toTypedArray()
                     val fallback = contents.fallback?.let(::take)
                     if (fallback != null) {
                         Component.translatableWithFallback(contents.key, fallback, *args)
@@ -88,15 +101,23 @@ object NotificationLimits {
                         Component.translatable(contents.key, *args)
                     }
                 }
-            is KeybindContents -> if (contents.name.length > MAX_KEY_LENGTH) Component.empty() else Component.keybind(contents.name)
+            is KeybindContents -> if (takeKey(contents.name)) Component.keybind(contents.name) else Component.empty()
             else -> Component.empty()
         }
 
+        // Past the part budget an argument keeps its place, empty, so the translation's %2$s still finds an argument.
         // A boolean is turned into its text: saved or sent, Minecraft writes it as a byte and reads it back as 1 or 0.
-        private fun argument(arg: Any?): Any = when (arg) {
-            is Component -> if (parts > 0) copy(arg) else Component.empty()
-            is Number -> arg
-            else -> take(arg.toString())
+        private fun argument(arg: Any?): Any = when {
+            parts <= 0 -> ""
+            arg is Component -> copy(arg)
+            arg is Number -> arg.also { parts-- }
+            else -> take(arg.toString()).also { parts-- }
+        }
+
+        private fun takeKey(key: String): Boolean {
+            if (key.length > MAX_KEY_LENGTH || key.length > keyChars) return false
+            keyChars -= key.length
+            return true
         }
 
         /** The start of [text] that the budget still allows, never splitting a surrogate pair. */

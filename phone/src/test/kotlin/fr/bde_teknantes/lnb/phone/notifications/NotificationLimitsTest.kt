@@ -208,13 +208,55 @@ class NotificationLimitsTest {
     }
 
     @Test
-    fun `component arguments count as parts, and their places are kept past the cap`() {
+    fun `a translation keeps its first 16 arguments`() {
         val args = Array<Any>(40) { Component.literal("$it") }
         val clamped = NotificationLimits.text(Component.translatable("k", *args))
         val kept = (clamped.contents as TranslatableContents).args
-        assertEquals(40, kept.size)
-        assertEquals((0 until NotificationLimits.MAX_PARTS - 1).map { "$it" }, kept.take(NotificationLimits.MAX_PARTS - 1).map { budgetText(it as Component) })
-        assertTrue(kept.drop(NotificationLimits.MAX_PARTS - 1).all { budgetText(it as Component).isEmpty() })
+        assertEquals(NotificationLimits.MAX_ARGUMENTS, kept.size)
+        assertEquals((0 until NotificationLimits.MAX_ARGUMENTS).map { "$it" }, kept.map { budgetText(it as Component) })
+    }
+
+    @Test
+    fun `every argument is a part, and past the cap arguments keep their places, empty`() {
+        // 31 siblings spend the parts after the root; a translation then gets its place but empty arguments.
+        val component = Component.literal("root")
+        repeat(NotificationLimits.MAX_PARTS - 2) { component.append(Component.literal("$it")) }
+        component.append(Component.translatable("k", "s", 3, Component.literal("c")))
+        val clamped = NotificationLimits.text(component)
+        val translation = clamped.siblings.last().contents as TranslatableContents
+        assertEquals(listOf<Any>("", "", ""), translation.args.toList())
+        // Strings and numbers spend parts too: a list of them can't grow a notification without bound.
+        val many = NotificationLimits.text(Component.translatable("k", *Array<Any>(NotificationLimits.MAX_ARGUMENTS) { "a$it" }))
+        val strings = Component.literal("r")
+        repeat(3) { strings.append(Component.translatable("k", *Array<Any>(NotificationLimits.MAX_ARGUMENTS) { "a$it" })) }
+        val spent = NotificationLimits.text(strings)
+        assertEquals(NotificationLimits.MAX_ARGUMENTS, (many.contents as TranslatableContents).args.count { it != "" })
+        val nonEmpty = spent.siblings.sumOf { (it.contents as TranslatableContents).args.count { a -> a != "" } }
+        assertEquals(NotificationLimits.MAX_PARTS - 1 - 2, nonEmpty) // the root and two of the translations are parts
+    }
+
+    @Test
+    fun `translation keys share one budget`() {
+        val key = "k".repeat(NotificationLimits.MAX_KEY_LENGTH)
+        val component = Component.translatable(key).append(Component.translatable(key)).append(Component.translatable(key))
+        val clamped = NotificationLimits.text(component)
+        assertInstanceOf(TranslatableContents::class.java, clamped.contents)
+        assertInstanceOf(TranslatableContents::class.java, clamped.siblings[0].contents)
+        // 512 key characters in all: the third key is over.
+        assertInstanceOf(PlainTextContents::class.java, clamped.siblings[1].contents)
+    }
+
+    @Test
+    fun `the largest possible result stays small on the wire`() {
+        val key = "k".repeat(NotificationLimits.MAX_KEY_LENGTH)
+        val x = "x".repeat(1000)
+        val y = Component.literal(x)
+        val huge = Component.translatable(key, *Array<Any>(1000) { x })
+        val sibling = Component.translatable(key, *Array<Any>(1000) { y })
+        repeat(1000) { huge.append(sibling) }
+        val buf = RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY)
+        ComponentSerialization.STREAM_CODEC.encode(buf, NotificationLimits.text(huge))
+        assertTrue(buf.readableBytes() < 4096, "${buf.readableBytes()} bytes")
     }
 
     @Test
@@ -229,22 +271,21 @@ class NotificationLimitsTest {
     // ---- What is stripped ----
 
     @Test
-    fun `click, hover and insertion are dropped, colours and bold stay`() {
+    fun `no style is kept, not even colours, bold, obfuscation or font`() {
         val style = Style.EMPTY
             .withColor(TextColor.fromRgb(0x3A8DF0))
             .withBold(true)
+            .withObfuscated(true)
+            .withFont(ResourceLocation.withDefaultNamespace("alt"))
             .withClickEvent(ClickEvent(ClickEvent.Action.RUN_COMMAND, "/op @s"))
             .withHoverEvent(HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal("hover")))
             .withInsertion("insert")
+        val arg = Component.literal("c").withStyle(style)
         val component = Component.literal("a").withStyle(style).append(Component.literal("b").withStyle(style))
+            .append(Component.translatable("k", arg).withStyle(style))
         val clamped = NotificationLimits.title(component)
-        for (part in listOf(clamped, clamped.siblings[0])) {
-            assertNull(part.style.clickEvent)
-            assertNull(part.style.hoverEvent)
-            assertNull(part.style.insertion)
-            assertEquals(TextColor.fromRgb(0x3A8DF0), part.style.color)
-            assertTrue(part.style.isBold)
-        }
+        val translatedArg = (clamped.siblings[1].contents as TranslatableContents).args[0] as Component
+        for (part in listOf(clamped, clamped.siblings[0], clamped.siblings[1], translatedArg)) assertEquals(Style.EMPTY, part.style)
     }
 
     @Test
