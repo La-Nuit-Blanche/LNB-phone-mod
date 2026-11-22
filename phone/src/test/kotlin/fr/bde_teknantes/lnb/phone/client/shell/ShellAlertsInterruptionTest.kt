@@ -422,4 +422,50 @@ internal class ShellAlertsInterruptionTest : AlertsTestBase() {
         assertEquals(DevicePose(254, 248, 0f), peekAt())
     }
 
+    // The GUI scale falls to 1 when a window is made small under the automatic scale, which can happen with the phone
+    // open or during a peek. Nothing smooth can be drawn there (decision 1), so what was showing goes.
+
+    @Test
+    fun `a banner whose GUI scale falls to 1 can't be seen, so it no longer takes clicks, and it goes`() {
+        registerAll()
+        openFully()
+        notify()
+        tick(BANNER_IN_TICKS)
+        host.guiScale = 1.0
+        // Feed's icon, under where the banner was.
+        clickIcon(0)
+        assertEquals("feed", host.navigator.currentScreen.toString())
+        tick()
+        assertNull(alerts.banner)
+        host.guiScale = 2.0
+        tick()
+        assertNull(alerts.banner)
+    }
+
+    @Test
+    fun `a peek whose GUI scale falls to 1 goes, and the phone key then opens the phone as usual`() {
+        registerAll()
+        notify(target = "thread:5")
+        tick(10)
+        host.guiScale = 1.0
+        assertNull(peekAt())
+        pressPhoneKeyInGame()
+        assertTrue(host.navigator.isHome)
+        assertEquals(DevicePose(334, 270, 0f), pose)
+        tick()
+        assertNull(alerts.peek)
+    }
+
+    @Test
+    fun `a peek waiting for the device to be away doesn't rise if the GUI scale fell to 1 meanwhile`() {
+        registerAll()
+        openFully()
+        host.pressKey(ESC)
+        notify()
+        host.guiScale = 1.0
+        closeFully()
+        tick()
+        assertNull(alerts.peek)
+        assertNull(peekAt())
+    }
 }

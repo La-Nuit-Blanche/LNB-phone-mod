@@ -17,7 +17,7 @@ import org.lwjgl.glfw.GLFW
  *
  * Rules the art direction leaves open, settled here:
  * - At GUI scale 1 there is no smooth layer to draw a banner on: no banner and no peek; the chime plays and the badge
- *   waits, as with the preview off.
+ *   waits, as with the preview off. A banner or a peek showing when the scale falls to 1 goes at once.
  * - The peek rises only over the game itself. With another screen open (chat, a container, the pause menu, the death
  *   screen) there is none: the chime plays and the badge waits. A screen that opens during a peek sends it back down.
  * - While the device slides down, a peek waits for it to be away, then rises.
@@ -106,6 +106,8 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
 
     /** Every client tick, after the shell's own animations. */
     fun tick() {
+        // The GUI scale fell to 1 (a window made small under the automatic scale): nothing smooth can be drawn there.
+        if (!shell.appsSupported()) return forgetShown()
         val now = nowMs()
         // Held by the screenshot harness: nothing ends.
         val held = shell.heldProgress != null
@@ -141,6 +143,8 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     /** Where the peeking device is at [now], or null while no peek shows. */
     fun peekPose(now: Float = shell.now()): DevicePose? {
         val shown = peek ?: return null
+        // Until the next tick drops it, a peek whose GUI scale fell to 1 is not there.
+        if (!shell.appsSupported()) return null
         val progress = shell.heldProgress ?: shown.timeline.progress(now * BannerMotion.TICK_MS)
         if (progress <= 0f) return null
         val at = PhoneLayout.peekPosition(host.guiWidth, host.guiHeight, progress)
@@ -183,7 +187,8 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
 
     /** Whether the app-local point ([x], [y]) dp is on the banner as it is drawn at [now], clipped to the viewport. */
     fun bannerContains(x: Float, y: Float, now: Float): Boolean {
-        if (banner == null) return false
+        // Not drawn at GUI scale 1, so not there to click or to hide the screen under it from the pointer.
+        if (banner == null || !shell.appsSupported()) return false
         val progress = bannerProgress(now)
         if (progress <= 0f || y < 0f) return false
         return BannerLayout.contains(x - BannerLayout.IN_PHONE_X, y - BannerLayout.inPhoneY(progress))
@@ -218,11 +223,15 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
 
     /** Disconnection: everything forgotten. */
     fun reset() {
+        forgetShown()
+        lastChime = Long.MIN_VALUE
+    }
+
+    private fun forgetShown() {
         banner = null
         peek = null
         pendingPeek = null
         bannerPressed = false
-        lastChime = Long.MIN_VALUE
     }
 
     private fun nowMs(): Double = shell.now() * BannerMotion.TICK_MS
