@@ -14,3 +14,4 @@ plugins {
 rootProject.name = "lnb-phone"
 
 include(":phone")
+include(":apps:demo")
