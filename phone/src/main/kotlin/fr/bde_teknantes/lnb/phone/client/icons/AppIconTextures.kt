@@ -33,14 +33,26 @@ object AppIconTextures : ResourceManagerReloadListener {
     private const val ITEM_AT = 2
 
     /** The composed texture of [icon], 20 x 20 texels. */
-    fun texture(icon: AppIcon): ResourceLocation {
-        val key: Any = when (icon) {
-            is AppIcon.Glyph -> icon.tile to icon.texture
-            is AppIcon.Item -> icon.tile
-        }
-        return textures.getOrPut(key) {
-            val glyph = (icon as? AppIcon.Glyph)?.let { glyphPixels(it.texture) }
-            upload(IconComposer.compose(icon.tile, glyph))
+    fun texture(icon: AppIcon): ResourceLocation = textures.getOrPut(cacheKey(icon)) { upload(pixels(icon, ::glyphPixels)) }
+
+    /** What [icon]'s texture is kept under: its tile and glyph, so that new [AppIcon] instances share it; an item's, its tile. */
+    internal fun cacheKey(icon: AppIcon): Any = when (icon) {
+        is AppIcon.Glyph -> icon.tile to icon.texture
+        is AppIcon.Item -> icon.tile
+    }
+
+    /** [icon]'s 20 x 20 ARGB pixels, its glyph read with [readGlyph]; an item's is the bare tile, the item going over it. */
+    internal fun pixels(icon: AppIcon, readGlyph: (ResourceLocation) -> IntArray?): IntArray =
+        IconComposer.compose(icon.tile, (icon as? AppIcon.Glyph)?.let { readGlyph(it.texture) })
+
+    /**
+     * A glyph image's pixels as ARGB, row by row, from [abgr] (NativeImage's order) at each pixel; null when the image
+     * isn't 16 x 16.
+     */
+    internal fun glyphFromImage(width: Int, height: Int, abgr: (Int, Int) -> Int): IntArray? {
+        if (width != IconComposer.GLYPH_SIZE || height != IconComposer.GLYPH_SIZE) return null
+        return IntArray(IconComposer.GLYPH_SIZE * IconComposer.GLYPH_SIZE) { i ->
+            swapRedBlue(abgr(i % IconComposer.GLYPH_SIZE, i / IconComposer.GLYPH_SIZE))
         }
     }
 
@@ -56,13 +68,9 @@ object AppIconTextures : ResourceManagerReloadListener {
             return null
         }
         image.use {
-            if (it.width != IconComposer.GLYPH_SIZE || it.height != IconComposer.GLYPH_SIZE) {
-                warnOnce(location, "is ${it.width} x ${it.height} pixels instead of 16 x 16")
-                return null
-            }
-            return IntArray(IconComposer.GLYPH_SIZE * IconComposer.GLYPH_SIZE) { i ->
-                swapRedBlue(it.getPixelRGBA(i % IconComposer.GLYPH_SIZE, i / IconComposer.GLYPH_SIZE))
-            }
+            val pixels = glyphFromImage(it.width, it.height, it::getPixelRGBA)
+            if (pixels == null) warnOnce(location, "is ${it.width} x ${it.height} pixels instead of 16 x 16")
+            return pixels
         }
     }
 
