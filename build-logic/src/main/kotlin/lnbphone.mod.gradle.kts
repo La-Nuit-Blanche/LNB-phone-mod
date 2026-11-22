@@ -87,8 +87,20 @@ val ownMetadataKeys = Properties().apply {
     if (own.exists()) own.reader(Charsets.UTF_8).use(::load)
 }.stringPropertyNames()
 
+// The mod list translates the description with this key, so a mod that has it in en_us.json keeps its English
+// description there only, and the metadata reads it from there. Otherwise mod_description in gradle.properties.
+fun modDescription(): String {
+    val english = file("src/main/resources/assets/$modId/lang/en_us.json")
+    if (english.exists()) {
+        val strings = groovy.json.JsonSlurper().parse(english, "UTF-8") as Map<*, *>
+        strings["fml.menu.mods.info.description.$modId"]?.let { return it.toString() }
+    }
+    return prop("mod_description")
+}
+
 val generateModMetadata = tasks.register<ProcessResources>("generateModMetadata") {
-    val replaceProperties = (sharedMetadataKeys + ownMetadataKeys).associateWith(::prop)
+    val replaceProperties = (sharedMetadataKeys + ownMetadataKeys).associateWith(::prop) +
+        ("mod_description" to modDescription())
     inputs.properties(replaceProperties)
     expand(replaceProperties)
     from("src/main/templates")
