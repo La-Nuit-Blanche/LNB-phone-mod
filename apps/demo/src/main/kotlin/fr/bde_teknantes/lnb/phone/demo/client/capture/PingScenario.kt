@@ -4,29 +4,36 @@ import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.debug.CaptureHooks
-import fr.bde_teknantes.lnb.phone.demo.client.notifications.LiveBannerScreen
 import fr.bde_teknantes.lnb.phone.demo.ping.Ping
+import fr.bde_teknantes.lnb.phone.demo.ping.PingTarget
+import fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession
 import fr.bde_teknantes.lnb.phone.demo.ping.SendPingPayload
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.neoforge.network.PacketDistributor
 import org.lwjgl.glfw.GLFW
+import java.util.UUID
 
 /**
  * Task 10: Ping, the example app, in a world and inside the real phone, driven through the game's input: its icon on
- * the home screen, the list of players, a ping typed and sent to the player themselves, the notification the server
- * sends back (read from the client's store), the app opened at that notification's target with the draft and history
- * kept while its screens were built anew, then back to the list. At GUI scale 3, the screens again at 2 and 4, and in
- * French at 3.
+ * the home screen, the list of players, a ping typed and sent to the player themselves (the server's answer adds it to
+ * the conversation, and the ping received shows there too); then pings arriving with the phone closed (the peek, and
+ * Up landing on the conversation) and open on home (the banner, the badge, a click on the banner); then the refusals:
+ * a second ping within the cooldown, and a ping to a player who isn't online. At GUI scale 3, the screens again at 2
+ * and 4, and in French at 3.
  *
- * Opening a notification from its banner is task 7's; here the app is opened at the stored notification's target the
- * way the banner does it, through the navigator, which is internal to the phone and so reached by reflection.
+ * Pings that must arrive while the player is elsewhere are sent as the screen sends them, from a step of the script.
+ * The player who isn't online is reached through the navigator (internal to the phone, so by reflection), opening
+ * Ping at a target that names them, as one of their old notifications would.
  */
 internal object PingScenario {
     fun script() = CaptureScript().apply {
         enterWorld()
         language("en_us")
-        run { CaptureHooks.setCentred(false) }
+        run {
+            CaptureHooks.resetSettings()
+            CaptureHooks.setCentred(false)
+        }
         guiScale(3)
         flow()
         for (scale in listOf(2, 4)) screens("gui$scale") { guiScale(scale) }
@@ -53,7 +60,8 @@ internal object PingScenario {
         waitTicks(3)
         shot(name("02_players"))
 
-        // The player's own row: a ping to oneself is how Ping is tried alone.
+        // The player's own row: a ping to oneself is how Ping is tried alone. It lands on the screen it points to,
+        // so no banner, and it is read at once.
         mouseDown()
         mouseUp()
         waitTicks(8)
@@ -64,32 +72,81 @@ internal object PingScenario {
         key(GLFW.GLFW_KEY_ENTER)
         waitTicks(4)
         shot(name("05_sent"))
-        waitTicks(30)
-        run { LnbPhone.LOGGER.info("Capture ping: after sending, client store has {}", LiveBannerScreen.summary()) }
+        log("after a ping to oneself on the conversation")
 
-        // A draft left behind, and home. A second ping arrives there: sent as the screen sends it, but from home, so
-        // that the phone doesn't count it as read in place (the first one landed on the very screen it points to).
-        type("see you soon")
+        // Refused: a second ping within the cooldown. The error, and the text back in the field.
+        type("again")
+        key(GLFW.GLFW_KEY_ENTER)
+        waitTicks(4)
+        shot(name("06_refused_too_fast"))
+        log("after a ping within the cooldown")
+
+        // With the phone closed: the peek, then Up during it lands on the conversation.
+        closePhone()
+        waitTicks(30)
+        ping("Are you there?")
+        waitUntil { CaptureHooks.isPeeking }
+        waitTicks(8)
+        shot(name("07_peek"))
+        log("during the peek")
+        key(GLFW.GLFW_KEY_UP)
+        waitUntil { CaptureHooks.isOpen }
+        waitTicks(6)
+        shot(name("08_opened_from_peek"))
+        log("after opening the peek")
+
+        // With the phone open on home: the banner, then the badge it leaves, then a click on a banner.
+        click { device(70, 218) }
+        waitTicks(30)
+        ping("Still there?")
+        waitUntil { CaptureHooks.bannerShown }
+        waitTicks(6)
+        shot(name("09_banner_on_home"))
+        waitUntil { !CaptureHooks.bannerShown }
+        waitTicks(4)
+        mouseTo { icon(slotOf(Ping.APP_ID)) }
+        waitTicks(2)
+        shot(name("10_badge"))
+        log("after the banner went")
+        mouseTo { device(70, 140) }
+        waitTicks(30)
+        ping("Hello?")
+        waitUntil { CaptureHooks.bannerShown }
+        waitTicks(6)
+        click { device(6 + 64, 23 + 21) }
+        waitTicks(8)
+        shot(name("11_opened_from_banner"))
         click { device(70, 218) }
         waitTicks(4)
-        run { PacketDistributor.sendToServer(SendPingPayload(Minecraft.getInstance().player!!.uuid, "Are you there?")) }
-        waitTicks(20)
-        shot(name("06_home_after_ping"))
+        shot(name("12_home_badge_cleared"))
+        log("back home after the banner")
 
-        // That notification opened at its target: Ping lands on the sender's screen, built anew with the draft and
-        // the history kept in the session, over the list.
-        run {
-            val newest = LiveBannerScreen.read().first.lastOrNull { it.appId == Ping.APP_ID }
-            LnbPhone.LOGGER.info("Capture ping: opening the newest ping notification, {}", newest)
-            openApp(Ping.APP_ID, newest?.target ?: error("No ping notification reached the client"))
-        }
+        // Refused: a player who isn't online. The error names them; the text comes back to the field.
+        run { openApp(Ping.APP_ID, PingTarget(GHOST, "Ghost").toString()) }
         waitTicks(8)
-        shot(name("07_opened_at_target"))
-        run { LnbPhone.LOGGER.info("Capture ping: after opening Ping, client store has {}", LiveBannerScreen.summary()) }
+        type("Where are you")
+        key(GLFW.GLFW_KEY_ENTER)
+        waitTicks(4)
+        shot(name("13_refused_offline"))
+        run { LnbPhone.LOGGER.info("Capture ping: after a ping to Ghost, draft '{}'", PingSession.draft(GHOST).text) }
         click { app(22, 22) }
         waitTicks(8)
-        shot(name("08_back_to_players"))
+        shot(name("14_back_to_players"))
         closePhone()
+    }
+
+    /** Pings the player themselves as the conversation screen does, from wherever the script stands. */
+    private fun CaptureScript.ping(text: String) = run {
+        PacketDistributor.sendToServer(SendPingPayload(Minecraft.getInstance().player!!.uuid, text))
+    }
+
+    private fun CaptureScript.log(moment: String) = run {
+        val me = Minecraft.getInstance().player!!.uuid
+        LnbPhone.LOGGER.info(
+            "Capture ping: {}: unread {}, conversation {}, draft '{}', peek {}, banner {}",
+            moment, CaptureHooks.unreadCount(Ping.APP_ID), PingSession.conversation(me).map { (if (it.mine) "> " else "< ") + it.text },
+            PingSession.draft(me).text, CaptureHooks.isPeeking, CaptureHooks.bannerShown,
+        )
     }
 
     /** The list and the ping screen (with its draft and history) at the GUI scale or language [setUp] sets. */
@@ -165,4 +222,7 @@ internal object PingScenario {
         val opened = navigator.javaClass.getMethod("openApp", ResourceLocation::class.java, String::class.java).invoke(navigator, id, target)
         check(opened == true) { "The phone refused to open $id at $target" }
     }
+
+    /** A player who never joined. */
+    private val GHOST: UUID = UUID.fromString("00000000-0000-4000-8000-000000000000")
 }

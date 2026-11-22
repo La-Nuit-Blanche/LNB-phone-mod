@@ -18,6 +18,11 @@ class PingTargetTest {
     }
 
     @Test
+    fun `a slash in the name stays in the name`() {
+        assertEquals(PingTarget(id, "a/b"), PingTarget.parse(PingTarget(id, "a/b").toString()))
+    }
+
+    @Test
     fun `the longest name keeps the target within the phone's limit`() {
         assertTrue(PingTarget(id, "A".repeat(16)).toString().length <= AppTarget.MAX_LENGTH)
     }

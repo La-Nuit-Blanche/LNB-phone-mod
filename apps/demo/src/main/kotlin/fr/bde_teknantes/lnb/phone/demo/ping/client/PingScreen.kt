@@ -16,6 +16,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.api.client.ui.atRight
 import fr.bde_teknantes.lnb.phone.demo.ping.Ping
+import fr.bde_teknantes.lnb.phone.demo.ping.PingOutcome
 import fr.bde_teknantes.lnb.phone.demo.ping.PingTarget
 import fr.bde_teknantes.lnb.phone.demo.ping.SendPingPayload
 import net.minecraft.client.resources.language.I18n
@@ -24,15 +25,15 @@ import java.util.UUID
 
 /**
  * Writing to one player: a field for the ping, the send button, and the pings exchanged with them this session (theirs
- * on the left, the player's on the right). The draft and the conversation live in [PingSession], so they are still
- * there when the player comes back to this screen.
+ * on the left, the player's on the right). Everything that lasts lives in [PingSession]: the draft, the conversation,
+ * whether a ping waits for the server's answer. The screen shows it, and catches up with it at every tick.
  */
 class PingScreen(private val player: UUID, private val name: String) : KitScreen() {
     private val draft = PingSession.draft(player)
     private val field = TextField(draft)
     private val send = Button(I18n.get("lnbphone_demo.ping.send")) { send() }
     private val conversation = ScrollList()
-    private var shown = 0
+    private var shownRevision = -1
 
     init {
         add(Header(name).at(0f, 0f))
@@ -60,16 +61,28 @@ class PingScreen(private val player: UUID, private val name: String) : KitScreen
             color = Colors.TEXT_2
         }.at(12f, 220f, 232f, 16f))
         add(conversation.at(12f, 240f, 232f, 130f))
-        showNewMessages()
+        showConversation()
     }
 
     override fun onScreenShown() {
+        // An answer that came while the player was elsewhere is old news.
+        PingSession.takeOutcome(player)
         // Ready to type: the field takes the keys, so Backspace erases instead of going back.
         field.requestFocus()
     }
 
-    // Pings that arrive while the screen is open (the payload handler adds them to the session).
-    override fun onTick() = showNewMessages()
+    override fun onTick() {
+        when (PingSession.takeOutcome(player)) {
+            PingOutcome.SENT -> {
+                PhoneSounds.sent()
+                showSnackbar(I18n.get("lnbphone_demo.ping.sent"))
+            }
+            PingOutcome.OFFLINE -> showErrorSnackbar(I18n.get("lnbphone_demo.ping.refused.offline", name))
+            PingOutcome.TOO_FAST -> showErrorSnackbar(I18n.get("lnbphone_demo.ping.refused.too_fast"))
+            null -> {}
+        }
+        showConversation()
+    }
 
     // A ping from this player lands in the conversation on screen: the phone needs no banner over it.
     override fun showsTarget(target: String) = PingTarget.parse(target)?.player == player
@@ -80,24 +93,21 @@ class PingScreen(private val player: UUID, private val name: String) : KitScreen
 
     private fun send() {
         val text = draft.text.trim()
-        if (!TextLimits.canSend(text, Ping.MAX_LENGTH)) return
+        if (!TextLimits.canSend(text, Ping.MAX_LENGTH) || PingSession.isWaiting(player)) return
         PacketDistributor.sendToServer(SendPingPayload(player, text))
-        PingSession.sent(player, text)
+        PingSession.sending(player)
+        // The server's answer adds the ping to the conversation, or puts the text back if it was refused.
         draft.clear()
-        PhoneSounds.sent()
-        showSnackbar(I18n.get("lnbphone_demo.ping.sent"))
-        showNewMessages()
     }
 
-    private fun showNewMessages() {
+    /** Rebuilds the conversation when the session's has changed since it was last shown. */
+    private fun showConversation() {
+        if (shownRevision == PingSession.revision) return
+        shownRevision = PingSession.revision
+        conversation.removeAll()
         val messages = PingSession.conversation(player)
-        if (messages.isEmpty()) {
-            if (conversation.children.isEmpty()) conversation.add(MessageRow(I18n.get("lnbphone_demo.ping.conversation.empty")))
-            return
-        }
-        if (messages.size == shown) return
-        if (shown == 0) conversation.removeAll()
-        for (message in messages.subList(shown, messages.size)) {
+        if (messages.isEmpty()) conversation.add(MessageRow(I18n.get("lnbphone_demo.ping.conversation.empty")))
+        for (message in messages) {
             conversation.add(Label(message.text).apply {
                 maxLines = 3
                 if (message.mine) {
@@ -107,7 +117,6 @@ class PingScreen(private val player: UUID, private val name: String) : KitScreen
             })
             conversation.add(Spacer(8f))
         }
-        shown = messages.size
         conversation.scrollTo(conversation.maxOffset)
     }
 }

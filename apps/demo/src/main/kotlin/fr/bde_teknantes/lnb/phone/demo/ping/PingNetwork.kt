@@ -10,15 +10,19 @@ import net.minecraft.resources.ResourceLocation
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import java.util.UUID
 
-// Twice the limit in UTF-16 units: a character outside the basic plane takes two.
+// Bounded: a client can't make the server read more than a ping can hold. Twice the limit in UTF-16 units, since a
+// character outside the basic plane takes two.
 private val TEXT_CODEC = ByteBufCodecs.stringUtf8(Ping.MAX_LENGTH * 2)
+
+private fun <T : CustomPacketPayload> type(name: String) =
+    CustomPacketPayload.Type<T>(ResourceLocation.fromNamespaceAndPath(DemoApp.ID, name))
 
 /** Client to server: the player pings [to] with [text]. */
 data class SendPingPayload(val to: UUID, val text: String) : CustomPacketPayload {
     override fun type() = TYPE
 
     companion object {
-        val TYPE = CustomPacketPayload.Type<SendPingPayload>(ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "send_ping"))
+        val TYPE = type<SendPingPayload>("send_ping")
         val STREAM_CODEC: StreamCodec<ByteBuf, SendPingPayload> = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, SendPingPayload::to,
             TEXT_CODEC, SendPingPayload::text,
@@ -27,12 +31,38 @@ data class SendPingPayload(val to: UUID, val text: String) : CustomPacketPayload
     }
 }
 
-/** Server to client: [from] pinged this player with [text], for the conversation on Ping's screen. */
+/** What became of a ping the player sent. */
+enum class PingOutcome {
+    SENT,
+
+    /** The recipient isn't connected: Ping only carries pings between players who are both here. */
+    OFFLINE,
+
+    /** The sender pinged less than [PingServer.COOLDOWN_MS] ago. */
+    TOO_FAST,
+}
+
+/** Server to client: the answer to the player's ping of [text] to [to]. */
+data class PingAnswerPayload(val to: UUID, val text: String, val outcome: PingOutcome) : CustomPacketPayload {
+    override fun type() = TYPE
+
+    companion object {
+        val TYPE = type<PingAnswerPayload>("ping_answer")
+        val STREAM_CODEC: StreamCodec<ByteBuf, PingAnswerPayload> = StreamCodec.composite(
+            UUIDUtil.STREAM_CODEC, PingAnswerPayload::to,
+            TEXT_CODEC, PingAnswerPayload::text,
+            ByteBufCodecs.VAR_INT.map({ PingOutcome.entries[it] }, { it.ordinal }), PingAnswerPayload::outcome,
+            ::PingAnswerPayload,
+        )
+    }
+}
+
+/** Server to client: [from] pinged this player with [text]. The text itself: the notification only points to it. */
 data class PingReceivedPayload(val from: UUID, val text: String) : CustomPacketPayload {
     override fun type() = TYPE
 
     companion object {
-        val TYPE = CustomPacketPayload.Type<PingReceivedPayload>(ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "ping_received"))
+        val TYPE = type<PingReceivedPayload>("ping_received")
         val STREAM_CODEC: StreamCodec<ByteBuf, PingReceivedPayload> = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, PingReceivedPayload::from,
             TEXT_CODEC, PingReceivedPayload::text,
@@ -41,13 +71,19 @@ data class PingReceivedPayload(val from: UUID, val text: String) : CustomPacketP
     }
 }
 
-/** Ping's payloads, registered on both sides. NeoForge runs each handler on the game thread of the side receiving it. */
+/**
+ * Ping's payloads, registered on both sides. NeoForge runs each handler on the game thread of the side receiving it.
+ * Bump the version when a payload changes, so that mismatched clients and servers refuse to connect.
+ */
 object PingNetwork {
     fun register(event: RegisterPayloadHandlersEvent) {
-        val registrar = event.registrar("1")
+        val registrar = event.registrar("2")
         registrar.playToServer(SendPingPayload.TYPE, SendPingPayload.STREAM_CODEC, PingServer::handle)
-        // The client's handler is named in full inside the lambda: its class loads only when a payload arrives, which
-        // never happens on a dedicated server.
+        // The client's handlers are named in full inside the lambdas: their class loads only when a payload arrives,
+        // which never happens on a dedicated server.
+        registrar.playToClient(PingAnswerPayload.TYPE, PingAnswerPayload.STREAM_CODEC) { payload, _ ->
+            fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession.answered(payload.to, payload.text, payload.outcome)
+        }
         registrar.playToClient(PingReceivedPayload.TYPE, PingReceivedPayload.STREAM_CODEC) { payload, _ ->
             fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession.received(payload.from, payload.text)
         }
