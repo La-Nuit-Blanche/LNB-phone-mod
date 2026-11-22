@@ -33,6 +33,9 @@ interface FontMetrics {
     /** Adjustment between two consecutive code points (negative brings them closer). */
     fun kerning(left: Int, right: Int): Float
 
+    /** Whether the font draws [codePoint]; without it, a missing-glyph box stands in. */
+    fun hasGlyph(codePoint: Int): Boolean = true
+
     /** Distance from the baseline up to the top of the font's line (positive). */
     val ascender: Float
 

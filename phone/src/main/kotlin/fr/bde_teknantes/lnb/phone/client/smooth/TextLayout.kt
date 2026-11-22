@@ -4,36 +4,112 @@ package fr.bde_teknantes.lnb.phone.client.smooth
  * Text measurement, truncation and wrapping, in dp, from [FontMetrics] alone. Advances are the font's unhinted ones,
  * scaled linearly, so a string measures the same in dp at every GUI scale and wraps at the same words everywhere;
  * only the final drawing snaps glyphs to pixels.
+ *
+ * Text from players is cleaned up as it is laid out, the same way for measuring and drawing:
+ * - `\r\n`, a lone `\r` and `\n` break lines; a tab is a space;
+ * - other control characters, zero-width and bidirectional format characters, variation selectors and joiners take
+ *   no room and draw nothing;
+ * - a character the font lacks draws one missing-glyph box for its whole grapheme (an emoji with its skin tone, a
+ *   flag's two letters, a letter with accents the font lacks), not one per code point.
  */
 object TextLayout {
     const val ELLIPSIS = "…"
     private const val ELLIPSIS_CP = 0x2026
     private const val EPSILON = 1e-3f
-    private const val LINE_FEED = '\u000A'
+    @PublishedApi
+    internal const val SPACE = 0x20
 
     // A regular space before these, or after «, is French typography's (non-breaking) space: never break there, so a
     // line never starts with "!" or ends with "«".
     private const val NO_BREAK_BEFORE = "!?:;»"
     private const val NO_BREAK_AFTER = "«"
 
+    /** Whether [cp] takes no room and is never drawn. */
+    fun isInvisible(cp: Int): Boolean {
+        if (cp == '\t'.code || cp == '\n'.code || cp == '\r'.code) return false
+        return when {
+            cp < 0x20 || cp in 0x7F..0x9F -> true
+            cp == 0x034F -> true // combining grapheme joiner
+            cp in 0x200B..0x200F -> true // zero-width space, joiners, LRM, RLM
+            cp in 0x202A..0x202E -> true // bidirectional embeddings and overrides
+            cp in 0x2060..0x2064 || cp in 0x2066..0x206F -> true // word joiner, invisible operators, isolates
+            cp == 0xFEFF -> true // zero-width no-break space
+            cp in 0xFE00..0xFE0F || cp in 0xE0100..0xE01EF -> true // variation selectors
+            cp in 0xE0000..0xE007F -> true // tags
+            else -> Character.getType(cp) == Character.FORMAT.toInt()
+        }
+    }
+
+    /** Whether [cp] belongs to the grapheme before it rather than starting one (marks, skin tones). */
+    private fun extendsGrapheme(cp: Int): Boolean {
+        val type = Character.getType(cp)
+        return type == Character.NON_SPACING_MARK.toInt() || type == Character.ENCLOSING_MARK.toInt() ||
+            type == Character.COMBINING_SPACING_MARK.toInt() || cp in 0x1F3FB..0x1F3FF
+    }
+
+    @PublishedApi
+    internal fun isRegionalIndicator(cp: Int) = cp in 0x1F1E6..0x1F1FF
+
     /**
-     * Walks [text] glyph by glyph: [glyph] receives each code point and its pen position in dp, kerning included.
-     * Returns the total advance.
+     * Walks [text] unit by unit, with the rules above: [unit] receives each code point's range in the text
+     * ([start] to [end]), the code point to draw (-1 for one that draws nothing), the pen position in dp, kerning
+     * included, and the advance it takes. Returns the total advance.
      */
-    inline fun forEachGlyph(text: String, font: FontMetrics, size: Float, glyph: (codePoint: Int, x: Float) -> Unit): Float {
+    inline fun forEachUnit(
+        text: String, font: FontMetrics, size: Float,
+        unit: (start: Int, end: Int, drawn: Int, x: Float, advance: Float) -> Unit,
+    ): Float {
         var pen = 0f
         var previous = -1
+        // The last drawn unit was a missing-glyph box, and how far its grapheme goes.
+        var lastMissing = false
+        var afterJoiner = false
+        var regional = 0
         var i = 0
         while (i < text.length) {
-            val cp = text.codePointAt(i)
+            val raw = text.codePointAt(i)
+            val end = i + Character.charCount(raw)
+            val cp = if (raw == '\t'.code || raw == '\n'.code || raw == '\r'.code) SPACE else raw
+            if (isInvisibleUnit(cp)) {
+                if (cp == 0x200D) afterJoiner = true
+                unit(i, end, -1, pen, 0f)
+                i = end
+                continue
+            }
+            val missing = !font.hasGlyph(cp)
+            val pairsFlag = isRegionalIndicator(cp) && regional % 2 == 1
+            // A missing character that continues a grapheme draws nothing: its grapheme has its box, or its base.
+            val skip = missing && (extendsGraphemeUnit(cp) || afterJoiner || pairsFlag) && (lastMissing || !pairsFlag)
+            regional = if (isRegionalIndicator(cp)) regional + 1 else 0
+            afterJoiner = false
+            if (skip) {
+                unit(i, end, -1, pen, 0f)
+                i = end
+                continue
+            }
             if (previous >= 0) pen += font.kerning(previous, cp) * size
-            glyph(cp, pen)
-            pen += font.advance(cp) * size
+            val advance = font.advance(cp) * size
+            unit(i, end, cp, pen, advance)
+            pen += advance
             previous = cp
-            i += Character.charCount(cp)
+            lastMissing = missing
+            i = end
         }
         return pen
     }
+
+    @PublishedApi
+    internal fun isInvisibleUnit(cp: Int) = isInvisible(cp)
+
+    @PublishedApi
+    internal fun extendsGraphemeUnit(cp: Int) = extendsGrapheme(cp)
+
+    /**
+     * Walks [text] glyph by glyph: [glyph] receives each code point to draw and its pen position in dp, kerning
+     * included. Returns the total advance.
+     */
+    inline fun forEachGlyph(text: String, font: FontMetrics, size: Float, glyph: (codePoint: Int, x: Float) -> Unit): Float =
+        forEachUnit(text, font, size) { _, _, drawn, x, _ -> if (drawn >= 0) glyph(drawn, x) }
 
     fun width(text: String, font: FontMetrics, size: Float): Float = forEachGlyph(text, font, size) { _, _ -> }
 
@@ -45,41 +121,49 @@ object TextLayout {
 
     /**
      * [text] if it fits in [maxWidth], else its longest start that fits followed by an ellipsis (spaces before the
-     * ellipsis dropped). Empty when not even the ellipsis fits.
+     * ellipsis dropped). Empty when not even the ellipsis fits. Linear in the text's length.
      */
     fun truncate(text: String, font: FontMetrics, size: Float, maxWidth: Float): String {
-        val cps = text.codePoints().toArray()
-        // ends[i]: width of the first i code points.
-        val ends = FloatArray(cps.size + 1)
-        var pen = 0f
-        for (i in cps.indices) {
-            if (i > 0) pen += font.kerning(cps[i - 1], cps[i]) * size
-            pen += font.advance(cps[i]) * size
-            ends[i + 1] = pen
+        // ends[k]: width of the text up to the end of its k-th code point; starts[k]: where that code point starts;
+        // drawnBefore[k]: the last drawn code point among the first k (for the kerning before the ellipsis).
+        val count = text.codePointCount(0, text.length)
+        val ends = FloatArray(count + 1)
+        val starts = IntArray(count + 1)
+        val drawnBefore = IntArray(count + 1) { -1 }
+        val spaceBefore = BooleanArray(count + 1)
+        var k = 0
+        val total = forEachUnit(text, font, size) { start, _, drawn, x, advance ->
+            starts[k] = start
+            ends[k + 1] = if (drawn >= 0) x + advance else ends[k]
+            drawnBefore[k + 1] = if (drawn >= 0) drawn else drawnBefore[k]
+            spaceBefore[k + 1] = Character.isWhitespace(text.codePointAt(start))
+            k++
         }
-        if (ends[cps.size] <= maxWidth + EPSILON) return text
+        starts[count] = text.length
+        if (total <= maxWidth + EPSILON) return text
 
+        // kept[n]: n without the whitespace that ends it, computed once (a long run of spaces stays linear).
+        val kept = IntArray(count + 1)
+        for (n in 1..count) kept[n] = if (spaceBefore[n]) kept[n - 1] else n
         val ellipsis = font.advance(ELLIPSIS_CP) * size
-        for (count in cps.size - 1 downTo 0) {
-            var kept = count
-            while (kept > 0 && Character.isWhitespace(cps[kept - 1])) kept--
-            val kern = if (kept > 0) font.kerning(cps[kept - 1], ELLIPSIS_CP) * size else 0f
-            if (ends[kept] + kern + ellipsis <= maxWidth + EPSILON) {
-                return String(cps, 0, kept) + ELLIPSIS
-            }
+        for (n in count - 1 downTo 0) {
+            val keep = kept[n]
+            val last = drawnBefore[keep]
+            val kern = if (keep > 0 && last >= 0) font.kerning(last, ELLIPSIS_CP) * size else 0f
+            if (ends[keep] + kern + ellipsis <= maxWidth + EPSILON) return text.substring(0, starts[keep]) + ELLIPSIS
         }
         return ""
     }
 
     /**
      * One line of wrapped text: `text[start, end)` is drawn, [width] dp wide; [next] is where the following line
-     * starts, past the space or line feed this one broke at (equal to [end] for a word cut in two). Offsets are UTF-16
+     * starts, past the space or line break this one broke at (equal to [end] for a word cut in two). Offsets are UTF-16
      * indexes into the wrapped text, for placing a caret, a selection or marks on characters.
      */
     data class Line(val start: Int, val end: Int, val next: Int, val width: Float)
 
     /**
-     * Breaks [text] into lines no wider than [maxWidth]: at spaces, at line feeds, and inside a word only when the
+     * Breaks [text] into lines no wider than [maxWidth]: at spaces, at line breaks, and inside a word only when the
      * word alone is wider than a line. The space a line breaks at is dropped. An empty text is one empty line.
      */
     fun wrap(text: String, font: FontMetrics, size: Float, maxWidth: Float): List<String> =
@@ -104,16 +188,19 @@ object TextLayout {
         val out = ArrayList<Line>()
         var paragraphStart = 0
         while (true) {
-            val feed = text.indexOf(LINE_FEED, paragraphStart)
-            val paragraphEnd = if (feed < 0) text.length else feed
-            wrapParagraph(text, paragraphStart, paragraphEnd, font, size, maxWidth, out)
-            if (feed < 0) break
-            // The line feed belongs to the paragraph's last line, like a break space.
-            out[out.size - 1] = out.last().copy(next = feed + 1)
-            paragraphStart = feed + 1
+            var feed = paragraphStart
+            while (feed < text.length && text[feed] != '\n' && text[feed] != '\r') feed++
+            wrapParagraph(text, paragraphStart, feed, font, size, maxWidth, out)
+            if (feed >= text.length) break
+            // The line break (\n, \r or \r\n) belongs to the paragraph's last line, like a break space.
+            val next = if (text[feed] == '\r' && text.getOrNull(feed + 1) == '\n') feed + 2 else feed + 1
+            out[out.size - 1] = out.last().copy(next = next)
+            paragraphStart = next
         }
         return out
     }
+
+    private fun isBreakSpace(text: String, i: Int) = (text[i] == ' ' || text[i] == '\t') && breakable(text, i)
 
     private fun wrapParagraph(text: String, from: Int, to: Int, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<Line>) {
         fun width(a: Int, b: Int) = width(text.substring(a, b), font, size)
@@ -125,7 +212,7 @@ object TextLayout {
         var wordStart = from
         var i = from
         while (i <= to) {
-            if (i < to && !(text[i] == ' ' && breakable(text, i))) {
+            if (i < to && !isBreakSpace(text, i)) {
                 i++
                 continue
             }
@@ -155,8 +242,15 @@ object TextLayout {
                     while (j < i) {
                         val next = j + Character.charCount(text.codePointAt(j))
                         if (j > pieceStart && !fits(pieceStart, next)) {
-                            out.add(Line(pieceStart, j, j, width(pieceStart, j)))
-                            pieceStart = j
+                            if (text[j] == ' ') {
+                                // The space that glues French punctuation to the word ("…forteresse !"): it ends this
+                                // piece rather than start the next one.
+                                out.add(Line(pieceStart, j, next, width(pieceStart, j)))
+                                pieceStart = next
+                            } else {
+                                out.add(Line(pieceStart, j, j, width(pieceStart, j)))
+                                pieceStart = j
+                            }
                         }
                         j = next
                     }
@@ -172,7 +266,7 @@ object TextLayout {
         // Empty here after earlier lines means the paragraph ended in spaces it broke at: they make no line of their
         // own, and the line before them reaches the paragraph's end.
         if (lineEnd > lineStart || out.size == first) {
-            out.add(Line(lineStart, lineEnd, to, width(lineStart, lineEnd)))
+            out.add(Line(lineStart, maxOf(lineStart, lineEnd), to, width(lineStart, maxOf(lineStart, lineEnd))))
         } else {
             out[out.size - 1] = out.last().copy(next = to)
         }
@@ -183,7 +277,7 @@ object TextLayout {
         val words = ArrayList<String>()
         var start = 0
         for (i in paragraph.indices) {
-            if (paragraph[i] != ' ' || !breakable(paragraph, i)) continue
+            if (!isBreakSpace(paragraph, i)) continue
             words.add(paragraph.substring(start, i))
             start = i + 1
         }
@@ -191,7 +285,7 @@ object TextLayout {
         return words
     }
 
-        /** Whether a line may break at the space at [i]: not before high punctuation, not after an opening guillemet. */
+    /** Whether a line may break at the space at [i]: not before high punctuation, not after an opening guillemet. */
     private fun breakable(text: String, i: Int): Boolean {
         val next = text.getOrNull(i + 1)
         val previous = text.getOrNull(i - 1)
