@@ -41,13 +41,13 @@ class PhoneApp(
     private val rootScreen: AppScreenFactory,
 ) {
     /** A new instance of the app's first screen. Called by the phone each time the app is opened from home. */
-    fun createRootScreen(): AppScreen = rootScreen.create()
+    internal fun createRootScreen(): AppScreen = rootScreen.create()
 
     /**
      * The screens to open for [target], root first, or an empty list when the app has none for it (it then opens on
      * its first screen). Called by the phone when the player opens a notification that carries a target.
      */
-    fun createTargetScreens(target: String): List<AppScreen> = targetScreens?.create(target).orEmpty()
+    internal fun createTargetScreens(target: String): List<AppScreen> = targetScreens?.create(target).orEmpty()
 
     override fun toString() = "PhoneApp($id)"
 }
