@@ -45,7 +45,7 @@ class KitFromSettingsTest {
     fun tearDown() = KitFakes.uninstall()
 
     @Test
-    fun `a row with a click handler of its own doesn't switch its toggle, though ListRow's KDoc says any click does`() {
+    fun `a row with a click handler of its own leaves its toggle a target of its own, by pointer and by Tab`() {
         val screen = Plain()
         var opened = 0
         val toggle = Toggle()
@@ -55,17 +55,33 @@ class KitFromSettingsTest {
         p.click(40f, 24f)
         assertEquals(1, opened)
         assertFalse(toggle.checked)
+        p.click(TOGGLE_X, 24f)
+        assertTrue(toggle.checked)
+        assertEquals(1, opened)
 
         p.key(GLFW_KEY_TAB)
         assertSame(row, screen.focused)
         p.key(GLFW_KEY_SPACE)
         assertEquals(2, opened)
+        p.key(GLFW_KEY_TAB)
+        assertSame(toggle, screen.focused)
+        p.key(GLFW_KEY_SPACE)
         assertFalse(toggle.checked)
-
-        // Only the toggle itself still switches it.
-        p.click(226f, 24f)
-        assertTrue(toggle.checked)
         assertEquals(2, opened)
+    }
+
+    @Test
+    fun `a settings row owns its toggle, hovered as one, one tap per click, one Tab stop`() {
+        val store = PhoneSettingsStore(dir.resolve("lnbphone-client.json")) { "alice" }
+        val s = SettingsPlayer(store).apply { frame() }
+        s.frame(TOGGLE_X, SOUNDS_Y)
+        assertSame(s.soundsRow, s.screen.hovered, "the pointer on the toggle hovers the row")
+        s.click(TOGGLE_X, SOUNDS_Y)
+        assertFalse(store.current.sounds)
+        assertEquals(listOf(PhoneSounds.Sound.TAP), KitFakes.sounds)
+        assertSame(s.soundsRow, s.screen.focused, "the click on the toggle focused the row")
+        s.key(GLFW_KEY_TAB)
+        assertSame(s.previewRow, s.screen.focused, "the toggle is no Tab stop of its own")
     }
 
     @Test

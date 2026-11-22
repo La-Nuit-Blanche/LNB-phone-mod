@@ -184,7 +184,7 @@ class KitReviewTest {
 
     @Test
     fun `a toggle row is one stop and switches from anywhere`() {
-        val row = screen.add(ToggleRow("Publier anonymement").apply { helper = "Nom masqué aux joueurs" }.at(12f, 0f))
+        val row = screen.add(LabeledToggle("Publier anonymement").apply { helper = "Nom masqué aux joueurs" }.at(12f, 0f))
         val heard = ArrayList<Boolean>()
         row.toggle.onChange = { heard += it }
         screen.frame()

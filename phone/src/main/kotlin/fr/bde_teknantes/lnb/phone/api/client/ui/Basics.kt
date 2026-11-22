@@ -70,13 +70,17 @@ class Divider : Widget() {
  * - With a title only: 48 dp, the title in [TextStyle.BODY_STRONG].
  * - With a [subtitle]: 56 dp, the subtitle in grey under the title.
  * - [leading]: a 32 dp [Avatar] or an [IconView] (20 dp), in a 32 dp box at x 12; the text then starts at x 56.
- * - [trailing]: a [Toggle], an [IconView] of [Icon.CHEVRON], or a grey [Label], right-aligned at x 244. With a toggle,
- *   a click anywhere on the row switches it, and the row is one Tab stop.
+ * - [trailing]: a [Toggle], an [IconView] of [Icon.CHEVRON], or a grey [Label], right-aligned at x 244.
+ *
+ * A row with a trailing toggle and no [onClick] of its own is a setting's row: it owns the toggle. A click anywhere on
+ * the row, the toggle included, switches it; the row lights up as one, and is one Tab stop (Space switches). With an
+ * [onClick], the row opens something and the toggle is a target of its own: a click on the toggle switches it, a click
+ * elsewhere runs [onClick], and Tab stops at the row, then at the toggle.
  *
  * The row lights up under the pointer and when pressed; it ends with a divider (from x 56 with a leading element)
  * unless [divider] is false.
  */
-class ListRow(var title: String) : Clickable() {
+class ListRow(var title: String) : Clickable(), ToggleOwner {
     /** A row that runs [onClick] when clicked. */
     constructor(title: String, onClick: () -> Unit) : this(title) {
         this.onClick = onClick
@@ -102,10 +106,12 @@ class ListRow(var title: String) : Clickable() {
     override val preferredWidth get() = 256f
     override val preferredHeight get() = if (subtitle != null) 56f else 48f
 
+    override fun owns(toggle: Toggle) = toggle === trailing && onClick == null
+
     override fun perform() {
-        // With a toggle and nothing else to do, the whole row switches it; the row's tap is the only one.
+        // Owning its toggle, the row switches it; the row's tap is the only one.
         val toggle = trailing as? Toggle
-        if (onClick == null && toggle != null) toggle.toggle() else super.perform()
+        if (toggle != null && owns(toggle)) toggle.toggle() else super.perform()
     }
 
     override fun layout() {
@@ -139,27 +145,33 @@ class ListRow(var title: String) : Clickable() {
 }
 
 /**
- * A title, an optional helper line and a toggle, the whole row switching it and counting as one Tab stop: Compose's
- * "Post anonymously" row (art direction 9.8). No hover tint of its own: the toggle shows the row's hover.
+ * A toggle with its label, inside a form: Compose's "Post anonymously" (art direction 9.8), the reply composer's
+ * "Anonymous" (9.7). Not a row of a list: for a setting in a list, use a [ListRow] with a trailing [Toggle].
  *
- * - With a [helper]: 44 dp, the title in [TextStyle.BODY_STRONG] at row y 4, the helper in grey at y 22, the toggle
- *   at the right, centred.
+ * It owns its [toggle] (see [Toggle]): a click anywhere on it switches the toggle, it is one Tab stop, and it has no
+ * hover tint of its own: the toggle shows its hover. Read and set [Toggle.checked], listen with [Toggle.onChange]; an
+ * [onClick], if you set one, runs after the switch.
+ *
+ * - With a [helper]: 44 dp, the title in [TextStyle.BODY_STRONG] at y 4, the helper in grey at y 22, the toggle at
+ *   the right, centred.
  * - Without: 32 dp, the title and the toggle centred.
  * - [toggleFirst] puts the toggle at the left and the title 44 dp right of it, as the reply composer does (9.7).
  *
  * Give it its width (232 dp at x 12 in Compose).
  */
-class ToggleRow(var title: String) : Clickable() {
-    /** The row's switch: read and set [Toggle.checked], listen with [Toggle.onChange]. */
+class LabeledToggle(var title: String) : Clickable(), ToggleOwner {
+    /** The switch: read and set [Toggle.checked], listen with [Toggle.onChange]. */
     val toggle: Toggle = add(Toggle())
 
     var helper: String? = null
 
     var toggleFirst = false
 
-    init {
-        silent = true
-        onClick = { toggle.click() }
+    override fun owns(toggle: Toggle) = toggle === this.toggle
+
+    override fun perform() {
+        toggle.toggle()
+        super.perform()
     }
 
     override val preferredWidth get() = 232f

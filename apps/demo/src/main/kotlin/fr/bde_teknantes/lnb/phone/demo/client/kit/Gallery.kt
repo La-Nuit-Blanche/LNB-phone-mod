@@ -20,6 +20,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Interaction
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitPreview
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
 import fr.bde_teknantes.lnb.phone.api.client.ui.Label
+import fr.bde_teknantes.lnb.phone.api.client.ui.LabeledToggle
 import fr.bde_teknantes.lnb.phone.api.client.ui.ListRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.MessageRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
@@ -34,7 +35,6 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.TextField
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextState
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
 import fr.bde_teknantes.lnb.phone.api.client.ui.Toggle
-import fr.bde_teknantes.lnb.phone.api.client.ui.ToggleRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.demo.client.smooth.SampleSkins
@@ -214,7 +214,7 @@ object Gallery {
             enabled = false
         }.at(12f, 212f))
         caption("Toggle row (Compose 9.8): one Tab stop, all of it clicks", 254f)
-        add(ToggleRow(tr("compose.anonymous")).apply { helper = tr("compose.anonymous.help") }.at(12f, 272f, 232f, 44f))
+        add(LabeledToggle(tr("compose.anonymous")).apply { helper = tr("compose.anonymous.help") }.at(12f, 272f, 232f, 44f))
         caption("Focus ring", 322f)
         add(Toggle().apply { checked = true }.look(null, focus = true).at(12f, 342f))
         add(Button("OK").apply { fixedWidth = 64f }.look(null, focus = true).at(68f, 336f))

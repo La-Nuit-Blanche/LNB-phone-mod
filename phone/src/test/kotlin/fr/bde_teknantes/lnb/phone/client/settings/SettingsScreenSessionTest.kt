@@ -296,16 +296,17 @@ class SettingsScreenSessionTest {
     }
 
     @Test
-    fun `a click takes the keyboard focus away, so the rings go`() {
+    fun `a click moves the focus without rings`() {
         val s = open()
         s.key(GLFW_KEY_TAB)
         s.key(GLFW_KEY_TAB)
         s.key(GLFW_KEY_TAB)
         assertSame(s.soundsRow, s.screen.focused)
+        assertTrue(s.soundsRow.showsFocusRing)
         s.click(TOGGLE_X, PREVIEW_Y)
-        // A click on a toggle inside a row lands on the toggle, which isn't a Tab stop: no widget keeps the focus.
-        assertNull(s.screen.focused)
-        assertFalse(s.sounds.showsFocusRing)
+        // A click on a row's toggle lands on the row, which owns it: the row takes the focus, from the pointer.
+        assertSame(s.previewRow, s.screen.focused)
+        for (w in listOf(s.soundsRow, s.sounds, s.previewRow, s.preview)) assertFalse(w.showsFocusRing, "$w")
     }
 
     // ---- Strings ----

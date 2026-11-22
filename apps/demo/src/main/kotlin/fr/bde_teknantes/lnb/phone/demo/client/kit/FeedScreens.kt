@@ -12,6 +12,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Header
 import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
 import fr.bde_teknantes.lnb.phone.api.client.ui.IconButton
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
+import fr.bde_teknantes.lnb.phone.api.client.ui.LabeledToggle
 import fr.bde_teknantes.lnb.phone.api.client.ui.MessageRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
@@ -25,7 +26,6 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Tabs
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextArea
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextState
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
-import fr.bde_teknantes.lnb.phone.api.client.ui.ToggleRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 
@@ -205,7 +205,7 @@ class ComposeScreen(
         placeholder = tr("compose.placeholder")
         limit = LIMIT
     }
-    private val anonymous = ToggleRow(tr("compose.anonymous")).apply {
+    private val anonymous = LabeledToggle(tr("compose.anonymous")).apply {
         helper = tr("compose.anonymous.help")
         toggle.checked = draft.anonymous
         toggle.onChange = { draft.anonymous = it }
