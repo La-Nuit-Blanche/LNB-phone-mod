@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.apps
 
+import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -251,6 +252,42 @@ class PhoneNavigatorReentrancyTest {
         assertEquals(listOf("first:closed", "second:shown"), log)
         first.handle.push(screen("late"))
         assertEquals(listOf(second), navigator.screens)
+    }
+
+    @Test
+    fun `a listener that throws neither escapes nor stops the navigation or the other listeners`() {
+        val later = mutableListOf<String>()
+        val root = screen("root")
+        val top = screen("top")
+        navigator.addListener(object : NavigationListener {
+            override fun onTransition(transition: Transition, outgoing: AppScreen?) =
+                error("listener fails")
+
+            override fun onPhoneClosed() = error("listener fails")
+        })
+        navigator.addListener(RecordingListener(later))
+        openStack(root)
+
+        root.handle.push(top)
+        navigator.close()
+
+        assertSame(top, navigator.currentScreen)
+        assertFalse(navigator.isOpen)
+        assertEquals(listOf("root:hidden", "top:shown", "top:hidden"), log)
+        assertTrue(later.containsAll(listOf("@FORWARD from root", "@phone closed")), "later: $later")
+    }
+
+    @Test
+    fun `a listener may add a listener from its callback`() {
+        val added = mutableListOf<String>()
+        navigator.addListener(object : NavigationListener {
+            override fun onPhoneOpened() = navigator.addListener(RecordingListener(added))
+        })
+
+        navigator.open()
+        navigator.close()
+
+        assertEquals(listOf("@phone closed"), added)
     }
 
     @Test

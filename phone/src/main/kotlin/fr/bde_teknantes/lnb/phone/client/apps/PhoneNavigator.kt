@@ -7,6 +7,7 @@ import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import net.minecraft.resources.ResourceLocation
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * What the phone shows, independently of how it is drawn: the home screen, or one app with its stack of screens; and
@@ -34,7 +35,8 @@ internal class PhoneNavigator(
     private var session: AppSession? = null
     private var shown: AppScreen? = null
     private var syncing = false
-    private val listeners = ArrayList<NavigationListener>()
+    // Copy on write: a listener may add another from inside a callback.
+    private val listeners = CopyOnWriteArrayList<NavigationListener>()
 
     /** Whether the phone is out (open), as opposed to put away. */
     var isOpen = false
@@ -66,7 +68,7 @@ internal class PhoneNavigator(
         checkThread()
         if (isOpen) return
         isOpen = true
-        listeners.forEach { it.onPhoneOpened() }
+        notifyListeners { it.onPhoneOpened() }
         syncVisibility()
     }
 
@@ -75,7 +77,7 @@ internal class PhoneNavigator(
         checkThread()
         if (!isOpen) return
         isOpen = false
-        listeners.forEach { it.onPhoneClosed() }
+        notifyListeners { it.onPhoneClosed() }
         syncVisibility()
     }
 
@@ -116,8 +118,8 @@ internal class PhoneNavigator(
         val opened = AppSession(app)
         session = opened
         stack.forEach { attach(it, opened) }
-        listeners.forEach { it.onTransition(Transition.FORWARD, outgoing) }
-        listeners.forEach { it.onAppOpened(app) }
+        notifyListeners { it.onTransition(Transition.FORWARD, outgoing) }
+        notifyListeners { it.onAppOpened(app) }
         closeScreens(closing)
         syncVisibility()
         return true
@@ -135,7 +137,7 @@ internal class PhoneNavigator(
         val ending = session ?: return
         val outgoing = ending.screens.lastOrNull()
         val closing = endSession(ending)
-        listeners.forEach { it.onTransition(Transition.INSTANT, outgoing) }
+        notifyListeners { it.onTransition(Transition.INSTANT, outgoing) }
         closeScreens(closing)
         syncVisibility()
     }
@@ -154,7 +156,7 @@ internal class PhoneNavigator(
         require(screen.host == null) { REUSED_SCREEN }
         val outgoing = from.session.screens.last()
         attach(screen, from.session)
-        listeners.forEach { it.onTransition(Transition.FORWARD, outgoing) }
+        notifyListeners { it.onTransition(Transition.FORWARD, outgoing) }
         syncVisibility()
     }
 
@@ -166,7 +168,7 @@ internal class PhoneNavigator(
         if (index <= 0) return false
         val outgoing = stack.last()
         val closing = detachFrom(stack, index)
-        listeners.forEach { it.onTransition(Transition.BACK, outgoing) }
+        notifyListeners { it.onTransition(Transition.BACK, outgoing) }
         closeScreens(closing)
         syncVisibility()
         return true
@@ -180,7 +182,7 @@ internal class PhoneNavigator(
         val outgoing = stack.last()
         val closing = detachFrom(stack, stack.indexOf(from.screen))
         attach(screen, from.session)
-        listeners.forEach { it.onTransition(Transition.FORWARD, outgoing) }
+        notifyListeners { it.onTransition(Transition.FORWARD, outgoing) }
         closeScreens(closing)
         syncVisibility()
     }
@@ -245,6 +247,19 @@ internal class PhoneNavigator(
             if (screens.isNotEmpty()) return screens
         }
         return listOf(app.createRootScreen())
+    }
+
+    // Each listener behind its own guard: one that throws must neither escape into the game's input handling nor
+    // leave the navigation half done, nor keep the other listeners from hearing.
+    private inline fun notifyListeners(event: (NavigationListener) -> Unit) {
+        for (listener in listeners) {
+            try {
+                event(listener)
+            } catch (e: Throwable) {
+                rethrowIfFatal(e)
+                LnbPhone.LOGGER.error("Phone navigation listener {} failed", listener.javaClass.name, e)
+            }
+        }
     }
 
     private fun attach(screen: AppScreen, session: AppSession) {
@@ -341,15 +356,15 @@ internal class PhoneNavigator(
         val failing = host!!.session
         val outgoing = failing.screens.lastOrNull()
         val closing = endSession(failing)
-        listeners.forEach { it.onTransition(Transition.INSTANT, outgoing) }
-        listeners.forEach { it.onAppFailed(failing.app, error) }
+        notifyListeners { it.onTransition(Transition.INSTANT, outgoing) }
+        notifyListeners { it.onAppFailed(failing.app, error) }
         closeScreens(closing)
         syncVisibility()
     }
 
     private fun appFailed(app: PhoneApp, what: String, error: Throwable) {
         LnbPhone.LOGGER.error("Phone app {} failed {}; it stays closed", app.id, what, error)
-        listeners.forEach { it.onAppFailed(app, error) }
+        notifyListeners { it.onAppFailed(app, error) }
     }
 
     private fun ignored(from: ScreenHost, what: String): Boolean {
