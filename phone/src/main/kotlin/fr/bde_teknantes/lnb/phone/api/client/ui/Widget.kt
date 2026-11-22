@@ -77,12 +77,15 @@ abstract class Widget {
             if (!value) screen?.let { if (contains(it.focused)) it.focus(null) }
         }
 
+    /** The kit's own reason to count a widget as disabled besides [enabled]: a row whose toggle is disabled. */
+    internal open val kitEnabled: Boolean get() = true
+
     /** Whether this widget and every widget it is inside are enabled. */
     val isEnabled: Boolean
         get() {
             var w: Widget? = this
             while (w != null) {
-                if (!w.enabled) return false
+                if (!w.enabled || !w.kitEnabled) return false
                 w = w.parent
             }
             return true
@@ -221,12 +224,15 @@ abstract class Widget {
     val now: Float get() = screen?.now ?: 0f
 
     /**
-     * Whether a change of what the widget shows should animate now: it is on a screen that has drawn a frame since it
-     * was last shown. A value set while the screen is built or shown (its constructor, [KitScreen.onScreenShown])
-     * should simply be there when the player first sees it. The kit's animated values ([Toggle.checked],
+     * Whether a change of what the widget shows should animate now: the widget itself has been drawn since its screen
+     * was last shown, so the player has seen it. A value set before that (the screen being built or shown, a row added
+     * to a list and set up just after, in either order) simply appears. The kit's animated values ([Toggle.checked],
      * [SegmentedControl.selected], [Tabs.selected]) follow this; so should a widget of yours.
      */
-    val shouldAnimate: Boolean get() = screen?.drawnSinceShown == true
+    val shouldAnimate: Boolean get() = screen?.let { drawnIn == it.shownCount } == true
+
+    // The screen's showing (KitScreen.shownCount) in which this widget was last drawn.
+    private var drawnIn = -1
 
     /** Whether the pointer is on this widget (and on nothing above it that catches the pointer). */
     open val isHovered: Boolean get() = screen?.hovered === this
@@ -286,6 +292,7 @@ abstract class Widget {
 
     internal fun draw(canvas: AppCanvas) {
         if (!visible) return
+        drawnIn = screen?.shownCount ?: -1
         canvas.offset(x, y) {
             render(canvas)
             renderChildren(canvas)

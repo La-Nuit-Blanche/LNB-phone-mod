@@ -28,16 +28,26 @@ class Header(var title: String?) : Widget() {
      * whenever there is a screen to go back to.
      */
     var leading: Clickable? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
             layout()
         }
 
     /** An [IconButton] (placed at (218, 6)) or a [Button] (right-aligned to x 244, at y 6), or null. */
     var trailing: Clickable? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
             layout()
         }

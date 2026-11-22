@@ -64,8 +64,8 @@ abstract class KitScreen : AppScreen() {
     var now = 0f
         private set
 
-    /** Whether a frame was drawn since the screen was last shown: until then, values set by code don't animate. */
-    internal var drawnSinceShown = false
+    /** How many times the screen was shown: widgets drawn in the current showing animate their changes. */
+    internal var shownCount = 0
         private set
 
     /** Where the pointer was last seen, in viewport dp. */
@@ -284,7 +284,6 @@ abstract class KitScreen : AppScreen() {
         floating.draw(canvas)
         overlays.draw(canvas)
         drawTooltip(canvas)
-        drawnSinceShown = true
     }
 
     /** Sizes, layout and the widgets' own updates, top-down; then a focused widget that can't keep the focus loses it. */
@@ -292,7 +291,9 @@ abstract class KitScreen : AppScreen() {
         content.updateTree()
         floating.updateTree()
         overlays.updateTree()
-        focused?.let { if (!it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
+        // A widget that can't take the focus any more loses it: disabled, hidden, gone, or no longer a stop of its own
+        // (a toggle its row now owns).
+        focused?.let { if (!it.focusable || !it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
     }
 
     final override fun tick() {
@@ -313,7 +314,7 @@ abstract class KitScreen : AppScreen() {
     }
 
     final override fun onShown() {
-        drawnSinceShown = false
+        shownCount++
         restoreSnackbar()
         onScreenShown()
         // Brought up to date before the first frame: a key or a click that comes first finds what that frame will
@@ -400,7 +401,7 @@ abstract class KitScreen : AppScreen() {
             revealFocused()
             return true
         }
-        var w: Widget? = focused?.takeIf { it.isEnabled && it.isShowing }
+        var w: Widget? = focused?.takeIf { it.focusable && it.isEnabled && it.isShowing }
         while (w != null && w !is Root) {
             if (w.keyPressed(keyCode, scanCode, modifiers)) return true
             w = w.parent
@@ -430,7 +431,7 @@ abstract class KitScreen : AppScreen() {
             else -> codePoint.code
         }
         pendingHighSurrogate = null
-        val w = focused?.takeIf { it.isEnabled && it.isShowing } ?: return false
+        val w = focused?.takeIf { it.focusable && it.isEnabled && it.isShowing } ?: return false
         return w.charTyped(code, modifiers)
     }
 

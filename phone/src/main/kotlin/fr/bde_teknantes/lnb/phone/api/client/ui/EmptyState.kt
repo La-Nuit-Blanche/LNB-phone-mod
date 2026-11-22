@@ -25,8 +25,13 @@ class EmptyState(var icon: Icon, var title: String) : Widget() {
 
     /** The button under the text, if any. */
     var button: Button? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
         }
 

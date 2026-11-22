@@ -92,7 +92,8 @@ class Divider : Widget() {
  * A row with a trailing toggle and no [onClick] of its own is a setting's row: it owns the toggle. A click anywhere on
  * the row, the toggle included, switches it; the row lights up as one, and is one Tab stop (Space switches). With an
  * [onClick], the row opens something and the toggle is a target of its own: a click on the toggle switches it, a click
- * elsewhere runs [onClick], and Tab stops at the row, then at the toggle.
+ * elsewhere runs [onClick], and Tab stops at the row, then at the toggle. To grey out a setting, disable its toggle:
+ * the row that owns it counts as disabled too (grey title, no hover tint, the "can't" sound on a click).
  *
  * The row lights up under the pointer and when pressed. Its [divider] is its own last dp row, inside its 48 or 56 dp,
  * from x 56 with a leading element and x 12 without. Rows stacked in a [ScrollList] want just that. Rows that must
@@ -112,15 +113,25 @@ class ListRow(var title: String) : Clickable(), ToggleOwner {
     var divider = true
 
     var leading: Widget? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
             layout()
         }
 
     var trailing: Widget? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
             layout()
         }
@@ -129,6 +140,9 @@ class ListRow(var title: String) : Clickable(), ToggleOwner {
     override val preferredHeight get() = if (subtitle != null) 56f else 48f
 
     override fun owns(toggle: Toggle) = toggle === trailing && onClick == null
+
+    // A setting greyed out by disabling its toggle greys out its row.
+    override val kitEnabled get() = (trailing as? Toggle)?.takeIf { owns(it) }?.enabled ?: true
 
     override fun perform() {
         // Owning its toggle, the row switches it; the row's tap is the only one.
@@ -172,7 +186,7 @@ class ListRow(var title: String) : Clickable(), ToggleOwner {
  *
  * It owns its [toggle] (see [Toggle]): a click anywhere on it switches the toggle, it is one Tab stop, and it has no
  * hover tint of its own: the toggle shows its hover. Read and set [Toggle.checked], listen with [Toggle.onChange]; an
- * [onClick], if you set one, runs after the switch.
+ * [onClick], if you set one, runs after the switch. Disabling it or its toggle disables both.
  *
  * - With a [helper]: 44 dp, the title in [TextStyle.BODY_STRONG] at y 4, the helper in grey at y 22, the toggle at
  *   the right, centred.
@@ -190,6 +204,8 @@ class LabeledToggle(var title: String) : Clickable(), ToggleOwner {
     var toggleFirst = false
 
     override fun owns(toggle: Toggle) = toggle === this.toggle
+
+    override val kitEnabled get() = toggle.enabled
 
     override fun perform() {
         toggle.toggle()

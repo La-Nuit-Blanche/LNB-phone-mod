@@ -10,7 +10,8 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * handler of its own, or a [LabeledToggle]. The owner then takes the pointer, the hover, the focus and the click for
  * the whole row, the toggle included, and the toggle only shows the row's state: hovering anywhere on the row lights
  * both, a click anywhere switches it, and the row is one Tab stop. Anywhere else (a row with its own [ListRow.onClick],
- * a toggle placed on its own) it is a target of its own: it is clicked and focused by itself.
+ * a toggle placed on its own) it is a target of its own: it is clicked and focused by itself. A disabled toggle
+ * disables the row that owns it: disable the toggle to grey out the whole setting.
  */
 class Toggle : Clickable() {
     private val knob = Tween(OFF_X)
