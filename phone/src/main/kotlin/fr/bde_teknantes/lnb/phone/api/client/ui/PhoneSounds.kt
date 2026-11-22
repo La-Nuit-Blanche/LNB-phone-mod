@@ -12,6 +12,9 @@ import net.minecraft.sounds.SoundEvent
  * turns sounds off in Settings. The kit's widgets already play [tap] when clicked (after the click has done its work)
  * and [error] for a click on something disabled or an error snackbar; call the others when your app does what they
  * stand for. Client thread.
+ *
+ * In an app's unit tests, the phone's test support (`fr.bde_teknantes.lnb.phone.testing.PhoneTester`) records the
+ * sounds instead of playing them.
  */
 object PhoneSounds {
     /** One sound of the phone, with the volume and pitch art direction 15 gives it. */

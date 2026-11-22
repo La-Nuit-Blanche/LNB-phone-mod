@@ -181,7 +181,8 @@ Warden and more), with their own client settings. Install the phone on that modp
 launcher), and cover what can be reasoned about without a window: the navigation model, the shell's state machine and
 its handling of every key, notification alerts and the inventory button's logic, the layout maths, text layout and
 editing, the kit's widgets and focus, the notification store, its limits and its sync, the settings file and the
-Settings app. The demo's tests check Ping's session and target, and that every code sample of
+Settings app (played through `PhoneTester`, the test support apps use too, in `phone/src/testing/`). The demo's tests
+check Ping's session, target and conversation screen, and that every code sample of
 `docs/writing-an-app.md` is still found in the file it quotes.
 
 ### Screenshots

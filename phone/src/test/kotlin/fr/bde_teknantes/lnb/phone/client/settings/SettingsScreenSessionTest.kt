@@ -107,10 +107,10 @@ class SettingsScreenSessionTest {
         // The toggles end at x 244, centred in their rows: P-13's and P-14's cursor (226, 169) and (226, 218) is on them.
         assertEquals(listOf(208f, 159f, 36f, 20f), box(s.sounds))
         assertEquals(listOf(208f, 208f, 36f, 20f), box(s.preview))
-        val section = s.canvas.texts.single { it.style == TextStyle.CAPTION_STRONG }
+        val section = s.texts.single { it.style == TextStyle.CAPTION_STRONG }
         assertEquals(12f to 56f, section.x to section.y)
         assertEquals(Colors.TEXT_2, section.color)
-        val label = s.canvas.texts.single { it.text == "settings.lnbphone.position" }
+        val label = s.texts.single { it.text == "settings.lnbphone.position" }
         assertEquals(Triple(12f, 76f, TextStyle.BODY_STRONG), Triple(label.x, label.y, label.style))
     }
 
@@ -320,25 +320,30 @@ class SettingsScreenSessionTest {
 
     @Test
     fun `every text on the screen is a key of section 13 present in both language files`() {
-        // No language is loaded in tests, so the screen draws its keys: each must exist in en_us and fr_fr.
+        // No language is loaded in tests, so the screen draws its keys: each must exist in en_us and fr_fr. A key too
+        // long for a segment is cut with an ellipsis, as a long label would be.
         val s = open()
-        val drawn = s.canvas.texts.map { it.text }.toSet()
-        assertEquals(
-            setOf(
-                "app.lnbphone.settings",
-                "settings.lnbphone.section.phone",
-                "settings.lnbphone.position",
-                "settings.lnbphone.position.corner",
-                "settings.lnbphone.position.centre",
-                "settings.lnbphone.sounds",
-                "settings.lnbphone.preview",
-            ),
-            drawn,
+        val expected = setOf(
+            "app.lnbphone.settings",
+            "settings.lnbphone.section.phone",
+            "settings.lnbphone.position",
+            "settings.lnbphone.position.corner",
+            "settings.lnbphone.position.centre",
+            "settings.lnbphone.sounds",
+            "settings.lnbphone.preview",
         )
+        val drawn = s.texts.map { it.text }
+        assertEquals(expected.size, drawn.size, "$drawn")
+        for (text in drawn) {
+            assertTrue(text in expected || (text.endsWith("…") && expected.any { it.startsWith(text.dropLast(1)) }), text)
+        }
+        val shownKeys = expected.filter { key -> drawn.any { it == key || (it.endsWith("…") && key.startsWith(it.dropLast(1))) } }
+        assertEquals(expected.size, shownKeys.size, "every key shows")
+        val keysDrawn = expected
         for (lang in listOf("en_us", "fr_fr")) {
             val keys = javaClass.getResourceAsStream("/assets/lnbphone/lang/$lang.json")!!.reader(Charsets.UTF_8)
                 .use { JsonParser.parseReader(it).asJsonObject.keySet() }
-            assertTrue(keys.containsAll(drawn), "$lang lacks ${drawn - keys}")
+            assertTrue(keys.containsAll(keysDrawn), "$lang lacks ${keysDrawn - keys}")
         }
     }
 }

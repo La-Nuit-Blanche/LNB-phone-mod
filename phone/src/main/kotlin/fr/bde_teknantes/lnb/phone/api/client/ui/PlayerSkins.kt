@@ -36,7 +36,8 @@ object PlayerSkins {
 
     /** The best skin known for the player [id] named [name] right now. */
     fun skin(id: UUID, name: String): ResourceLocation {
-        val mc = Minecraft.getInstance()
+        // No game in an app's unit tests (PhoneTester): the default skin, without fetching anything.
+        val mc: Minecraft = Minecraft.getInstance() ?: return DefaultPlayerSkin.get(id).texture()
         mc.connection?.getPlayerInfo(id)?.let { return it.skin.texture() }
         when (val entry = entries[id]) {
             is Found -> return mc.skinManager.getInsecureSkin(entry.profile).texture()

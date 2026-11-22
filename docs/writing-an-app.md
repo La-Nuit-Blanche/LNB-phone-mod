@@ -659,6 +659,31 @@ plain classes, as `PingTarget` and `PingSession` are, and test it with JUnit und
 `PingTargetTest` and `PingSessionTest`. Tests run with the game loaded, which loads Kotlin twice: use JUnit's
 `assertInstanceOf` and `assertThrows`, not kotlin.test's `assertIs` and `assertFailsWith`.
 
+Your screens can be tested too, with `PhoneTester` (`fr.bde_teknantes.lnb.phone.testing`), which the app plugin puts on
+your tests' classpath and never in your jar. It is a phone without the game: it opens your app, passes your screens
+frames, ticks, clicks, keys and typed text as the phone does, navigates as the phone does, and records the sounds
+instead of playing them. Text is measured as if every character were half its size wide, and no language is loaded,
+so `I18n.get` returns its key. Its KDoc has the rest.
+
+<!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreenTest.kt -->
+```kotlin
+    // A phone without the game, open on the conversation with Dev.
+    private val tester = PhoneTester { PingScreen(dev, "Dev") }
+
+    @AfterEach
+    fun tearDown() {
+        tester.close()
+        PingSession.clear()
+    }
+
+    @Test
+    fun `Send waits for something to send`() {
+        // The send button, right-aligned to x 244 at y 168: disabled, a click on it answers with the error sound.
+        tester.click(200f, 184f)
+        assertEquals(listOf(PhoneSound.ERROR), tester.sounds)
+    }
+```
+
 ## Mistakes to avoid
 
 Each of these compiles, and most of them work in single player.
