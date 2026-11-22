@@ -14,5 +14,8 @@ class HelloScreen(private val depth: Int) : AppScreen() {
         return true
     }
 
+    // A demo notification for this depth needs no banner here: the player is looking at it.
+    override fun showsTarget(target: String) = target == "depth:$depth"
+
     override fun toString() = "HelloScreen($depth)"
 }

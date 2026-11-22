@@ -1,3 +1,7 @@
 {
-  "app.lnbphone_demo.hello": "Hello"
+  "app.lnbphone_demo.hello": "Hello",
+  "notif.lnbphone_demo.test.title": "Test notification",
+  "notif.lnbphone_demo.test.text": "%1$s: this is test notification no. %2$s from the demo app.",
+  "commands.phonedemo.notify.done": "Sent a test notification to %s player(s)",
+  "commands.phonedemo.clear.done": "Cleared the demo app's notifications of %s player(s)"
 }
