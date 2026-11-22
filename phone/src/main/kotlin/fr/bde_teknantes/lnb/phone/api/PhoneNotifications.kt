@@ -4,6 +4,7 @@ import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.notifications.NotificationLimits
 import fr.bde_teknantes.lnb.phone.notifications.NotificationList
 import fr.bde_teknantes.lnb.phone.notifications.server.ServerNotifications
+import fr.bde_teknantes.lnb.phone.notifications.server.ServerThread
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.MinecraftServer
@@ -117,13 +118,6 @@ object PhoneNotifications {
         if (it == null) LnbPhone.LOGGER.warn("No server is running: can't {}", what)
     }
 
-    private fun onServerThread(server: MinecraftServer, action: (MinecraftServer) -> Unit) {
-        if (server.isSameThread) return action(server)
-        // A stopped server runs execute()'s task in the caller's thread instead of queueing it: never touch the store
-        // from there.
-        if (!server.isRunning) return dropped()
-        server.execute { if (server.isSameThread) action(server) else dropped() }
-    }
-
-    private fun dropped() = LnbPhone.LOGGER.warn("The server is stopping: phone notification change dropped")
+    private fun onServerThread(server: MinecraftServer, action: (MinecraftServer) -> Unit) =
+        ServerThread.run(server, server::isRunning) { action(server) }
 }
