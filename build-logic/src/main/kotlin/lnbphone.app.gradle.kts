@@ -27,6 +27,8 @@ neoForge {
         register("server") {
             server()
             programArgument("--nogui")
+            // -Pserver_port=25566 lets servers from several checkouts run at once without fighting over 25565.
+            programArguments.addAll("--port", findProperty("server_port")?.toString() ?: "25565")
         }
     }
 }

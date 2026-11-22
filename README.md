@@ -32,6 +32,7 @@ Needs Java 21 (`JAVA_HOME`). The phone's jar is `phone/build/libs/lnbphone-<vers
 
 Both load the phone and the demo app. The game runs in `apps/demo/run/`; the server needs `eula=true` in
 `apps/demo/run/eula.txt`.
+The server listens on 25565; `-Pserver_port=25566` picks another port, for servers from several checkouts at once.
 
 ## License
 
