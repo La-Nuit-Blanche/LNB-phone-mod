@@ -7,8 +7,8 @@ import org.lwjgl.glfw.GLFW
 
 /**
  * Task 8: the Settings app in the real phone, in a world, through the game's own input path, step by step through
- * art direction 17's flows P-12 (placement), P-13 (sounds) and P-14 (preview, the steps this branch can show). Run with
- * `-PdemoApps=1` so that Settings is the fifth icon of row 0, as in P-12.1.
+ * art direction 17's flows P-12 (placement), P-13 (sounds) and P-14 (preview, the steps this branch can show). Run without
+ * `-PdemoApps`: Settings is then the fifth icon of row 0, as in P-12.1 (after Hello, the kit, the sample Feed and Ping).
  *
  * [settings] plays the flows at GUI scale 2, 3 and 4 in French, shows the screen in English at each scale, and ends
  * with the phone centred and its sounds off, saved. [window] is the next launch, in a 480 x 270 window
@@ -42,7 +42,7 @@ internal object SettingsScenarios {
         waitTicks(8)
         click { device(70, 218) }
         waitTicks(4)
-        click { icon(4) }
+        click { icon(HomeSlots.of(HomeSlots.SETTINGS)) }
         waitTicks(8)
         mouseToApp(186, 116)
         waitTicks(3)
@@ -72,10 +72,10 @@ internal object SettingsScenarios {
         waitTicks(4)
 
         // P-12: placement.
-        mouseTo { icon(4) }
+        mouseTo { icon(HomeSlots.of(HomeSlots.SETTINGS)) }
         waitTicks(2)
         shot(name("p12_1_home_hover_settings"))
-        click { icon(4) }
+        click { icon(HomeSlots.of(HomeSlots.SETTINGS)) }
         waitTicks(8)
         mouseToApp(128, 300)
         waitTicks(3)
@@ -132,10 +132,10 @@ internal object SettingsScenarios {
         openPhone()
         click { device(70, 218) }
         waitTicks(4)
-        mouseTo { icon(4) }
+        mouseTo { icon(HomeSlots.of(HomeSlots.SETTINGS)) }
         waitTicks(2)
         shot("en_home_hover_settings_gui$s")
-        click { icon(4) }
+        click { icon(HomeSlots.of(HomeSlots.SETTINGS)) }
         waitTicks(8)
         mouseToApp(226, 218)
         waitTicks(3)
