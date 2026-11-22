@@ -17,6 +17,9 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Banner text.** Emoji are dropped and each run of other characters the font lacks becomes one `?`; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
 - **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
 - **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
+- **Text and keys in apps.** The 280-character limit counts code points after NFC normalisation (an accented letter is 1, an emoji 1, a flag 2); the counter and the Publier button use the same untrimmed count and the text is sent trimmed. Enter makes a new line in a text area and Ctrl+Enter submits; Backspace does nothing while a menu or dialog is open; Tab cycles a menu's or dialog's items; a menu that fits neither below nor above its button covers it; a double click selects a word; selected text has the new `selection` colour `#3A8DF066` (8.3, 8.7, 9.7, 9.8, 2.3).
+- **Feed details.** A 17-character handle does not always fit its line: `@` plus sixteen `W` is about 205 dp, wider than the 188 dp column, so the handle line truncates too (9.2, 9.3, 19). `heart_filled` is drawn filled and stroked so that it keeps the outline heart's size (8.6). Avatars: a face is resolved from the player's UUID and name, and the default skin shows until it is known and for players the session service does not know (8.7, 9.2).
+- **App glyphs and fonts.** A glyph that is not 16 x 16 is fitted: a square multiple of 16 is sampled down, a 16-wide strip shows its first frame, anything else shows the bare tile (7.2). Inter has no emoji or non-Latin glyphs: such characters show one missing-glyph box each in apps; bundling an emoji font is a new open question (8.4, 19).
 - **Settings.** Section 12 places the rows 49 dp apart with separate dividers at `y 193` and `y 242`, and 8.7 says where a row's own divider sits. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer (2.4, 8.7, 12).
 - **Language.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch`; everything else gets English (13.1).
 
@@ -379,6 +382,7 @@ On a 20 x 20 canvas:
 - At most 4 inks from the list below. Do not draw shadows.
 - An ItemStack may replace the glyph (16 x 16 at `(2,2)`, no auto-shade).
 - App names: 16 characters or fewer recommended, in both languages. The limit is not enforced: a name too long for the label line (section 6) is truncated when drawn.
+- A glyph that is not 16 x 16 is fitted, with a warning in the log: a square multiple of 16 (32 x 32, 48 x 48) is sampled down with nearest-neighbour, a strip 16 wide and a multiple of 16 tall shows its first frame, anything else shows the bare tile.
 
 | Ink | Hex |
 |---|---|
@@ -568,6 +572,7 @@ Inside apps the pixel status bar is painted in `status-bg-app` = `#12151B`, exac
 | `anon-bg` | `#3A4250` | anonymous avatar disc |
 | `banner-edge` | `#FFFFFF0F` | 1 dp inner stroke of the banner |
 | `focus-ring` | `#3A8DF080` | keyboard focus ring |
+| `selection` | `#3A8DF066` | background behind selected text in a field or area |
 
 ### 8.4 Type
 
@@ -588,6 +593,8 @@ Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter
 
 Text is left-aligned, sentence case. Every fixed-width slot is sized for the longer of the French and English strings (section 13.3). Single-line slots truncate with an ellipsis character. Post text wraps on word boundaries and is never truncated in the timeline.
 
+**Characters Inter lacks.** Inter covers Latin, Greek and Cyrillic; it has no emoji and no CJK, Arabic or other scripts. In apps such a character shows one missing-glyph box per grapheme (an emoji with its skin tone, or a flag, is one box); the text itself is never altered. The notification banner differs: it drops emoji and shows one `?` per run of other characters (10.1). Whether to bundle an emoji font is an open question for the Feed phase (19).
+
 ### 8.5 Spacing and radius
 
 - Spacing scale (dp): **2, 4, 8, 12, 16, 24, 32**.
@@ -601,7 +608,7 @@ Text is left-aligned, sentence case. Every fixed-width slot is sized for the lon
 - Grids: **12 dp** (the filled megaphone in the announcer badge, `person` in a 16 dp avatar), **16 dp** (action row, pin, lock, more, trash, alert, arrows; stroke 1.5 dp), **20 dp** (header and row icons; stroke 2 dp), **24 dp** (FAB; stroke 2 dp), **28 dp** (`person` in a 48 dp avatar; stroke 2 dp), **40 dp** (empty states; stroke 2.5 dp). `person` is drawn at 12, 20 and 28 dp, so the anonymous avatar's icon is exported at the size it is drawn.
 - Live area: grid minus 2 dp on every side (20 dp icon draws inside 16 dp).
 - Round caps, round joins, 2 dp corner radius on drawn rectangles.
-- Outline style. Filled variants only for active states (`heart_filled`, `pin_filled`).
+- Outline style. Filled variants only for active states (`heart_filled`, `pin_filled`). `heart_filled` is drawn filled and stroked, so that it keeps the outline heart's size (in the mockup the heart shrank when liked).
 - Exported white on transparent and tinted at draw time: `text-1` by default, `text-2` in action rows and meta, `on-accent` on accent.
 
 Icon set: `back` (chevron left), `close` (X), `compose` (pen nib with a short line under it), `heart`, `heart_filled`, `reply` (rounded speech bubble), `pin`, `pin_filled`, `lock` (padlock, private lines), `more` (three horizontal dots), `trash` (bin), `alert` (circle with an exclamation mark), `arrow_up`, `person` (head circle and shoulders, for the anonymous avatar), `globe`, `megaphone`, `megaphone_filled` (12 dp solid silhouette, announcer badge), `inbox`.
@@ -678,8 +685,12 @@ Minimum width 64 dp for primary, danger and secondary. Buttons in fixed layouts 
 | Counter | `caption`, right-aligned at 12 dp from the right edge, line box 22 dp above the bottom edge; format `142/280` |
 | Counter colour | 0 to 260 characters `text-2`; 261 to 280 `warning`; over 280 `danger`, and the counter shows the excess as `-5` |
 | Over the limit | characters after the 280th get a `danger-soft` background behind each glyph run |
+| Counting | characters are Unicode code points of the text in normalisation form C: `é` is 1 however it was typed, an emoji is 1, a flag (two code points) is 2. The counter and the send button use the same **untrimmed** count, spaces and line breaks included, so they always agree; the text is sent trimmed. An app's server counts the same way (`TextLimits`) |
+| Keys | Enter makes a new line; Ctrl+Enter submits (in a single-line text field, Enter submits) |
 | Placeholder | `body` `text-3` |
 | Sending | text `text-2`, no caret, not editable, border `stroke` |
+
+In both kinds of field, selected text has a `selection` background, and a double click selects a word.
 
 **Toggle** (switch, 36 x 20 dp, full radius)
 
@@ -715,7 +726,8 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 |---|---|
 | Sizes | **16, 32 or 48 dp only**. These give whole-number scaling of the 8 x 8 face at every GUI scale (32 dp at scale 3 is 48 px = 6x) |
 | Content | the player's 8 x 8 skin face, hat layer on top, scaled with nearest-neighbour |
-| Shape | circle, through the anti-aliased circle mask sprite; no ring, no border |
+| Which face | resolved from the player's UUID and name. A player on the server now: the skin the tab list has. Otherwise the profile is fetched once, in the background, from Mojang's session service by UUID, then by name if the UUID is unknown there, and kept for the session. Until it is known, and for players the session service doesn't know (offline-mode accounts, made-up names), the default skin Minecraft gives that UUID shows; the face changes by itself when the real one arrives |
+| Shape | circle, computed by the drawing surface (8.1); no ring, no border |
 | Anonymous | `anon-bg` disc with the `person` icon in `text-2` (20 dp icon on a 32 dp avatar, 12 dp on 16, 28 dp on 48) |
 
 **Badges (app layer)**: count badge 16 dp tall, full radius, minimum width 16 dp, padding 4 dp each side, fill `badge`, text `micro` `#FFFFFF`; `99+` above 99. Dot badge: 8 dp circle `badge`.
@@ -738,8 +750,8 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Shape | 168 dp wide, radius 10, fill `surface-3`, `shadow/sheet` under it; 4 dp padding top and bottom |
 | Item | 40 dp tall, icon 16 dp at `x 12` (vertically centred), label `body` at `x 40`; normal item `text-1`, destructive item icon and label `danger` |
 | Item hover / pressed | `overlay-hover` / `overlay-pressed` over the item |
-| Position | its top-right corner 4 dp under the bottom-right corner of the button that opened it; it opens upward instead (its bottom-right 4 dp above the button) when its bottom would pass `y 362` |
-| Closing | an item click, a click anywhere else (that click does nothing else), Esc |
+| Position | its top-right corner 4 dp under the bottom-right corner of the button that opened it; it opens upward instead (its bottom-right 4 dp above the button) when its bottom would pass `y 362`. A menu that fits neither below nor above the button covers the button, kept inside the viewport |
+| Closing | an item click, a click anywhere else (that click does nothing else), Esc. While it is open Tab and Shift+Tab cycle its items, and Backspace does nothing |
 | Timing | fades in 100 ms; closes at once |
 
 **Dialog** (confirmation)
@@ -752,7 +764,7 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Text | 8 dp under the title, `body` `text-2`, up to 3 lines |
 | Buttons | 16 dp under the text, right-aligned to the card's right padding: cancel (secondary, 88 dp) then, 8 dp to its right, confirm (primary or danger, 104 dp) |
 | Height | `16 + title + 8 + text + 16 + 32 + 16` dp |
-| Closing | cancel button, click on the scrim, Esc: same as cancel. The confirm button goes into its loading state until the server answers, then the dialog closes |
+| Closing | cancel button, click on the scrim, Esc: same as cancel. The confirm button goes into its loading state until the server answers, then the dialog closes. While it is open Tab and Shift+Tab cycle its buttons, and Backspace does nothing (the confirm button may be waiting for the server) |
 | Timing | scrim and card fade in 150 ms; fade out 100 ms |
 
 **Snackbar**
@@ -804,8 +816,8 @@ There is no registration. Everything comes from the game and from LNB Warden, th
 | Display name (bold) | the player's **real name** from LNB Warden, exactly the string the tab list shows (unchanged, may contain spaces and accents): `Alexandre Morel` |
 | Handle (grey) | `@` + the **Minecraft username**: `@Alex_Craft` |
 | No real name | when Warden has no real name for the player (hidden or guest), the **username is the display name** and there is **no handle**, so the same word is never printed twice: `SteveBuilds` |
-| Lengths | handles are at most 17 characters (`@` + 16). Real names are capped by Warden (`RealNamesPayload.MAX_NAME_LENGTH`); every layout is checked with a 32-character real name and truncates the real name |
-| Avatar | the face of the username's skin |
+| Lengths | handles are at most 17 characters (`@` + 16). Real names are capped by Warden (`RealNamesPayload.MAX_NAME_LENGTH`); every layout is checked with a 32-character real name and truncates the real name. The handle line truncates too (9.3) |
+| Avatar | the face of the player's skin, resolved from their UUID and name (8.7) |
 | Operators | players with op permission level 2 or higher |
 | Announcers | operators, plus players an admin has granted the right to by command. Only announcers can post in Annonces, pin, and see the destination choice in Compose |
 | Announcer badge | on every post and reply by an announcer, both feeds (8.7) |
@@ -836,7 +848,7 @@ x: 12        44 56                                 214    244
 | Avatar | 32 dp at `(12, 10)` |
 | Name line | line box `y 10`, 18 dp: display name `title-m` `text-1`; announcer badge 4 dp after the name, vertically centred; relative time `caption` `text-2` right-aligned to `x 244`, or to `x 214` when the more button shows |
 | Name truncation | the display name truncates so that badge + 8 dp + time always fit; badge and time never truncate |
-| Handle line | line box `y 28`, 16 dp: handle `caption` `text-2` at `x 56`. Absent when there is no real name, and on anonymous posts. A 17-character handle (about 106 dp) always fits |
+| Handle line | line box `y 28`, 16 dp: handle `caption` `text-2` at `x 56`. Absent when there is no real name, and on anonymous posts. The handle truncates with an ellipsis at `x 244`, like any single-line slot. A typical 17-character handle is about 106 dp and fits, but the worst case, `@` plus sixteen `W`, is about 205 dp in `caption`, wider than the 188 dp column |
 | More button | 28 x 28 dp icon button at `(220, 5)`, `more` icon 16 dp `text-2`; shown only when the viewer can delete the post (9.9) |
 | Private line | one optional 16 dp line after the header lines (see below) |
 | Reply-to line | in threads only, 16 dp, before the private line (9.7) |
@@ -950,7 +962,7 @@ y 306  ------------------------------------------------   composer (collapsed)
 |---|---|
 | Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre Morel…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. Hover: field hover state. Click: expands |
 | Expanded, 200 dp (`y 170..369`) | `En réponse à Alexandre Morel` (`post.reply_to`) in `caption` `text-2`, line box at `(12, 182)`; text area 232 x 112 at `(12, 202)` with the `n/280` counter (4 text lines visible, then it scrolls); at `y 326`: toggle at `(12, 332)` with label `Anonyme` (`reply.anonymous`) in `body-strong` at `x 56`, line box `y 333`; primary button `Répondre` (`reply.send`, 96 dp wide) right-aligned to `x 244`, `y 326` |
-| Répondre button | disabled while the text is empty (after trimming) or over 280 characters |
+| Répondre button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Sending | button in its loading state, text area in its sending state, toggle disabled |
 | Back while expanded | collapses the composer and keeps the draft (one draft per thread) |
 | Success | collapses, clears the draft and the toggle, the new reply appears at the end with the post highlight and is scrolled into view, snackbar `Réponse envoyée` (`reply.sent`) |
@@ -975,10 +987,10 @@ y 96  +------------------------------------------------+
 | Element | Value |
 |---|---|
 | Header | close icon button (`close`) at `(6, 6)`; no title; primary button `Publier` (`compose.post`), **88 dp wide**, right-aligned to `x 244`, at `y 6` |
-| Publier button | disabled while the text is empty (after trimming) or over 280 characters |
+| Publier button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Author row | avatar 32 dp at `(12, 52)`; display name `title-m` at `x 56`, line box `y 52`; handle `caption` `text-2` at `x 56`, line box `y 70`. Without a real name: the username alone as display name, line box `y 59` (centred on the avatar) |
 | Author row, anonymous on | anonymous avatar; `Anonyme` in `title-m` `text-2` at line box `y 52`; `Masqué aux joueurs` (`compose.anon_sub`) in `caption` `text-2` at line box `y 70` |
-| Text area | at `(12, 96)`, 232 dp wide; **196 dp tall for players**, **152 dp for announcers**; placeholder `Quoi de neuf sur le serveur ?` (`compose.placeholder`); counter `n/280`; focused on open |
+| Text area | at `(12, 96)`, 232 dp wide; **196 dp tall for players**, **152 dp for announcers**; placeholder `Quoi de neuf sur le serveur ?` (`compose.placeholder`); counter `n/280`; focused on open; Enter makes a new line, Ctrl+Enter publishes |
 | Anonymous row | 44 dp, `x 12..244`, 12 dp under the text area: `Publier anonymement` (`compose.anonymous`) in `body-strong` (line box at row `y 4`), `Nom masqué aux joueurs` (`compose.anonymous.help`) in `caption` `text-2` (line box at row `y 22`), toggle right-aligned to `x 244`, centred at row `y 22`. Default off. **Hidden while Annonces is selected**; selecting Annonces also turns it off. The slot stays empty so nothing jumps |
 | Destination (announcers only) | segmented control 232 x 32 at `(12, 316)`: `Annonces` / `Global`, same order as the tabs; preselected from the FAB that opened Compose. Everyone else never sees it |
 | Bottom | both layouts end at `y 347` |
@@ -1885,14 +1897,18 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 1. Without a real name, the Minecraft username becomes the bold name and no handle is shown.
 2. Deleting is in version 1: players delete their own posts and replies, operators delete anything, with a confirmation. Deleting a post deletes its replies. Nothing can be restored.
 3. Pinning: limit of 3 pinned announcements; pinning a 4th asks to replace the oldest.
-4. The player cannot walk while the phone is open in version 1 (it is a normal game screen).
+4. The player cannot walk while the phone is open in version 1 (it is a normal game screen). They can still move during the 250 ms slide that precedes it (2.3).
 
 **Shown on the storyboard canvas and not objected to** (built this way unless the user says otherwise):
 
-1. The post header is two lines (name, then `@handle`), because a real name, a 16-character handle and the time do not fit on one line in 188 dp. Long real names truncate; the handle never does. Warden caps real names at 64 characters.
+1. The post header is two lines (name, then `@handle`), because a real name, a 16-character handle and the time do not fit on one line in 188 dp. Long real names truncate; the handle truncates only in the worst case, sixteen wide letters after the `@` (9.3). Warden caps real names at 64 characters.
 2. Any announcer can pin or unpin any announcement.
 3. Esc closes the phone even inside an app (after closing a menu or dialog); the phone reopens on the same screen. With unread notifications, the inventory button opens the home screen instead, but only from home or an app's root screen; from deeper in an app it reopens that screen, since drafts win over badges (11).
 4. A Feed badge clears when Feed is opened. Replies to your own posts stay marked in the feed (blue reply count) until you open the thread.
+
+**Open for the Feed phase** (found while building the phone; to settle when Feed is designed in detail):
+
+1. Emoji and other scripts. Inter has no emoji and no non-Latin glyphs (8.4), so a post with an emoji shows one missing-glyph box per emoji in the apps, while the notification banner drops emoji. Whether to bundle an emoji font, and with what size, licence and colour handling, is open. The 280-character count already counts an emoji as one character (8.7).
 
 **Known slips in the Feed sample data** (found while drawing the canvas; to fix before the Feed app is built, they do not affect the phone):
 
