@@ -91,8 +91,12 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
     /** Notifications read in place, in order. */
     val dismissed = ArrayList<PhoneNotification>()
 
+    /** What reading in place does besides being recorded (a test wires the client's notification store here). */
+    var onDismiss: (PhoneNotification) -> Unit = {}
+
     override fun dismissNotification(notification: PhoneNotification) {
         dismissed += notification
+        onDismiss(notification)
     }
 
     /** Runs the tasks queued with [later], as the client does between frames. */
