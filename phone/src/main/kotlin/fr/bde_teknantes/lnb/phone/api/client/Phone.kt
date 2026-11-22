@@ -51,8 +51,8 @@ interface Phone {
     fun home()
 
     /**
-     * Puts the phone away. The app keeps its screens: the phone reopens on this one, with its state, the next time the
-     * player opens it (until they disconnect).
+     * Puts the phone away. The app keeps its screens: the next time the player opens the phone (until they
+     * disconnect), it reopens on the app's top screen, with its state.
      */
     fun close()
 }

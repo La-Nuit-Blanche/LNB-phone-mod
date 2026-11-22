@@ -77,9 +77,10 @@ abstract class AppScreen {
      * Draws the screen, every frame while it is shown.
      *
      * The phone may also call it briefly while the screen is not the one shown, to draw it under or beside another
-     * one during a slide (150 ms), including just after [onClosed] when it is popped: draw from your state as it is,
-     * and don't free in [onClosed] what drawing needs. Conversely, the phone may skip it while the screen is shown,
-     * when it can't draw apps (at GUI scale 1 it shows a message instead).
+     * one during a slide (150 ms), including just after [onClosed]: when the screen is popped or replaced, and when
+     * the app is opened again from a notification while this screen was on top. Draw from your state as it is, and
+     * don't free in [onClosed] what drawing needs. Conversely, the phone may skip it while the screen is shown, when
+     * it can't draw apps (at GUI scale 1 it shows a message instead).
      *
      * @param mouseX where the pointer is, in viewport dp; it can lie outside the viewport.
      * @param mouseY see [mouseX].

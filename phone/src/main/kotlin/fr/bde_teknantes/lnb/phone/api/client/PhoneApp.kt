@@ -26,8 +26,8 @@ import net.minecraft.resources.ResourceLocation
  * Use your mod id as the namespace so that two mods can't pick the same id. If two apps register the same id, the
  * first one wins and the second is left out (with an error in the log).
  * @property name The name shown on the home screen when the app is hovered, in the player's language. Use a
- * translatable component and give the key in both `en_us.json` and `fr_fr.json`. At most 16 characters in each
- * language: longer names are cut on the home screen.
+ * translatable component and give the key in both `en_us.json` and `fr_fr.json`. Keep it to 16 characters or fewer
+ * in each language: a name too long for the home screen's label line is truncated when drawn.
  * @property icon The app's icon on the home screen and on its notifications.
  * @param targetScreens Only for apps whose notifications point somewhere precise (see [AppTarget]); leave it out
  * otherwise, and notifications open the app on its first screen.
@@ -68,12 +68,23 @@ fun interface AppScreenFactory {
 /**
  * Turns a notification's target into the screens to show. See [AppTarget] for what a target is.
  *
+ * The phone always opens an app afresh, with new screens, even when the player was in it a moment ago. So that "back"
+ * from the landing screen returns to what the player was looking at (the tab they were on, where they had scrolled),
+ * rebuild the screens under it from state that your app keeps itself, outside its screens, and that its screens
+ * update as the player moves around:
+ *
  * ```kotlin
+ * // Kept by the app for the whole session, written by FeedScreen when the tab changes or the list scrolls.
+ * object FeedState {
+ *     var tab = FeedTab.ANNOUNCEMENTS
+ *     var scroll = 0f
+ * }
+ *
  * PhoneApp(id, name, icon, targetScreens = { target ->
  *     val post = target.removePrefix("thread:").toLongOrNull()
- *     // Back from the thread leads to the feed, as if the player had opened the thread from there.
- *     if (post == null) emptyList() else listOf(FeedScreen(), ThreadScreen(post))
- * }) { FeedScreen() }
+ *     // Back from the thread leads to the feed as the player left it, as if they had opened the thread from there.
+ *     if (post == null) emptyList() else listOf(FeedScreen(FeedState.tab, FeedState.scroll), ThreadScreen(post))
+ * }) { FeedScreen(FeedTab.ANNOUNCEMENTS, 0f) }
  * ```
  */
 fun interface AppTargetScreens {
