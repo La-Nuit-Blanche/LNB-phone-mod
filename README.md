@@ -33,6 +33,16 @@ Needs Java 21 (`JAVA_HOME`). The phone's jar is `phone/build/libs/lnbphone-<vers
 Both load the phone and the demo app. The game runs in `apps/demo/run/`; the server needs `eula=true` in
 `apps/demo/run/eula.txt`.
 
+## Screenshots
+
+```
+./gradlew :apps:demo:runCapture -Pcapture=smooth [-PcaptureDir=<absolute directory>]
+```
+
+Starts a client that plays a capture scenario by itself (GUI scale changes, screens, a throwaway world) and quits.
+Shots go to `captureDir`, or `apps/demo/run/captures/<scenario>/`. Scenarios are in the demo's
+`client/capture/CaptureScenarios.kt`.
+
 ## License
 
 AGPL-3.0-or-later.
