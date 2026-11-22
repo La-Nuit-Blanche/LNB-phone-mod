@@ -5,6 +5,8 @@ import fr.bde_teknantes.lnb.phone.client.debug.CaptureHooks
 import fr.bde_teknantes.lnb.phone.demo.DemoApp
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
+import net.minecraft.network.chat.Component
+import net.minecraft.world.item.Items
 import org.lwjgl.glfw.GLFW
 
 /**
@@ -34,6 +36,163 @@ internal object NotificationScenarios {
             previewOff(scale)
         }
         narrow()
+        reset()
+    }
+
+    /**
+     * What the review of task 7 changed, at GUI scale 4 in a 480 x 270 window: the peek's banner over a chat line (in a
+     * narrow window, where the chat reaches it), with subtitles on, under F1; the inventory button with news on an
+     * app's root screen and deeper; the crafting grid after the phone; the open recipe book over the button.
+     */
+    fun review() = CaptureScript().apply {
+        enterWorld()
+        quietCommands()
+        reset()
+
+        // The chat reaches the peek only in a narrow window (forced GUI scale 5: 384 x 216).
+        forceGuiScale(5)
+        waitTicks(5)
+        run { Minecraft.getInstance().player!!.displayClientMessage(Component.literal("A chat line that runs under the peek's banner"), false) }
+        notify(1, ANNOUNCEMENT)
+        waitUntil { CaptureHooks.isPeeking }
+        waitTicks(8)
+        shot("review_chat_under_peek_banner_forced_gui5")
+        waitUntil { !CaptureHooks.isPeeking }
+        guiScale(4)
+        waitTicks(5)
+
+        // Subtitles: the chime says what it is; the phone's interface sounds say nothing.
+        run { Minecraft.getInstance().options.showSubtitles().set(true) }
+        notify(1, REPLY)
+        waitUntil { CaptureHooks.isPeeking }
+        waitTicks(8)
+        shot("review_subtitles_peek_gui4")
+        waitUntil { !CaptureHooks.isPeeking }
+        waitTicks(70)
+        openPhone()
+        waitTicks(3)
+        shot("review_subtitles_phone_opened_gui4")
+        closePhone()
+        run { Minecraft.getInstance().options.showSubtitles().set(false) }
+
+        // F1: nothing of the phone over the picture.
+        run { Minecraft.getInstance().options.hideGui = true }
+        notify(1, PVP)
+        waitUntil { CaptureHooks.isPeeking }
+        waitTicks(8)
+        shot("review_f1_notification_arrives_gui4")
+        run { Minecraft.getInstance().options.hideGui = false }
+        waitUntil { !CaptureHooks.isPeeking }
+        readHello()
+
+        // With news, put away on an app's root screen: the button opens on home.
+        openPhone()
+        mouseTo { icon(HELLO_SLOT) }
+        mouseDown()
+        mouseUp()
+        waitTicks(6)
+        closePhone()
+        notify(1, ANNOUNCEMENT)
+        waitUntil { CaptureHooks.isPeeking }
+        waitUntil { !CaptureHooks.isPeeking }
+        screen { InventoryScreen(Minecraft.getInstance().player!!) }
+        waitTicks(3)
+        mouseTo { phoneButton(13, 14) }
+        mouseDown()
+        mouseUp()
+        waitUntil { CaptureHooks.isOpen }
+        pointAtNothing()
+        waitTicks(3)
+        shot("review_p5_root_opens_home_gui4")
+        backToGame()
+        readHello()
+
+        // With news, put away deeper (Hello 2, where a draft could be): the button keeps the screen, and the newest
+        // unread shows as the banner.
+        openPhone()
+        mouseTo { icon(HELLO_SLOT) }
+        mouseDown()
+        mouseUp()
+        waitTicks(6)
+        mouseTo { device(70, 160) }
+        mouseDown()
+        mouseUp()
+        waitTicks(6)
+        closePhone()
+        notify(1, REPLY)
+        waitUntil { CaptureHooks.isPeeking }
+        waitUntil { !CaptureHooks.isPeeking }
+        screen { InventoryScreen(Minecraft.getInstance().player!!) }
+        waitTicks(3)
+        mouseTo { phoneButton(13, 14) }
+        mouseDown()
+        mouseUp()
+        waitUntil { CaptureHooks.isOpen }
+        mouseTo { device(70, 160) }
+        waitTicks(3)
+        shot("review_p5_deep_keeps_screen_with_banner_gui4")
+        waitUntil { !CaptureHooks.bannerShown }
+        backToGame()
+        readHello()
+
+        // The crafting grid: two planks in it and two on the cursor when the phone opens; all four back afterwards.
+        run { Minecraft.getInstance().player!!.connection.sendCommand("give @s oak_planks 4") }
+        waitTicks(10)
+        screen { InventoryScreen(Minecraft.getInstance().player!!) }
+        waitTicks(3)
+        mouseTo { inventory(16, 150) }
+        mouseDown()
+        mouseUp()
+        waitTicks(2)
+        for (slotY in listOf(26, 44)) {
+            mouseTo { inventory(106, slotY) }
+            mouseDown(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+            mouseUp(GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+            waitTicks(2)
+        }
+        mouseTo { phoneButton(13, 14) }
+        waitTicks(3)
+        logPlanks("before the phone")
+        shot("review_crafting_before_phone_gui4")
+        mouseDown()
+        mouseUp()
+        waitUntil { CaptureHooks.isOpen }
+        waitTicks(3)
+        key(GLFW.GLFW_KEY_ESCAPE)
+        waitUntil { CaptureHooks.isClosed && Minecraft.getInstance().screen is InventoryScreen }
+        mouseTo { inventory(108, 70) }
+        waitTicks(10)
+        logPlanks("after the phone")
+        shot("review_crafting_after_phone_gui4")
+
+        // The recipe book open over the button, with news on it.
+        notify(1, PVP)
+        waitUntil { CaptureHooks.totalUnread == 1 }
+        mouseTo { recipeButton() }
+        mouseDown()
+        mouseUp()
+        waitTicks(3)
+        mouseTo { inventory(108, 70) }
+        waitTicks(35)
+        shot("review_recipe_book_open_gui4")
+        mouseTo { phoneButton(5, 14) }
+        waitTicks(3)
+        shot("review_recipe_book_pointer_on_covered_part_gui4")
+        mouseDown()
+        mouseUp()
+        waitTicks(3)
+        run { LnbPhone.LOGGER.info("Capture review: click on the covered part, phone closed: {}", CaptureHooks.isClosed) }
+        mouseTo { phoneButton(24, 14) }
+        waitTicks(3)
+        shot("review_recipe_book_pointer_on_uncovered_part_gui4")
+        // The book stays open in the player's settings: closed again.
+        mouseTo { recipeButton() }
+        mouseDown()
+        mouseUp()
+        waitTicks(2)
+        run { Minecraft.getInstance().screen?.onClose() }
+        waitTicks(2)
+        readHello()
         reset()
     }
 
@@ -374,6 +533,40 @@ internal object NotificationScenarios {
 
     /** An inventory-local point in window GUI px. */
     private fun inventory(x: Int, y: Int): Pair<Int, Int> = inventoryScreen().let { it.guiLeft + x to it.guiTop + y }
+
+    /** The middle of vanilla's recipe book button, 20 x 18 at (guiLeft + 104, height / 2 - 22). */
+    private fun recipeButton(): Pair<Int, Int> = inventoryScreen().let { it.guiLeft + 104 + 10 to it.height / 2 - 22 + 9 }
+
+    // Opens Hello from home to read its notifications, and puts the phone away on home.
+    private fun CaptureScript.readHello() {
+        openPhone()
+        clickHomeButton()
+        waitTicks(2)
+        mouseTo { icon(HELLO_SLOT) }
+        mouseDown()
+        mouseUp()
+        waitTicks(6)
+        clickHomeButton()
+        waitTicks(2)
+        closePhone()
+    }
+
+    // Closes the phone opened from the inventory (the inventory comes back), then the inventory, as Esc would.
+    private fun CaptureScript.backToGame() {
+        key(GLFW.GLFW_KEY_ESCAPE)
+        waitUntil { CaptureHooks.isClosed }
+        run { Minecraft.getInstance().screen?.onClose() }
+        waitTicks(2)
+    }
+
+    private fun CaptureScript.logPlanks(moment: String) = run {
+        val player = Minecraft.getInstance().player!!
+        LnbPhone.LOGGER.info(
+            "Capture review {}: planks in the inventory {}, on the cursor {}, crafting grid {}", moment,
+            player.inventory.countItem(Items.OAK_PLANKS), player.containerMenu.carried.count,
+            player.inventoryMenu.craftSlots.items.sumOf { it.count },
+        )
+    }
 
     /** A point on the phone button, button-local: the button is at (guiLeft - 22, guiTop + 46) (art direction 11). */
     private fun phoneButton(x: Int, y: Int): Pair<Int, Int> = inventory(-22 + x, 46 + y)

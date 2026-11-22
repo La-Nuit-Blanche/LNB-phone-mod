@@ -24,6 +24,7 @@ object CaptureScenarios {
         "shell-window" to ShellScenarios::shellWindow,
         "notifications" to NotificationScenarios::notifications,
         "notifications-persist" to NotificationScenarios::persistence,
+        "notifications-review" to NotificationScenarios::review,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()
