@@ -3,5 +3,12 @@
   "key.categories.lnbphone": "LNB Phone",
   "key.lnbphone.open": "Open the phone",
   "gui.lnbphone.title": "LNB Phone",
-  "gui.lnbphone.scale": "GUI scale: 2+"
+  "gui.lnbphone.scale": "GUI scale: 2+",
+  "app.lnbphone.settings": "Settings",
+  "settings.lnbphone.section.phone": "PHONE",
+  "settings.lnbphone.position": "Position on screen",
+  "settings.lnbphone.position.corner": "Corner",
+  "settings.lnbphone.position.centre": "Centre",
+  "settings.lnbphone.sounds": "Sounds",
+  "settings.lnbphone.preview": "Notification preview"
 }
