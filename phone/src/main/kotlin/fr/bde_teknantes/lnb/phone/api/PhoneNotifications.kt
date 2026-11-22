@@ -30,9 +30,18 @@ import java.util.UUID
  *
  * The player sees a badge on the app's icon, a banner if the phone is open, the phone peeking up from the corner if
  * it is closed, and a chime; opening the notification opens your app at its target. A player who isn't connected gets
- * it when they next log in, as a badge. Each player keeps the newest [MAX_PER_PLAYER] notifications, saved with the
- * world, for at most [MAX_AGE_DAYS] days; they go away when the player opens the app (by any route), or when you
- * clear them ([clearApp], [clearTarget] and their forms for everyone).
+ * it when they next log in, as a badge. Each player keeps [MAX_PER_PLAYER] notifications, saved with the world, for at
+ * most [MAX_AGE_DAYS] days; they go away when the player opens the app (by any route), or when you clear them
+ * ([clearApp], [clearTarget] and their forms for everyone).
+ *
+ * **Sharing.** The apps of all mods share a player's [MAX_PER_PLAYER] slots, counted per mod (the namespace of the app
+ * id). When they are full, the oldest notification of the mod holding the most is dropped: an app alone may use every
+ * slot, but an app that sends a lot only ever pushes out its own notifications, never another mod's while that mod
+ * holds fewer. So your app id's namespace must be your mod id, a mod loaded on the server: `send` refuses any other
+ * (and Minecraft's and NeoForge's), so that ids made from player input can't claim shares of their own. As a backstop
+ * against a loop, one mod may send one player [MAX_BURST] notifications at once, then one every
+ * [SECONDS_PER_NOTIFICATION] seconds; beyond that, the notification is skipped for that player (with a warning in the
+ * log). Limiting what your own players can make your server side send is still your app's job.
  *
  * **Text.** Use translatable components for your wording (keys in your `en_us.json` and `fr_fr.json`): they resolve
  * on the player's client, in the player's language, even for a notification sent while they were away. Player content
@@ -58,8 +67,14 @@ import java.util.UUID
  * single-player game). Notifications are sent to players by the server; a client can't send one.
  */
 object PhoneNotifications {
-    /** How many notifications a player keeps; past this, the oldest is dropped. */
+    /** How many notifications a player keeps, all apps together; past this, the oldest of the busiest mod is dropped. */
     const val MAX_PER_PLAYER = NotificationList.CAPACITY
+
+    /** How many notifications one mod may send one player at once. */
+    const val MAX_BURST = NotificationService.APP_BURST
+
+    /** After [MAX_BURST], one mod may send one player one notification every this many seconds. */
+    const val SECONDS_PER_NOTIFICATION = NotificationService.APP_SECONDS_PER_NOTIFICATION
 
     /** How long a notification is kept, in days, if the player doesn't open its app. */
     const val MAX_AGE_DAYS = NotificationStore.MAX_AGE_DAYS
@@ -74,14 +89,14 @@ object PhoneNotifications {
      * Notifies [player], connected or not, by UUID: what to use for someone who may be offline (the author of a post
      * someone just replied to). A UUID that has never joined gets it at their first login, if within [MAX_AGE_DAYS].
      *
-     * @param appId your app's id, as registered with the phone on the client. A client that doesn't have this app
-     * keeps the notification but shows nothing for it.
+     * @param appId your app's id, as registered with the phone on the client, in your mod's namespace. A client that
+     * doesn't have this app keeps the notification but shows nothing for it.
      * @param title what happened, in a few words (`New reply`).
      * @param text the detail, usually starting with who did it (`Mika: I saw it near the mill!`).
      * @param target where in your app the notification leads ([AppTarget]), or null for your app's first screen. An
      * empty string counts as null.
      * @throws IllegalArgumentException if [target] is longer than [AppTarget.MAX_LENGTH] characters, or [appId]
-     * longer than 128.
+     * longer than 128 or not in the namespace of a mod loaded on the server.
      */
     @JvmStatic
     fun send(player: UUID, appId: ResourceLocation, title: Component, text: Component, target: String?) =

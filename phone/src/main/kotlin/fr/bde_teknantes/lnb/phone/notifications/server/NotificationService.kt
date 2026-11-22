@@ -9,7 +9,6 @@ import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.ResourceLocation
 import java.util.UUID
-import kotlin.math.roundToInt
 
 /**
  * What the service needs from the running server, so that it can be tested without one ([ServerNotifications] gives
@@ -94,7 +93,7 @@ internal class NotificationService(private val millis: () -> Long = { System.nan
         lastFloodWarning[appId.namespace] = now
         LnbPhone.LOGGER.warn(
             "Phone notifications from {} dropped for {} player(s): more than {} at once, then one every {} s, per player",
-            appId, refused, APP_BURST, (1 / APP_PER_SECOND).roundToInt(),
+            appId, refused, APP_BURST, APP_SECONDS_PER_NOTIFICATION,
         )
     }
 
@@ -208,8 +207,11 @@ internal class NotificationService(private val millis: () -> Long = { System.nan
         /** Notifications one mod may send one player at once, before [APP_PER_SECOND] applies. */
         const val APP_BURST = 20
 
-        /** Then how many a second: one every 3 seconds. */
-        const val APP_PER_SECOND = 1.0 / 3
+        /** Then one every this many seconds. */
+        const val APP_SECONDS_PER_NOTIFICATION = 3
+
+        /** [APP_SECONDS_PER_NOTIFICATION] as a rate. */
+        const val APP_PER_SECOND = 1.0 / APP_SECONDS_PER_NOTIFICATION
 
         private const val FLOOD_WARNING_MS = 60_000L
     }
