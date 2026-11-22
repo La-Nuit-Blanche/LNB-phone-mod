@@ -8,6 +8,9 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **GUI scales 2 and up.** The phone supports every integer GUI scale from 2, not only 2 to 4: Minecraft's Auto picks 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K (Units, 8.1, 16.2). Scale 1 stays unsupported for apps; there, also no notification banner and no peek (the chime and the badge only), and Backspace goes home (8.1, 10.2, 2.3, P-15).
 - **Pixel rules at every scale.** Layout arithmetic of the shell rounds halves to even, the only rule that reproduces the positions of P-3.2 and P-12.4 (2.4, 14). A 1 dp hairline is 2 real pixels at GUI scale 3 and the 3 dp tab indicator is 4 pixels tall there (8.1, 8.7).
 - **Corner phone and hotbar.** The bottom-right phone overlaps the hotbar in any window narrower than about 474 GUI px, which includes the default 854 x 480 window at GUI scale 2. Accepted as it is (2.4).
+- **Keys.** The phone reacts once per real key press, never to key repeats; inside the phone, Esc, the phone key and Backspace act on the first press only, while a focused text field still receives repeats. While a text field has the focus the phone key and Backspace don't close or go back, and typed keys never leave the phone (2.3).
+- **Opening.** The device slides over the HUD for 250 ms and the screen opens when the slide ends; the player can still move during the slide. Another screen opening during the rise sends the phone back down. The crosshair is hidden while the phone is open, and F1 hides the sliding device (2.3, 14, P-1, P-2).
+- **Home pages.** The mouse wheel turns one page per whole notch (2.3).
 
 ## History
 
@@ -141,22 +144,26 @@ R F F F F F F F F F F R
 
 States: hover: R becomes `accent`. Pressed: R `accent`, F `body-lo`.
 
-The open phone is a normal game screen: the mouse cursor is free and the player does not move while it is open.
+The open phone is a normal game screen: the mouse cursor is free and the player does not move while it is open. That starts when the slide up ends. During the 250 ms of the slide the device is drawn over the HUD, the game keeps the mouse, the player can still move, and the phone's screen opens when the slide ends. Closing gives the mouse back at once, and the player can move while the device slides down. Any other screen that opens during the rise (chat, the pause menu, a container, the death screen) sends the phone back down behind it. The crosshair is hidden while the phone is open, and F1 (hidden HUD) hides the sliding device.
+
+**Key presses.** The phone reacts once per real key press, never to key repeats: holding the phone key opens the phone once and, held again, closes it once. Inside the phone, Esc, the phone key and Backspace act on the first press only. While a text field has the focus, the phone key and Backspace belong to the field: they neither close the phone nor go back, a held Backspace erases character after character, and no typed key goes on to the game or to other mods' key handlers. A focused text field still receives key repeats.
 
 | Input | Action |
 |---|---|
-| Up arrow (phone closed) | Open the phone on the screen it was closed on (home on the first open of a session) |
+| Up arrow (phone closed) | Open the phone on the screen it was closed on (home on the first open of a session). One press, never its repeats |
 | Up arrow during a peek | Open the phone on the notification's target screen |
-| Up arrow (phone open, no text field focused) | Close the phone |
-| Esc | Close the topmost menu or dialog if one is open; otherwise close the phone. The current screen is kept for the next open |
+| Up arrow (phone open, no text field focused) | Close the phone (first press only) |
+| Esc | Close the topmost menu or dialog if one is open; otherwise close the phone (first press only). The current screen is kept for the next open |
 | Click outside the device | Close the phone, in both placements (in the centred placement, a click on the scrim). Clicks on the bezel do nothing, except on the home button |
 | Home button click | Go to the home screen (instant) |
-| Header back button, or Backspace when no text field has focus | Back one screen in the current app. On an app's root screen Backspace does nothing |
-| Mouse wheel on home | Change page |
+| Header back button, or Backspace when no text field has focus | Back one screen in the current app (Backspace: first press only). On an app's root screen Backspace does nothing, and it does nothing while a menu or dialog is open. At GUI scale 1, where no app screen shows, Backspace goes to the home screen |
+| Mouse wheel on home | One page per whole notch; the fractions a trackpad sends add up to a notch, and turning back starts the count over |
 | Mouse wheel in an app | Scroll 36 dp per notch |
 | Ctrl+Enter | Publish in Compose, send in the reply composer |
+| Enter | In a single-line field: submit it. In a text area: a new line |
+| Tab, Shift+Tab | Move the focus; while a menu or dialog is open it moves among that menu's items or that dialog's buttons only |
 
-The phone keeps its screen, scroll positions and drafts until the player disconnects.
+While it is put away the phone keeps its screen, scroll positions and drafts until the player disconnects. The inventory button can show the home screen instead (section 11), but only when that loses nothing: never from deeper than an app's root screen.
 
 ### 2.4 Placements
 
@@ -1219,9 +1226,9 @@ The game ticks every 50 ms. Durations are whole ticks. Animations interpolate wi
 
 | Motion | Duration | Easing | Detail |
 |---|---|---|---|
-| Open | 250 ms | ease-out | device slides up from `wy = H` to its placement; the centred scrim fades in over the same time |
+| Open | 250 ms | ease-out | device slides up from `wy = H` to its placement; the centred scrim fades in over the same time. The phone's screen opens when the slide ends; the player can move during it (2.3) |
 | Open from a peek | 250 ms | ease-out | from the peek position to the open position |
-| Close | 200 ms | ease-in | slides down to `wy = H`; scrim fades out |
+| Close | 200 ms | ease-in | slides down to `wy = H`; scrim fades out. The mouse is back at once and the player can move |
 | Placement change | 250 ms | ease-out | old position to new |
 | Open screen / forward (app from home, thread, Compose, banner target) | 150 ms | ease-out | new screen slides in from `x +256 dp` over the current one |
 | Back | 150 ms | ease-in | current screen slides out to `x +256 dp`, revealing the previous one |
@@ -1351,7 +1358,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | W | normal play, HUD, phone closed | no cursor | Playing. The player presses the Up arrow. |
-| 2 | W | device mid-slide at `(334, 153)`, home screen on it | no cursor | The phone slides up from the bottom edge (250 ms, ease-out). |
+| 2 | W | device mid-slide at `(334, 153)`, home screen on it | no cursor | The phone slides up from the bottom edge (250 ms, ease-out). The player can still move: the screen opens, and the mouse becomes free, when the slide ends. |
 | 3 | W | device open at `(334, 36)`, home screen, nothing hovered | `(240, 135)` | Open on the home screen. The mouse is free; the player stands still. |
 
 **P-2 Close the phone** (4 steps)
@@ -1360,7 +1367,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | open on home | `(240, 135)` | Three ways to close: Esc, the Up arrow again, or a click outside the phone. |
 | 2 | W | open on home, click marker on the world | `(120, 100)`, pressed | A click anywhere outside the device closes it. Clicks on the bezel do nothing. |
-| 3 | W | device mid-slide at `(334, 153)` | no cursor | The phone slides down (200 ms, ease-in). |
+| 3 | W | device mid-slide at `(334, 153)` | no cursor | The phone slides down (200 ms, ease-in). The mouse is back at once. |
 | 4 | W | normal play | no cursor | Closed. It will reopen on the screen it was closed on. |
 
 **P-3 Open and close in the centred placement** (4 steps)
