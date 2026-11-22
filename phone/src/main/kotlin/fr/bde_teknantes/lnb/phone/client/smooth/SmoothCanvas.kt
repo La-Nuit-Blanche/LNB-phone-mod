@@ -122,6 +122,7 @@ class SmoothCanvas {
         val window = Minecraft.getInstance().window
         val scale = window.guiScale.roundToInt().coerceAtLeast(1)
         if (scale != grid.guiScale) grid = PixelGrid(scale)
+        SmoothResources.useScale(scale)
         framebufferHeight = window.height
         width = widthGui * 2f
         height = heightGui * 2f
@@ -218,16 +219,14 @@ class SmoothCanvas {
         val stroke = if (strokeDp > 0f) grid.strokePx(strokeDp) else 0
         if (radius <= 0f && stroke == 0) return solidQuad(l, t, r, b, color)
 
+        // Each axis slices if it holds two corners; one that does not (a 9 px circle at GUI scale 3, a pill of odd
+        // height) is taken whole from the tile, which then still serves every length of the other axis.
         val corner = NineSlice.cornerSize(radius, stroke)
-        if (NineSlice.fits(pw, ph, corner)) {
-            val tile = SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke) ?: return
-            NineSlice.forEachSlice(l, t, r, b, corner) { sl, st, sr, sb, u0, v0, u1, v1 ->
-                regionQuad(tile, sl, st, sr, sb, u0, v0, u1, v1, color)
-            }
-        } else {
-            // Too small for corners plus a middle (a 9 px circle at GUI scale 3): its own mask, drawn 1:1.
-            val mask = SmoothResources.shape(pw, ph, radius, stroke) ?: return
-            regionQuad(mask, l, t, r, b, 0, 0, pw, ph, color)
+        val sliceX = NineSlice.slices(pw, corner)
+        val sliceY = NineSlice.slices(ph, corner)
+        val tile = SmoothResources.shape(NineSlice.tileSize(pw, corner), NineSlice.tileSize(ph, corner), radius, stroke) ?: return
+        NineSlice.forEachSlice(l, t, r, b, corner, sliceX, sliceY) { sl, st, sr, sb, u0, v0, u1, v1 ->
+            regionQuad(tile, sl, st, sr, sb, u0, v0, u1, v1, color)
         }
     }
 

@@ -26,9 +26,15 @@ object SmoothResources : ResourceManagerReloadListener {
     /** Retry delay for a skin whose pixels are not on the GPU yet. */
     private const val SKIN_RETRY_NANOS = 500_000_000L
 
+    /** Two atlas clears closer than this mean it is thrashing. */
+    private const val THRASH_NANOS = 5_000_000_000L
+
     private val fonts = HashMap<FontWeight, SmoothFont>()
     private val fontFailures = HashMap<FontWeight, IllegalStateException>()
     private var warnedOversize = false
+    private var guiScale = 2
+    private var lastAtlasClear = 0L
+    private var warnedThrash = false
     private var atlasOrNull: MaskAtlas? = null
     private val glyphSets = HashMap<GlyphSetKey, GlyphSet>()
     private val shapes = Long2ObjectOpenHashMap<MaskAtlas.Region>()
@@ -46,7 +52,28 @@ object SmoothResources : ResourceManagerReloadListener {
 
     private val NO_GLYPH = Glyph(null, 0, 0)
 
-    val atlas: MaskAtlas get() = atlasOrNull ?: MaskAtlas().also { atlasOrNull = it }
+    val atlas: MaskAtlas
+        get() = atlasOrNull ?: MaskAtlas(atlasPageSize(guiScale), atlasPages(guiScale)).also { atlasOrNull = it }
+
+    /**
+     * Sizes the atlas for [scale]: glyphs and masks grow with the square of the GUI scale (scale 9 needs five times
+     * the room of scale 4), so above 4 the pages are 2048 px. Called by the canvas at every begin; a change of page
+     * size starts a new atlas.
+     */
+    internal fun useScale(scale: Int) {
+        if (scale == guiScale) return
+        val resize = atlasPageSize(scale) != atlasPageSize(guiScale)
+        guiScale = scale
+        if (resize) {
+            clearAtlas()
+            atlasOrNull = null
+        }
+    }
+
+    /** 1024 px pages up to GUI scale 4 (4 MB each, up to 4), 2048 px above (16 MB each, up to 3). */
+    internal fun atlasPageSize(scale: Int) = if (scale <= 4) 1024 else 2048
+
+    internal fun atlasPages(scale: Int) = if (scale <= 4) 4 else 3
 
     /**
      * The face of [weight]. The file comes from the highest resource pack that has a working one: a pack (a server's
@@ -202,6 +229,14 @@ object SmoothResources : ResourceManagerReloadListener {
         }
         atlas.allocate(width, height)?.let { return it }
         // Full: draw what is queued, then start over. Only what the current frames use comes back.
+        val now = System.nanoTime()
+        if (now - lastAtlasClear < THRASH_NANOS && !warnedThrash) {
+            // Filling up again within seconds means one screen needs more than the atlas holds: every frame redraws
+            // everything from scratch.
+            warnedThrash = true
+            LnbPhone.LOGGER.warn("Smooth atlas filled twice within {} s at GUI scale {}: a screen uses more glyphs and shapes than it holds", THRASH_NANOS / 1_000_000_000, guiScale)
+        }
+        lastAtlasClear = now
         beforeAtlasClear?.invoke()
         clearAtlas()
         return atlas.allocate(width, height)

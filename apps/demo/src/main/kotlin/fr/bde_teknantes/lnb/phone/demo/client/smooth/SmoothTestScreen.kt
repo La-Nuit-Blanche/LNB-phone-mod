@@ -19,7 +19,12 @@ import kotlin.math.max
  * column at the real viewport width (header, two post cards, a clipping test) and, on the right, the type ramp, text
  * rendering variants, shapes, avatars, icons, and native masks next to the art direction's 2x sprites.
  */
-class SmoothTestScreen(private val abandonOnce: Boolean = false) : Screen(Component.literal("Smooth layer test")) {
+class SmoothTestScreen(
+    private val abandonOnce: Boolean = false,
+    /** Scrolls the sheet by this many dp (even), to show its far parts at GUI scales too large for the window. */
+    private val offsetX: Int = 0,
+    private val offsetY: Int = 0,
+) : Screen(Component.literal("Smooth layer test")) {
     private val canvas = SmoothCanvas()
     private var frames = 0
     private var firstFrameStart: GlStateSnapshot? = null
@@ -37,8 +42,11 @@ class SmoothTestScreen(private val abandonOnce: Boolean = false) : Screen(Compon
         // Inside a scissor of the caller's, with an odd shader colour, to check the canvas puts both back.
         graphics.enableScissor(0, 0, width, height)
         RenderSystem.setShaderColor(1f, 1f, 1f, 0.999f)
+        graphics.pose().pushPose()
+        graphics.pose().translate(-offsetX / 2f, -offsetY / 2f, 0f)
         val before = GlStateSnapshot.take(graphics)
-        canvas.begin(graphics, 0, 0, width, height)
+        // The whole 640 x 480 dp sheet, even where it runs off the window.
+        canvas.begin(graphics, 0, 0, maxOf(width, 320), maxOf(height, 240))
         canvas.fillRect(0f, 0f, 256f, 480f, BG)
         canvas.fillRect(264f, 0f, 376f, 480f, BG)
         feedColumn()
@@ -48,11 +56,13 @@ class SmoothTestScreen(private val abandonOnce: Boolean = false) : Screen(Compon
         canvas.end()
         val after = GlStateSnapshot.take(graphics)
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+        minecraftTtfRow(graphics)
+        graphics.pose().popPose()
         graphics.disableScissor()
         if (frames == 0 && before != after) LnbPhone.LOGGER.error("Smooth canvas changed the render state: {} -> {}", before, after)
         if (frames == 0 && before == after) LnbPhone.LOGGER.info("Smooth canvas left the render state as it found it")
-        if (frames == 0) checkFaintOverlay()
-        minecraftTtfRow(graphics)
+        // Only where the swatches are on screen (not at forced high scales).
+        if (frames == 0 && offsetX == 0 && offsetY == 0 && height * 2 >= 480) checkFaintOverlay()
         if (abandonOnce && frames == 0) abandonCanvas(graphics)
         logCost()
     }
@@ -250,15 +260,16 @@ class SmoothTestScreen(private val abandonOnce: Boolean = false) : Screen(Compon
         c.playerFace(SampleSkins.ALEX, 434f, r2 + 8f, 32f)
         c.playerFace(minecraft!!.skinManager.getInsecureSkin(minecraft!!.gameProfile).texture(), 474f, r2, 48f)
         // Icons: the 2x sprite filtered down (art direction 8.1) next to the export made for this density, drawn 1:1.
+        // Above GUI scale 4 no export matches: the 2x one is filtered up.
         val density = when (c.grid.guiScale) {
             2 -> "1x"
             3 -> "1_5x"
             else -> "2x"
         }
         c.icon(HEART_2X, 532f, r2 + 16f, 16f, TEXT_1)
-        c.image(spike("heart_$density"), 556f, r2 + 16f, 16f, 16f, 0f, 0f, 1f, 1f, TEXT_1, linear = false)
+        c.image(spike("heart_$density"), 556f, r2 + 16f, 16f, 16f, 0f, 0f, 1f, 1f, TEXT_1, linear = c.grid.guiScale > 4)
         c.icon(BACK_2X, 584f, r2 + 14f, 20f, TEXT_1)
-        c.image(spike("back_$density"), 612f, r2 + 14f, 20f, 20f, 0f, 0f, 1f, 1f, TEXT_1, linear = false)
+        c.image(spike("back_$density"), 612f, r2 + 14f, 20f, 20f, 0f, 0f, 1f, 1f, TEXT_1, linear = c.grid.guiScale > 4)
 
         // Row 3: native masks (left of each pair) against the 2 px per dp sprites of art direction 16.2 (right).
         val r3 = 394f

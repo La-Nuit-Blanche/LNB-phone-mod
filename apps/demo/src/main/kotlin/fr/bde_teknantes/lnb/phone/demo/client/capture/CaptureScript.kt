@@ -28,6 +28,20 @@ class CaptureScript {
         }
     }
 
+    /**
+     * Forces the GUI scale to [scale] even when the window is too small for it (Minecraft caps the scale at what fits
+     * 320 x 240 GUI px), so high scales can be checked on a small screen. What falls outside the window is cut off;
+     * the next [guiScale] puts things back to normal.
+     */
+    fun forceGuiScale(scale: Int) = apply {
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            mc.window.setGuiScale(scale.toDouble())
+            mc.screen?.resize(mc, mc.window.guiScaledWidth, mc.window.guiScaledHeight)
+            true
+        }
+    }
+
     /** Opens the screen [factory] makes (null closes the current one). */
     fun screen(factory: () -> Screen?) = apply {
         steps += Step {
