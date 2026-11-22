@@ -13,7 +13,8 @@ package fr.bde_teknantes.lnb.phone.api
  * be read long after it was sent, by a newer version of the app: give it a prefix you can recognise and treat a target
  * you don't understand as none.
  *
- * Unlike the rest of the API, this lives on both sides: the server writes targets, the client reads them.
+ * Unlike the client API (`api.client`), this lives on both sides, as [PhoneNotifications] does: the server writes
+ * targets, the client reads them. [PhoneNotifications.send] refuses a longer target.
  */
 object AppTarget {
     /** The longest target a notification can carry, in characters. */

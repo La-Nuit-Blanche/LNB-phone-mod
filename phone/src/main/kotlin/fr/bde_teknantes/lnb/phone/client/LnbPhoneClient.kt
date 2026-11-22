@@ -3,6 +3,9 @@ package fr.bde_teknantes.lnb.phone.client
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistration
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
+import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import net.minecraft.client.Minecraft
 import net.neoforged.bus.api.IEventBus
@@ -19,12 +22,20 @@ object LnbPhoneClient {
     /** What the phone shows. Lives as long as the game: the phone reopens where it was left, until disconnection. */
     internal val navigator = PhoneNavigator(apps) { Minecraft.getInstance().isSameThread }
 
+    /** The player's notifications, mirrored from the server: badges, LED, inventory button. */
+    internal val notifications = ClientNotifications { apps[it] != null }
+
     // Takes the mod bus because client setup (key mappings, screens) is registered there, not on NeoForge's bus.
     fun init(modBus: IEventBus) {
         modBus.addListener(::onClientSetup)
-        // The smooth layer's fonts and atlas come from resources: drop them when resource packs change.
-        modBus.addListener(RegisterClientReloadListenersEvent::class.java) { it.registerReloadListener(SmoothResources) }
+        modBus.addListener(RegisterClientReloadListenersEvent::class.java) {
+            // The smooth layer's fonts and atlas, and the composed app icons, come from resources: drop them when
+            // resource packs change.
+            it.registerReloadListener(SmoothResources)
+            it.registerReloadListener(AppIconTextures)
+        }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        navigator.addListener(ClientNotificationHandler)
     }
 
     private fun onClientSetup(event: FMLClientSetupEvent) {
@@ -33,8 +44,11 @@ object LnbPhoneClient {
     }
 
     private fun onLoggingOut(event: ClientPlayerNetworkEvent.LoggingOut) {
-        // The phone keeps its screens until the player disconnects (art direction 2.3). execute runs at once on the
-        // client thread, and queues there from any other.
-        Minecraft.getInstance().execute { navigator.reset() }
+        // The phone keeps its screens until the player disconnects (art direction 2.3); the notifications belong to
+        // the server just left. execute runs at once on the client thread, and queues there from any other.
+        Minecraft.getInstance().execute {
+            navigator.reset()
+            notifications.reset()
+        }
     }
 }
