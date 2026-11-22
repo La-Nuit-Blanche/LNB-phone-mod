@@ -18,6 +18,7 @@ object CaptureScenarios {
         "smooth" to ::smooth,
         "kit" to { kit(2..4) },
         "kit-phone" to KitPhoneScenario::script,
+        "ping" to PingScenario::script,
         "banner" to ::banner,
         "shell" to ShellScenarios::shell,
         "shell-pages" to ShellScenarios::shellPages,
