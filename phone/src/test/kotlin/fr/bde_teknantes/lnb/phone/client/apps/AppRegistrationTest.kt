@@ -37,4 +37,25 @@ class AppRegistrationTest {
         assertTrue(registry.isFrozen)
         assertThrows(IllegalStateException::class.java) { event!!.register(testApp("late")) }
     }
+
+    @Test
+    fun `an app built against an older phone throwing an Error doesn't stop registration`() {
+        val registry = AppRegistry()
+        val kept = testApp("kept")
+
+        withListener({
+            it.register(kept)
+            throw NoSuchMethodError("RegisterPhoneAppsEvent.registerOld")
+        }) { AppRegistration.fire(registry) }
+
+        assertEquals(listOf(kept), registry.apps)
+        assertTrue(registry.isFrozen)
+    }
+
+    @Test
+    fun `running out of memory while registering is the game's problem`() {
+        withListener({ throw OutOfMemoryError("test") }) {
+            assertThrows(OutOfMemoryError::class.java) { AppRegistration.fire(AppRegistry()) }
+        }
+    }
 }

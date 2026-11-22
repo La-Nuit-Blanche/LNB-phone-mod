@@ -13,13 +13,15 @@ internal object AppRegistration {
     fun fire(registry: AppRegistry) {
         val event = RegisterPhoneAppsEvent(registry)
         // Mod by mod rather than through ModLoader.postEvent: there, a listener that throws stops the game with a
-        // loading error. Here it costs that mod's remaining apps only.
+        // loading error. Here it costs that mod's remaining apps only, Errors included: an app built against an older
+        // phone throws NoSuchMethodError, and that must not stop the game in the phone's name.
         ModList.get().forEachModInOrder { mod ->
             val bus = mod.eventBus ?: return@forEachModInOrder
             event.modId = mod.modId
             try {
                 bus.post(event)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                rethrowIfFatal(e)
                 LnbPhone.LOGGER.error("{} failed while registering its phone apps; the ones it registered before stay", mod.modId, e)
             }
         }

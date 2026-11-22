@@ -101,7 +101,7 @@ internal class PhoneNavigator(
         val stack = try {
             startingScreens(app, target)
         } catch (e: Throwable) {
-            rethrowFatal(e)
+            rethrowIfFatal(e)
             appFailed(app, "creating its screens" + target?.let { " for target \"$it\"" }.orEmpty(), e)
             return false
         }
@@ -319,7 +319,7 @@ internal class PhoneNavigator(
         return try {
             block()
         } catch (e: Throwable) {
-            rethrowFatal(e)
+            rethrowIfFatal(e)
             screenFailed(screen, what, e)
             fallback
         }
@@ -363,11 +363,6 @@ internal class PhoneNavigator(
             "The phone can only be used from the client thread, not from ${Thread.currentThread().name}: " +
                 "hop over with Minecraft.getInstance().execute { ... }"
         }
-    }
-
-    // Out of memory and the like are the game's problem, not the app's: let them through. A stack overflow is the app's.
-    private fun rethrowFatal(e: Throwable) {
-        if (e is VirtualMachineError && e !is StackOverflowError) throw e
     }
 
     private companion object {
