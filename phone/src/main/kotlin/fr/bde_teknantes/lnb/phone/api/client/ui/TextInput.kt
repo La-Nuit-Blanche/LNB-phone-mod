@@ -4,8 +4,8 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
 import fr.bde_teknantes.lnb.phone.client.ui.EditCommand
 import fr.bde_teknantes.lnb.phone.client.ui.EditKey
+import fr.bde_teknantes.lnb.phone.client.ui.TextEnvironment
 import fr.bde_teknantes.lnb.phone.client.ui.TextKeys
-import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
 /**
@@ -133,7 +133,7 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
         if (!editable) return false
-        val key = TextKeys.read(keyCode, modifiers, state.multiline, Minecraft.ON_OSX) ?: return false
+        val key = TextKeys.read(keyCode, modifiers, state.multiline, TextEnvironment.current.mac) ?: return false
         val before = state.version
         apply(key)
         edited(before)
@@ -172,12 +172,12 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
     }
 
     private var clipboard: String
-        get() = Minecraft.getInstance().keyboardHandler.clipboard
+        get() = TextEnvironment.current.clipboard
         set(value) {
-            Minecraft.getInstance().keyboardHandler.clipboard = value
+            TextEnvironment.current.clipboard = value
         }
 
-    private fun modifierShift(): Boolean = net.minecraft.client.gui.screens.Screen.hasShiftDown()
+    private fun modifierShift(): Boolean = TextEnvironment.current.shiftDown
 
     // ---- Drawing helpers ----
 

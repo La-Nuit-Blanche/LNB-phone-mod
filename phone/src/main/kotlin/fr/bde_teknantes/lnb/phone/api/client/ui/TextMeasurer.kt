@@ -1,7 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
+import fr.bde_teknantes.lnb.phone.client.smooth.FontMetrics
 import fr.bde_teknantes.lnb.phone.client.smooth.FontWeight
-import fr.bde_teknantes.lnb.phone.client.smooth.SmoothFont
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
 
@@ -41,7 +41,11 @@ object TextMetrics : TextMeasurer {
     private const val CACHE_SIZE = 2048
 
     // The font is part of the key: a resource reload brings new fonts, and the old entries simply age out.
-    private data class Key(val kind: Int, val text: String, val font: SmoothFont, val size: Float, val width: Float, val lines: Int)
+    private data class Key(val kind: Int, val text: String, val font: FontMetrics, val size: Float, val width: Float, val lines: Int)
+
+    /** Where the fonts come from: the phone's Inter faces, or fake metrics in tests. */
+    @Volatile
+    internal var fonts: (FontWeight) -> FontMetrics = { SmoothResources.font(it) }
 
     private val cache = object : LinkedHashMap<Key, Any>(256, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Any>?) = size > CACHE_SIZE
@@ -74,5 +78,5 @@ object TextMetrics : TextMeasurer {
         return cache.getOrPut(Key(3, text, font, style.size, maxWidth, 0)) { TextLayout.lines(text, font, style.size, maxWidth) } as List<TextLayout.Line>
     }
 
-    internal fun font(style: TextStyle): SmoothFont = SmoothResources.font(if (style.semibold) FontWeight.SEMIBOLD else FontWeight.REGULAR)
+    internal fun font(style: TextStyle): FontMetrics = fonts(if (style.semibold) FontWeight.SEMIBOLD else FontWeight.REGULAR)
 }
