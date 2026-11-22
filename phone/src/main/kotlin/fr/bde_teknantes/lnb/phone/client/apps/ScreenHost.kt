@@ -11,6 +11,8 @@ internal class ScreenHost(
 ) : Phone {
     var closed = false
 
+    override val canGoBack: Boolean get() = !closed && session.screens.indexOf(screen) > 0
+
     override fun push(screen: AppScreen) = navigator.push(this, screen)
 
     override fun pop() {

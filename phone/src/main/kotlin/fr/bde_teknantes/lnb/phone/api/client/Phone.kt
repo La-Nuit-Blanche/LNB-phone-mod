@@ -5,8 +5,8 @@ package fr.bde_teknantes.lnb.phone.api.client
  *
  * An app is a stack of screens. Its first screen (the root) comes from [PhoneApp]'s factory; [push] opens another one
  * on top, [pop] goes back to the one underneath. The phone draws the back transition and offers the usual ways back
- * (Backspace when no text field has focus); drawing a back button in your header is up to you (on every screen but
- * the root), and it should call [pop].
+ * (Backspace when no text field has focus); drawing a back button in your header is up to you (when [canGoBack] is
+ * true, which is on every screen but the root), and it should call [pop].
  *
  * The handle belongs to the screen it was given to. Once that screen is closed (the player went back past it, went
  * home, disconnected, or the app failed), every call on it does nothing. So a late answer from the server that calls
@@ -16,6 +16,12 @@ package fr.bde_teknantes.lnb.phone.api.client
  * an answer that arrives on another thread, hop over first with `Minecraft.getInstance().execute { ... }`.
  */
 interface Phone {
+    /**
+     * Whether [pop] would lead somewhere: there is a screen under this one. Draw a back arrow in your header when it
+     * is true; it is false on the app's root screen, and once this screen is closed.
+     */
+    val canGoBack: Boolean
+
     /**
      * Opens [screen] on top of this app's stack, sliding in from the right. The current screen stays underneath with
      * its state, and comes back when the new one is popped.

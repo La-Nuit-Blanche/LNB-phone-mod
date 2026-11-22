@@ -231,6 +231,23 @@ class PhoneNavigatorTest {
     }
 
     @Test
+    fun `a screen's handle tells whether back leads anywhere`() {
+        val root = openOn(screen("root"))
+        val second = screen("second")
+        assertFalse(root.handle.canGoBack)
+        root.handle.push(second)
+        assertTrue(second.handle.canGoBack)
+        assertFalse(root.handle.canGoBack)
+
+        second.handle.pop()
+        assertFalse(second.handle.canGoBack)
+        val loaded = screen("loaded")
+        root.handle.replace(loaded)
+        assertFalse(loaded.handle.canGoBack)
+        assertFalse(root.handle.canGoBack)
+    }
+
+    @Test
     fun `calls from another thread throw`() {
         val offThread = PhoneNavigator(registry) { false }
         assertThrows(IllegalStateException::class.java) { offThread.open() }
