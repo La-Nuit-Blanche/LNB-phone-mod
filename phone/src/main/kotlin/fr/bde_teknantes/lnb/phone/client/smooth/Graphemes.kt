@@ -34,7 +34,9 @@ object Graphemes {
         val iterator = iterators.get()
         var window = WINDOW
         while (true) {
-            val end = minOf(text.length, start + window)
+            var end = minOf(text.length, start + window)
+            // Never cut a surrogate pair: half of one is a lone surrogate, which no grapheme rule joins to what precedes.
+            if (end < text.length && Character.isHighSurrogate(text[end - 1])) end++
             iterator.setText(StringCharacterIterator(text, start, end, start))
             val boundary = iterator.following(start)
             // A boundary at the window's end may only be where the window cut the grapheme: look further.
