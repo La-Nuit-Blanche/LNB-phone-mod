@@ -21,23 +21,21 @@ enum class BannerLook { NORMAL, HOVER, PRESSED }
  * ([BannerText]). Laid out on first draw, when the fonts are at hand.
  */
 class BannerContent(val icon: AppIcon, title: String, text: String) {
-    val title: String = BannerText.clean(title) { hasGlyph(FontWeight.SEMIBOLD, it) }
-    val text: String = BannerText.clean(text) { hasGlyph(FontWeight.REGULAR, it) }
+    val title: String = BannerText.clean(title, SmoothResources.face(FontWeight.SEMIBOLD))
+    val text: String = BannerText.clean(text, SmoothResources.face(FontWeight.REGULAR))
 
     private var laidOut: Pair<String, List<String>>? = null
 
     /** The title cut to its slot and the text on its two lines. Render thread (it reads the fonts). */
     fun layout(): Pair<String, List<String>> = laidOut ?: Pair(
-        BannerLayout.title(title, SmoothResources.font(FontWeight.SEMIBOLD)),
-        BannerLayout.textLines(text, SmoothResources.font(FontWeight.REGULAR)),
+        BannerLayout.title(title, SmoothResources.face(FontWeight.SEMIBOLD)),
+        BannerLayout.textLines(text, SmoothResources.face(FontWeight.REGULAR)),
     ).also { laidOut = it }
 
     companion object {
         /** The banner of [notification], from [app] (the app it names, installed on this client). */
         fun of(app: PhoneApp, notification: PhoneNotification) =
             BannerContent(app.icon, notification.title.string, notification.text.string)
-
-        private fun hasGlyph(weight: FontWeight, codePoint: Int) = SmoothResources.font(weight).glyphId(codePoint) != 0
     }
 }
 

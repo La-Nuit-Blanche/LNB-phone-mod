@@ -5,12 +5,16 @@ package fr.bde_teknantes.lnb.phone.client.smooth
  * scaled linearly, so a string measures the same in dp at every GUI scale and wraps at the same words everywhere;
  * only the final drawing snaps glyphs to pixels.
  *
- * Text from players is cleaned up as it is laid out, the same way for measuring and drawing:
+ * Text is laid out grapheme by grapheme ([Graphemes]): every cut (wrapping, truncation) and every caret position falls
+ * between graphemes, never inside an emoji sequence or between a letter and its accent. Text from players is cleaned
+ * up as it is laid out, the same way for measuring and drawing:
  * - `\r\n`, a lone `\r` and `\n` break lines; a tab is a space;
  * - other control characters, zero-width and bidirectional format characters, variation selectors and joiners take
  *   no room and draw nothing;
- * - a character the font lacks draws one missing-glyph box for its whole grapheme (an emoji with its skin tone, a
- *   flag's two letters, a letter with accents the font lacks), not one per code point.
+ * - a grapheme the emoji face draws ([EmojiShaping]) is its glyphs, composed where the face can, drawn in the text's
+ *   colour like any glyph;
+ * - otherwise a character neither face has draws one missing-glyph box for its whole grapheme (an emoji the emoji
+ *   face lacks, with its skin tone; a letter with accents the font lacks), not one per code point.
  */
 object TextLayout {
     const val ELLIPSIS = "…"
@@ -40,60 +44,61 @@ object TextLayout {
         }
     }
 
-    /** Whether [cp] belongs to the grapheme before it rather than starting one (marks, skin tones). */
-    private fun extendsGrapheme(cp: Int): Boolean {
-        val type = Character.getType(cp)
-        return type == Character.NON_SPACING_MARK.toInt() || type == Character.ENCLOSING_MARK.toInt() ||
-            type == Character.COMBINING_SPACING_MARK.toInt() || cp in 0x1F3FB..0x1F3FF
-    }
-
-    @PublishedApi
-    internal fun isRegionalIndicator(cp: Int) = cp in 0x1F1E6..0x1F1FF
-
     /**
-     * Walks [text] unit by unit, with the rules above: [unit] receives each code point's range in the text
-     * ([start] to [end]), the code point to draw (-1 for one that draws nothing), the pen position in dp, kerning
-     * included, and the advance it takes. Returns the total advance.
+     * Walks [text] unit by unit, with the rules above: [unit] receives each unit's range in the text ([start] to
+     * [end]: one code point, or the several an emoji glyph stands for), what to draw (-1 for nothing, an Inter code
+     * point, or an emoji glyph marked with [EmojiShaping.EMOJI_GLYPH]), the pen position in dp, kerning included, and
+     * the advance it takes. Ranges follow each other and never cross a grapheme boundary. Returns the total advance.
      */
     inline fun forEachUnit(
         text: String, font: FontMetrics, size: Float,
         unit: (start: Int, end: Int, drawn: Int, x: Float, advance: Float) -> Unit,
     ): Float {
         var pen = 0f
+        // Last Inter code point drawn, for kerning; none after an emoji, as kerning never crosses faces.
         var previous = -1
-        // The last drawn unit was a missing-glyph box, and how far its grapheme goes.
-        var lastMissing = false
-        var afterJoiner = false
-        var regional = 0
         var i = 0
         while (i < text.length) {
-            val raw = text.codePointAt(i)
-            val end = i + Character.charCount(raw)
-            val cp = if (raw == '\t'.code || raw == '\n'.code || raw == '\r'.code) SPACE else raw
-            if (isInvisibleUnit(cp)) {
-                if (cp == 0x200D) afterJoiner = true
-                unit(i, end, -1, pen, 0f)
-                i = end
+            val graphemeEnd = Graphemes.next(text, i)
+            val parts = emojiParts(text, i, graphemeEnd, font)
+            if (parts != null) {
+                val emoji = font.emoji!!
+                var k = 0
+                while (k < parts.size) {
+                    val glyph = parts[k]
+                    if (glyph < 0) {
+                        unit(parts[k + 1], parts[k + 2], -1, pen, 0f)
+                    } else {
+                        val advance = emoji.advance(glyph) * size
+                        unit(parts[k + 1], parts[k + 2], EmojiShaping.EMOJI_GLYPH or glyph, pen, advance)
+                        pen += advance
+                    }
+                    k += 3
+                }
+                previous = -1
+                i = graphemeEnd
                 continue
             }
-            val missing = !font.hasGlyph(cp)
-            val pairsFlag = isRegionalIndicator(cp) && regional % 2 == 1
-            // A missing character that continues a grapheme draws nothing: its grapheme has its box, or its base.
-            val skip = missing && (extendsGraphemeUnit(cp) || afterJoiner || pairsFlag) && (lastMissing || !pairsFlag)
-            regional = if (isRegionalIndicator(cp)) regional + 1 else 0
-            afterJoiner = false
-            if (skip) {
-                unit(i, end, -1, pen, 0f)
+            // Inter, code point by code point. A missing character that continues a grapheme draws nothing: its
+            // grapheme has its box, or its base.
+            var based = false
+            while (i < graphemeEnd) {
+                val raw = text.codePointAt(i)
+                val end = i + Character.charCount(raw)
+                val cp = if (raw == '\t'.code || raw == '\n'.code || raw == '\r'.code) SPACE else raw
+                if (isInvisibleUnit(cp) || (based && !font.hasGlyph(cp))) {
+                    unit(i, end, -1, pen, 0f)
+                    i = end
+                    continue
+                }
+                if (previous >= 0) pen += font.kerning(previous, cp) * size
+                val advance = font.advance(cp) * size
+                unit(i, end, cp, pen, advance)
+                pen += advance
+                previous = cp
+                based = true
                 i = end
-                continue
             }
-            if (previous >= 0) pen += font.kerning(previous, cp) * size
-            val advance = font.advance(cp) * size
-            unit(i, end, cp, pen, advance)
-            pen += advance
-            previous = cp
-            lastMissing = missing
-            i = end
         }
         return pen
     }
@@ -101,12 +106,16 @@ object TextLayout {
     @PublishedApi
     internal fun isInvisibleUnit(cp: Int) = isInvisible(cp)
 
+    /** What an emoji grapheme draws ([EmojiShaping.shape]), or null when Inter draws it. */
     @PublishedApi
-    internal fun extendsGraphemeUnit(cp: Int) = extendsGrapheme(cp)
+    internal fun emojiParts(text: String, start: Int, end: Int, font: FontMetrics): IntArray? {
+        if (!EmojiShaping.drawsAsEmoji(text, start, end, font)) return null
+        return EmojiShaping.shape(text, start, end, font.emoji ?: return null)
+    }
 
     /**
-     * Walks [text] glyph by glyph: [glyph] receives each code point to draw and its pen position in dp, kerning
-     * included. Returns the total advance.
+     * Walks [text] glyph by glyph: [glyph] receives what to draw (an Inter code point, or an emoji glyph marked with
+     * [EmojiShaping.EMOJI_GLYPH]) and its pen position in dp, kerning included. Returns the total advance.
      */
     inline fun forEachGlyph(text: String, font: FontMetrics, size: Float, glyph: (codePoint: Int, x: Float) -> Unit): Float =
         forEachUnit(text, font, size) { _, _, drawn, x, _ -> if (drawn >= 0) glyph(drawn, x) }
@@ -124,22 +133,33 @@ object TextLayout {
      * ellipsis dropped). Empty when not even the ellipsis fits. Linear in the text's length.
      */
     fun truncate(text: String, font: FontMetrics, size: Float, maxWidth: Float): String {
-        // ends[k]: width of the text up to the end of its k-th code point; starts[k]: where that code point starts;
-        // drawnBefore[k]: the last drawn code point among the first k (for the kerning before the ellipsis).
-        val count = text.codePointCount(0, text.length)
+        // Cuts fall between graphemes only. For the k-th grapheme boundary: starts[k], where it is in the text;
+        // ends[k], the width of the text before it; drawnBefore[k], the last thing drawn before it (for the kerning
+        // before the ellipsis); spaceBefore[k], whether the grapheme ending there is whitespace.
+        val boundaries = Graphemes.boundaries(text)
+        val count = boundaries.count { it } - 1
         val ends = FloatArray(count + 1)
         val starts = IntArray(count + 1)
         val drawnBefore = IntArray(count + 1) { -1 }
         val spaceBefore = BooleanArray(count + 1)
         var k = 0
-        val total = forEachUnit(text, font, size) { start, _, drawn, x, advance ->
-            starts[k] = start
-            ends[k + 1] = if (drawn >= 0) x + advance else ends[k]
-            drawnBefore[k + 1] = if (drawn >= 0) drawn else drawnBefore[k]
-            spaceBefore[k + 1] = Character.isWhitespace(text.codePointAt(start))
-            k++
+        var pen = 0f
+        var last = -1
+        var graphemeStart = 0
+        val total = forEachUnit(text, font, size) { _, end, drawn, x, advance ->
+            if (drawn >= 0) {
+                pen = x + advance
+                last = drawn
+            }
+            if (boundaries[end]) {
+                k++
+                starts[k] = end
+                ends[k] = pen
+                drawnBefore[k] = last
+                spaceBefore[k] = Character.isWhitespace(text.codePointAt(graphemeStart))
+                graphemeStart = end
+            }
         }
-        starts[count] = text.length
         if (total <= maxWidth + EPSILON) return text
 
         // kept[n]: n without the whitespace that ends it, computed once (a long run of spaces stays linear).
@@ -148,8 +168,9 @@ object TextLayout {
         val ellipsis = font.advance(ELLIPSIS_CP) * size
         for (n in count - 1 downTo 0) {
             val keep = kept[n]
-            val last = drawnBefore[keep]
-            val kern = if (keep > 0 && last >= 0) font.kerning(last, ELLIPSIS_CP) * size else 0f
+            val before = drawnBefore[keep]
+            // No kerning across faces: an emoji before the ellipsis keeps its own spacing.
+            val kern = if (keep > 0 && before >= 0 && !EmojiShaping.isEmojiGlyph(before)) font.kerning(before, ELLIPSIS_CP) * size else 0f
             if (ends[keep] + kern + ellipsis <= maxWidth + EPSILON) return text.substring(0, starts[keep]) + ELLIPSIS
         }
         return ""
@@ -237,10 +258,10 @@ object TextLayout {
             if (!hasContent) {
                 var pieceStart = wordStart
                 if (!fits(wordStart, i)) {
-                    // Wider than a line alone: cut into pieces that fit, at least one code point each.
+                    // Wider than a line alone: cut into pieces that fit, at least one grapheme each.
                     var j = wordStart
                     while (j < i) {
-                        val next = j + Character.charCount(text.codePointAt(j))
+                        val next = minOf(i, Graphemes.next(text, j))
                         if (j > pieceStart && !fits(pieceStart, next)) {
                             if (text[j] == ' ') {
                                 // The space that glues French punctuation to the word ("…forteresse !"): it ends this
@@ -301,7 +322,10 @@ object TextLayout {
         return result
     }
 
-    /** The caret position on [line] nearest to [x] dp from the line's start (a click, or moving up and down). */
+    /**
+     * The caret position on [line] nearest to [x] dp from the line's start (a click, or moving up and down): always
+     * between graphemes.
+     */
     fun indexAt(text: String, line: Line, x: Float, font: FontMetrics, size: Float): Int {
         var best = line.start
         var bestDistance = Float.MAX_VALUE
@@ -313,7 +337,7 @@ object TextLayout {
                 best = i
             }
             if (i >= line.end) break
-            i += Character.charCount(text.codePointAt(i))
+            i = minOf(line.end, Graphemes.next(text, i))
         }
         return best
     }

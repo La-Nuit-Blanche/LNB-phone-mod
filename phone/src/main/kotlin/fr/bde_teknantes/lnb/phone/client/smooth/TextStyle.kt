@@ -36,6 +36,12 @@ interface FontMetrics {
     /** Whether the font draws [codePoint]; without it, a missing-glyph box stands in. */
     fun hasGlyph(codePoint: Int): Boolean = true
 
+    /**
+     * The emoji face that draws what this one lacks, and the emoji players type ([EmojiShaping]); null without one
+     * (in tests, or when the emoji font could not be loaded), and then such characters are missing-glyph boxes.
+     */
+    val emoji: EmojiMetrics? get() = null
+
     /** Distance from the baseline up to the top of the font's line (positive). */
     val ascender: Float
 

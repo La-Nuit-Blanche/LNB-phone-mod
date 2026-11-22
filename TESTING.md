@@ -57,6 +57,14 @@ Each item says what to do and what should be seen; anything else is a failure to
    mean something in the game (E, T, Q, the hotbar digits) type into the field and do nothing else. In "Feed
    (sample)", Compose (the round button): Ctrl+Enter publishes, the counter turns amber in the last 20 characters and
    red past 280.
+   **Emoji.** In Compose, open Windows' emoji panel (Win+.) and pick a few emoji, one with a skin tone, a family,
+   the French flag, a keycap (1️⃣) and the red heart: each appears as a white outline emoji at the size of the text,
+   on the same line, never as a box (the panel sends them through the game's character input as pairs of halves).
+   The caret stands after the emoji just picked; Left and Right step over a whole emoji, flag or family, and one
+   Backspace deletes it whole; a double click on a word next to an emoji selects the word. A toned emoji draws as its
+   plain emoji (the font has one colour). The counter counts 2 for a flag and for a toned emoji, 1 for a plain one.
+   Long text full of emoji wraps between emoji, never inside a family. In Ping, send a ping with emoji: the
+   conversation shows them.
 9. **A French keyboard (AZERTY).** Same field, Windows with a French layout: a dead key (`^` then `e` gives `ê`, `¨`
    then `i` gives `ï`), and AltGr characters `@` (AltGr+à), `#` (AltGr+") and `€` (AltGr+E): each types its character
    and nothing else, although Windows reports AltGr as Ctrl+Alt (a failure: the text is all selected, or the character
@@ -81,7 +89,8 @@ Each item says what to do and what should be seen; anything else is a failure to
       afterwards no badge waits on the home screen;
     - several pings in a row while the banner shows: its text is replaced, and each one chimes;
     - `/phonedemo notify B` then, at once, `/phonedemo clear B` (A): the banner or the peek goes away early.
-    Long texts end with an ellipsis on the banner's second line.
+    Long texts end with an ellipsis on the banner's second line. A ping with emoji (typed with the emoji panel, see
+    item 8): the banner shows them as in the conversation, in the text's grey; a ping in Japanese reads `?`.
 12. **Offline and restarts.** B leaves; A opens B's conversation and sends: "B isn't online", the text stays in the
     field. With B away, `/phonedemo notify B 3` twice (A). B joins: no banner and no sound at login, a badge `2` on
     Hello, the light blinks. Open it: Hello opens on "Hello 3", and back leads to 2 then 1. Again, but stop the server
@@ -154,6 +163,8 @@ Ping before the switch is still in its field.
     the apps keep Inter. A pack that replaces Inter (`assets/lnbphone/font/inter_regular.ttf`) or an app's glyph
     (`assets/lnbphone_demo/textures/gui/ping.png`, at 16 x 16 and at 32 x 32): the new font or picture shows; a glyph of
     another size is fitted, with a warning in the log; nothing crashes. Reload with F3+T while the phone is open.
+    A pack that replaces the emoji font (`assets/lnbphone/font/noto_emoji.ttf`) with a broken file: an error in the
+    log, and emoji come from the phone's own copy; nothing crashes.
 
 ### In the server's real modpack
 

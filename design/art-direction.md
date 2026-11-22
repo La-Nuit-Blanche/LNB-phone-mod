@@ -14,12 +14,13 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Inventory button.** With unread notifications the button opens the home screen only if the phone was put away on home or on an app's root screen; deeper in an app it reopens on that screen and shows the newest unread notification as the in-phone banner. This settles a contradiction with 2.3 (the phone keeps its screens and drafts until disconnect) in favour of drafts. Opening the phone closes the inventory properly (crafting grid and cursor items go back) and a fresh inventory opens when the phone closes. With the recipe book open the book covers most of the button: the covered part neither lights up nor takes a click, and the badge sits under the book. No button on the creative inventory (11, P-4, P-5, 19).
 - **Peek and banner.** The peek is two layers: the device stays below the hotbar, the banner is drawn above chat lines; F1 hides the peek and the sliding phone. No peek while another screen is open (chat, a container, the pause menu, the death screen): chime only, the badge waits; a screen opening during a peek sends it down. Several notifications at once: the last one shows and the chime plays once. A pressed banner freezes until released; a banner or peek whose notification the server clears goes away early; clicking the banner removes it at once (10.2, 10.3, 6.1).
 - **Read in place.** A notification whose target is already on screen gives no banner, the chime plays, and it counts as read. Reopening the phone onto an app left open keeps that app's badge, except for notifications the shown screen reports as visible, which are read in place. Notifications received while offline show as badges at login, with no peek and no chime (10.2, 10.3, 6.1).
-- **Banner text.** Emoji are dropped and each run of other characters the font lacks becomes one `?`; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
+- **Banner text.** Each run of characters the fonts lack becomes one `?`, and emoji the emoji font lacks are dropped; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
 - **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
 - **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
 - **Text and keys in apps.** The 280-character limit counts code points after NFC normalisation (an accented letter is 1, an emoji 1, a flag 2); the counter and the Publier button use the same untrimmed count and the text is sent trimmed. Enter makes a new line in a text area and Ctrl+Enter submits; Backspace does nothing while a menu or dialog is open; Tab cycles a menu's or dialog's items; a menu that fits neither below nor above its button covers it; a double click selects a word; selected text has the new `selection` colour `#3A8DF066` (8.3, 8.7, 9.7, 9.8, 2.3).
 - **Feed details.** A 17-character handle does not always fit its line: `@` plus sixteen `W` is about 205 dp, wider than the 188 dp column, so the handle line truncates too (9.2, 9.3, 19). `heart_filled` is drawn filled and stroked so that it keeps the outline heart's size (8.6). Avatars: a face is resolved from the player's UUID and name, and the default skin shows until it is known and for players the session service does not know (8.7, 9.2).
-- **App glyphs and fonts.** A glyph that is not 16 x 16 is fitted: a square multiple of 16 is sampled down, a 16-wide strip shows its first frame, anything else shows the bare tile (7.2). Inter has no emoji or non-Latin glyphs: such characters show one missing-glyph box each in apps; bundling an emoji font is a new open question (8.4, 19).
+- **App glyphs and fonts.** A glyph that is not 16 x 16 is fitted: a square multiple of 16 is sampled down, a 16-wide strip shows its first frame, anything else shows the bare tile (7.2). Inter has no non-Latin glyphs: such characters show one missing-glyph box per grapheme in apps (8.4, 19).
+- **Emoji.** Emoji show in apps and in the banner, from a bundled single-colour emoji font (Noto Emoji, SIL OFL), drawn in the text's colour at the text's size and weight. Skin tones, joined sequences, flags and keycaps are composed when the font has them, and degrade to the base emoji or its parts otherwise; the caret, wrapping and truncation never split one. This settles the open question of version 5 (8.4, 10.1, 16.2, 19).
 - **Settings.** Section 12 places the rows 49 dp apart with separate dividers at `y 193` and `y 242`, and 8.7 says where a row's own divider sits. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer (2.4, 8.7, 12).
 - **Language.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch`; everything else gets English (13.1).
 
@@ -576,7 +577,7 @@ Inside apps the pixel status bar is painted in `status-bg-app` = `#12151B`, exac
 
 ### 8.4 Type
 
-Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter-Regular.ttf` (400) and `Inter-SemiBold.ttf` (600). No other font and no other weights in apps. Text is rasterised at the real pixel size of each GUI scale, never as an upscaled texture.
+Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter-Regular.ttf` (400) and `Inter-SemiBold.ttf` (600). No other text font and no other weights in apps; emoji come from the emoji font below. Text is rasterised at the real pixel size of each GUI scale, never as an upscaled texture.
 
 **Minimum text size: 11 dp** (11 real px at GUI scale 2).
 
@@ -593,7 +594,25 @@ Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter
 
 Text is left-aligned, sentence case. Every fixed-width slot is sized for the longer of the French and English strings (section 13.3). Single-line slots truncate with an ellipsis character. Post text wraps on word boundaries and is never truncated in the timeline.
 
-**Characters Inter lacks.** Inter covers Latin, Greek and Cyrillic; it has no emoji and no CJK, Arabic or other scripts. In apps such a character shows one missing-glyph box per grapheme (an emoji with its skin tone, or a flag, is one box); the text itself is never altered. The notification banner differs: it drops emoji and shows one `?` per run of other characters (10.1). Whether to bundle an emoji font is an open question for the Feed phase (19).
+**Emoji.** Emoji come from **Noto Emoji** (Google, SIL Open Font License 1.1, version 3.002, Unicode emoji up to 15.1), a single-colour font: an emoji is a glyph like a letter, drawn in the text's colour (`text-1` in a post, `text-2` in the banner text), never in its own colours. It is drawn at the text's size: an emoji is about 1 em tall (13 dp in `body`), from a little below the baseline to a little above the capitals, centred where the capitals have their middle, inside the line box of every style, so a line with emoji is as tall as one without. Its advance is 1.27 em (16.5 dp in `body`). The font is variable and is drawn at weight 400 next to Regular text and 600 next to SemiBold, so its strokes match the words around it.
+
+Which font draws a character is decided per grapheme (what a reader sees as one character), never per code point:
+- emoji that are emoji by default (😀, 🎉, flags) and anything Inter lacks that the emoji font has (☺, ✔) are emoji;
+- symbols Inter has (`©` `®` `™`, arrows, `★`, `♥`, `❤`) stay Inter's in running text and become emoji only with the emoji variation selector (`❤️`, as emoji keyboards send it); with the text selector they stay Inter's;
+- digits, `#` and `*` stay Inter's, even with the selector: they become emoji only as a keycap (`1️⃣`).
+
+Sequences are composed when the font has them, and otherwise degrade, never to a row of boxes:
+
+| Sequence | Composed | Otherwise |
+|---|---|---|
+| Skin tone (👍🏽) | the emoji; a single-colour font has no skin colours, so it is the base emoji | the tone is dropped, no swatch |
+| Joined with ZWJ (👨‍👩‍👧, ❤️‍🔥, 🏳️‍🌈) | one glyph | its emoji side by side (👨👩👧); a part the font lacks is left out |
+| Flag (🇫🇷), subdivision flag (🏴󠁧󠁢󠁥󠁮󠁧󠁿) | one glyph | an unknown pair shows its two letters; unknown tags leave the black flag |
+| Keycap (1️⃣) | one glyph | |
+
+The caret steps over a grapheme whole, Backspace deletes it whole, and wrapping and truncation never cut one. The 280-character count is unchanged: code points after NFC, so `👍🏽` counts 2 and a flag 2 (8.7).
+
+**Characters no font has.** Inter covers Latin, Greek and Cyrillic and the emoji font covers emoji; there is no CJK, Arabic or other script. In apps such a character shows one missing-glyph box per grapheme (an emoji newer than the font, with its skin tone, is one box); the text itself is never altered. The notification banner differs: it drops emoji the emoji font lacks and shows one `?` per run of other characters (10.1).
 
 ### 8.5 Spacing and radius
 
@@ -1046,7 +1065,7 @@ When several notifications are waiting, a click on the app icon follows the usua
 | Hover (phone open only) | fill `surface-3` |
 | Pressed (phone open only) | fill `surface-3` with `overlay-pressed` |
 
-**Text cleaning.** Title and text are drawn plain. Line breaks and tabs become spaces, emoji are dropped, and each run of other characters Inter lacks (CJK, Arabic and the like) becomes one `?`, so a name in an unsupported script still shows that a name is there (`田中 : salut` reads `? : salut`). The two lines above are the rule whatever the text: a longer one ends with an ellipsis on line 2, so the sample banner texts in the flows end earlier than the posts they quote.
+**Text cleaning.** Title and text are drawn plain. Line breaks and tabs become spaces. Emoji stay, drawn as in apps (8.4), except those the emoji font lacks, which are dropped with their skin tones and joiners. Each run of other characters the fonts lack (CJK, Arabic and the like) becomes one `?`, so a name in an unsupported script still shows that a name is there (`田中 : salut` reads `? : salut`). The two lines above are the rule whatever the text: a longer one ends with an ellipsis on line 2, so the sample banner texts in the flows end earlier than the posts they quote.
 
 No time is shown: a banner always describes something that just happened. Feed contents are in 9.10; other apps give a title and a text.
 
@@ -1382,7 +1401,7 @@ Icons and the spinner, white with alpha and tinted at draw time, at `<density>/i
 | `icon40/inbox`, `megaphone`, `globe` | 40 | stroke 2.5 dp, empty and error states |
 | `spinner` | 20 | 90 degree arc on a 25% ring, 2 dp stroke, rotated at draw time (drawn at 16 dp inside buttons) |
 
-Fonts: `assets/lnbphone/font/inter_regular.ttf`, `assets/lnbphone/font/inter_semibold.ttf`, with the OFL licence text alongside.
+Fonts: `assets/lnbphone/font/inter_regular.ttf`, `assets/lnbphone/font/inter_semibold.ttf` and `assets/lnbphone/font/noto_emoji.ttf` (Noto Emoji 3.002, the variable `wght` 300 to 700 file, unmodified), each with its OFL licence text alongside (`inter_ofl.txt`, `noto_emoji_ofl.txt`). A resource pack may replace any of them; a broken emoji font costs the emoji only (they become missing-glyph boxes), never the text.
 
 ---
 
@@ -1908,7 +1927,7 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 
 **Open for the Feed phase** (found while building the phone; to settle when Feed is designed in detail):
 
-1. Emoji and other scripts. Inter has no emoji and no non-Latin glyphs (8.4), so a post with an emoji shows one missing-glyph box per emoji in the apps, while the notification banner drops emoji. Whether to bundle an emoji font, and with what size, licence and colour handling, is open. The 280-character count already counts an emoji as one character (8.7).
+1. Other scripts. Inter has no CJK, Arabic or other non-Latin glyphs (8.4), so such characters show one missing-glyph box per grapheme in the apps and one `?` per run in the banner. Emoji are settled: the user chose to bundle an emoji font so that they show in the apps (8.4).
 
 **Known slips in the Feed sample data** (found while drawing the canvas; to fix before the Feed app is built, they do not affect the phone):
 
