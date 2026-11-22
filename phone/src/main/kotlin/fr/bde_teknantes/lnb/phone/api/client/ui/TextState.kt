@@ -262,7 +262,7 @@ class TextState(initial: String, val multiline: Boolean, val maxLength: Int) {
 
     companion object {
         /** Far beyond any limit a field shows; only there so a huge paste can't stall the game. */
-        const val DEFAULT_MAX_LENGTH = 4000
+        val DEFAULT_MAX_LENGTH = 4000
 
         /** Whether [codePoint] may be typed: not a control character, not Minecraft's section sign, not half a surrogate pair. */
         fun isAllowed(codePoint: Int): Boolean =

@@ -68,8 +68,11 @@ class Tween(initial: Float) {
     var target = initial
         private set
 
+    /** [animateTo] with [Easing.OUT], the phone's easing for what arrives. */
+    fun animateTo(value: Float, now: Float, durationMs: Float) = animateTo(value, now, durationMs, Easing.OUT)
+
     /** Starts moving from where it is at [now] to [value], over [durationMs]. Nothing changes if it already goes there. */
-    fun animateTo(value: Float, now: Float, durationMs: Float, easing: Easing = Easing.OUT) {
+    fun animateTo(value: Float, now: Float, durationMs: Float, easing: Easing) {
         if (value == target) return
         from = value(now)
         target = value

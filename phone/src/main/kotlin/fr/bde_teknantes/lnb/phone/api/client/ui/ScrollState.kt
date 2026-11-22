@@ -5,7 +5,10 @@ package fr.bde_teknantes.lnb.phone.api.client.ui
  * kept outside the screen when the position must survive the screen (the feed the player comes back to after a
  * thread opened from a notification). Plain data, no game classes.
  */
-class ScrollState(offset: Float = 0f) {
+class ScrollState(offset: Float) {
+    /** A position at the top. */
+    constructor() : this(0f)
+
     /** Distance scrolled from the top, in dp; the list keeps it between 0 and its maximum. */
     var offset: Float = offset.coerceAtLeast(0f)
 }
