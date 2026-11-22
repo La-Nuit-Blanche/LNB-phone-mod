@@ -221,7 +221,10 @@ object TextLayout {
         return out
     }
 
-    private fun isBreakSpace(text: String, i: Int) = (text[i] == ' ' || text[i] == '\t') && breakable(text, i)
+    // A space that a mark, a tone or a selector follows is one grapheme with it (a lone tone after a space draws nothing):
+    // breaking there would start the next line inside a grapheme, with the tone alone drawn as a swatch.
+    private fun isBreakSpace(text: String, i: Int) =
+        (text[i] == ' ' || text[i] == '\t') && breakable(text, i) && Graphemes.isBoundary(text, i + 1)
 
     private fun wrapParagraph(text: String, from: Int, to: Int, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<Line>) {
         fun width(a: Int, b: Int) = width(text.substring(a, b), font, size)
