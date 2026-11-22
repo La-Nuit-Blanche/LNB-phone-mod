@@ -126,12 +126,26 @@ abstract class AppScreen {
      *
      * The phone's own keys reach the screen first: Esc, Backspace and the key that opens the phone. Return true to
      * keep them, otherwise the phone does what they normally do (Esc and the phone key put the phone away, Backspace
-     * goes back one screen). So a screen with a menu open closes it on Esc and returns true, and a screen with a text
-     * field that has focus returns true for the keys it types with.
+     * goes back one screen). So a screen with a menu or dialog open closes it on Esc and returns true. While
+     * [hasTextFocus] is true, the phone key and Backspace never do their usual thing, whatever this returns: they
+     * belong to the text field.
      *
      * @return true if the screen used the key.
      */
     open fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
+
+    /**
+     * Whether a text field of this screen has the keyboard focus right now. Read by the phone at each key press, while
+     * the screen is shown.
+     *
+     * While it is true, the phone key and Backspace no longer put the phone away or go back: they are left to the
+     * screen, which gets them in [keyPressed] (and letters in [charTyped]) as usual. So a player can type a sentence
+     * with the letter they bound the phone key to, or erase it with Backspace, without leaving. Esc keeps its meaning:
+     * if [keyPressed] doesn't use it, the phone is put away.
+     *
+     * Override it if the screen has a text field; the default, false, suits every other screen.
+     */
+    open val hasTextFocus: Boolean get() = false
 
     /**
      * A character was typed, for text input. Comes in addition to [keyPressed], for the keys that produce text.

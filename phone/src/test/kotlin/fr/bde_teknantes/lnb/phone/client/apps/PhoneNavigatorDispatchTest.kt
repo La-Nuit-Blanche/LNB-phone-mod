@@ -147,6 +147,42 @@ class PhoneNavigatorDispatchTest {
         assertEquals(listOf("old:render"), log)
     }
 
+    /** A screen whose text field focus a test sets. */
+    private class TypingScreen(name: String, log: MutableList<String>) : RecordingScreen(name, log) {
+        var typing = false
+        override val hasTextFocus get() = typing
+    }
+
+    @Test
+    fun `text focus is the shown screen's, and nobody's at home or with the phone away`() {
+        val root = TypingScreen("root", log)
+        openStack(root)
+        assertFalse(navigator.hasTextFocus)
+        root.typing = true
+        assertTrue(navigator.hasTextFocus)
+
+        root.handle.push(screen("top"))
+        assertFalse(navigator.hasTextFocus)
+        navigator.back()
+        assertTrue(navigator.hasTextFocus)
+        navigator.close()
+        assertFalse(navigator.hasTextFocus)
+        navigator.open()
+        navigator.home()
+        assertFalse(navigator.hasTextFocus)
+    }
+
+    @Test
+    fun `a text focus that throws counts as an app failure`() {
+        val broken = object : RecordingScreen("broken", log) {
+            override val hasTextFocus: Boolean get() = error("boom")
+        }
+        openStack(screen("root"), broken)
+
+        assertFalse(navigator.hasTextFocus)
+        assertTrue(navigator.isHome)
+    }
+
     @Test
     fun `every navigation from another thread throws and changes nothing`() {
         val registry = AppRegistry()

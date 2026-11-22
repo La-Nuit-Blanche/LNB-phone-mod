@@ -227,6 +227,12 @@ internal class PhoneNavigator(
     fun charTyped(codePoint: Char, modifiers: Int): Boolean =
         dispatch("charTyped") { it.charTyped(codePoint, modifiers) }
 
+    /**
+     * Whether the shown screen has a text field with the focus ([AppScreen.hasTextFocus]): then the phone key and
+     * Backspace belong to it and must not close the phone or go back. False at home and with the phone put away.
+     */
+    val hasTextFocus: Boolean get() = dispatch("hasTextFocus") { it.hasTextFocus }
+
     private inline fun dispatch(what: String, action: (AppScreen) -> Boolean): Boolean {
         val screen = shown ?: return false
         return guard(screen, what, false) { action(screen) }
