@@ -21,6 +21,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
+import net.neoforged.neoforge.client.event.RenderFrameEvent
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers
 import net.neoforged.neoforge.common.NeoForge
@@ -59,6 +60,7 @@ object LnbPhoneClient {
             PhoneKeys.discardClicks()
             PhoneShell.tick()
         }
+        NeoForge.EVENT_BUS.addListener(RenderFrameEvent.Pre::class.java) { PhoneShell.frame() }
         NeoForge.EVENT_BUS.addListener(PhoneKeys::onKey)
         NeoForge.EVENT_BUS.addListener(PhoneKeys::onMouseButton)
         NeoForge.EVENT_BUS.addListener(RenderGuiLayerEvent.Pre::class.java) { event ->

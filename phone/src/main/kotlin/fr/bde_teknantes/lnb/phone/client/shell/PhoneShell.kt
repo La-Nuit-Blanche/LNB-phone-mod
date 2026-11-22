@@ -151,17 +151,35 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     }
 
     private fun startClosing() {
+        val screen = host.screen
+        val back = returnTo
+        slideDown()
+        // State first: the phone screen's removed() then knows the shell closed it. Closed while still rising, the
+        // phone has no screen yet, but the one it was opened from comes back all the same.
+        if (host.isPhoneScreen(screen) || (screen == null && back != null)) {
+            host.setScreen(back)
+            // A mod refused the screen it came from (ScreenEvent.Opening): give the game back rather than leave the
+            // phone's screen up with nothing behind it. Going back to the game can't be refused.
+            if (host.isPhoneScreen(host.screen)) host.setScreen(null)
+        }
+    }
+
+    /**
+     * Another screen took over while the phone rose, or the phone's own screen was refused or replaced: the device
+     * slides down behind whatever is shown, which is left alone.
+     */
+    private fun standDown() {
+        slideDown()
+        navigator.close()
+    }
+
+    private fun slideDown() {
         val now = now()
         slide = DeviceSlide.close(currentPose(now) ?: restingPose().let { DevicePose(it.x, guiHeight(), 0f) }, now)
         state = State.CLOSING
+        returnTo = null
         clearPointer()
         host.play(ShellSound.CLOSE)
-        val screen = host.screen
-        val back = returnTo
-        returnTo = null
-        // State first: the phone screen's removed() then knows the shell closed it. Closed while still rising, the
-        // phone has no screen yet, but the one it was opened from comes back all the same.
-        if (host.isPhoneScreen(screen) || (screen == null && back != null)) host.setScreen(back)
     }
 
     /** The phone's screen was replaced by another one (death screen, another mod's screen): put away at once. */
@@ -175,37 +193,55 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         navigator.close()
     }
 
-    /** The phone's screen became the game's screen: what it hears of the keyboard starts over. */
+    /**
+     * The phone's screen became the game's screen: opened by the shell, or shown again by someone else. A vanilla
+     * dialog an app opens (a link to confirm, another mod's settings) has the phone's screen as its parent and shows
+     * that same screen again when it closes: the phone is then taken back as open, standing, without a slide, so the
+     * player never sits in a phone screen that draws nothing.
+     */
     fun onScreenShown() {
         keysHeld.clear()
         phoneKeyLatched = host.isPhoneKeyDown()
+        if (state == State.OPEN) return
+        state = State.OPEN
+        slide = null
+        returnTo = null
+        clearPointer()
+        if (!navigator.isOpen) navigator.open()
     }
 
     // ---- Ticks ----
 
     fun tick() {
         ticks++
-        if (state != State.CLOSED && !host.inWorld) reset()
+        if (state != State.CLOSED && !host.inWorld) {
+            navigator.close()
+            reset()
+        }
         updateCounts()
-        if (heldProgress == null) finishAnimations()
+        finishAnimations(now())
         if (navigator.isOpen && appsSupported()) navigator.tick()
     }
 
-    private fun finishAnimations() {
-        val now = ticks.toFloat()
+    /** At the start of each frame: a slide that has just ended opens the phone's screen at once, not a tick later. */
+    fun frame() = finishAnimations(now())
+
+    private fun finishAnimations(now: Float) {
+        // Any screen that opens while the device rises (pause menu, inventory, chat, a container the server opens,
+        // the death screen) sends it back down at once, behind that screen.
+        val shown = host.screen
+        if (state == State.OPENING && shown != null && !host.isPhoneScreen(shown)) standDown()
+        if (heldProgress != null) return
         if (screenSlide?.isDone(now) == true) clearSlide()
         val current = slide ?: return
         if (!current.isDone(now)) return
         slide = null
         when (state) {
-            State.OPENING -> if (host.screen == null) {
+            State.OPENING -> {
                 state = State.OPEN
                 host.setScreen(host.createPhoneScreen())
-            } else {
-                // Something else took the screen while the phone rose (the pause menu, the inventory): stand down.
-                state = State.CLOSED
-                returnTo = null
-                navigator.close()
+                // A mod may refuse or replace the phone's screen (ScreenEvent.Opening): then the phone isn't open.
+                if (!host.isPhoneScreen(host.screen)) standDown()
             }
             State.CLOSING -> state = State.CLOSED
             else -> {}
@@ -294,6 +330,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     private fun showsApp() = !navigator.isHome && appsSupported()
 
     fun mouseClicked(x: Double, y: Double, button: Int): Boolean {
+        if (state != State.OPEN) return false
         val pose = currentPose() ?: return false
         val dx = x - pose.x
         val dy = y - pose.y
@@ -369,6 +406,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     }
 
     fun mouseScrolled(x: Double, y: Double, scrollX: Double, scrollY: Double): Boolean {
+        if (state != State.OPEN) return false
         val pose = currentPose() ?: return false
         if (!Device.inViewport(x - pose.x, y - pose.y)) return true
         if (navigator.isHome) {
@@ -381,7 +419,15 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
 
     fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
         val repeat = !keysHeld.add(keyCode)
-        if (state != State.OPEN) return true
+        if (state != State.OPEN) {
+            // The phone's screen up while the phone isn't standing open must never trap the player: Esc puts the
+            // screen away, every other key is left to the game.
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE && host.isPhoneScreen(host.screen)) {
+                host.setScreen(null)
+                return true
+            }
+            return false
+        }
         val phoneKey = host.isPhoneKey(keyCode, scanCode)
         if (phoneKey && phoneKeyLatched) return true
         val app = showsApp()

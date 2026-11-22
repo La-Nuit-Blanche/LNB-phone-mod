@@ -4,13 +4,15 @@ import fr.bde_teknantes.lnb.phone.client.apps.testApp
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShellCore.State
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
 
 /**
- * The phone as a guest in Minecraft's input system: held keys and their repeats.
+ * The phone as a guest in Minecraft's input and screen system: held keys and their repeats, screens that open over
+ * the rising phone, dialogs that come back to the phone's screen, mods that refuse or replace screens.
  */
 internal class PhoneShellGuestTest : ShellTestBase() {
     private val root = ScriptedScreen("root", log)
@@ -108,5 +110,128 @@ internal class PhoneShellGuestTest : ShellTestBase() {
         assertEquals(emptyList<String>(), log)
         host.releaseKey(GLFW.GLFW_KEY_P)
         assertTrue(shell.charTyped('p', 0))
+    }
+
+    // ---- Screens over the rising phone ----
+
+    @Test
+    fun `a screen opening during the rise sends the device down behind it, at once`() {
+        registerApps(1)
+        pressPhoneKeyInGame()
+        tick(2)
+        val here = pose!!
+        val inventory = host.openOtherScreen("inventory")
+        shell.frame()
+        assertEquals(State.CLOSING, shell.state)
+        assertFalse(host.navigator.isOpen)
+        assertEquals(here, pose)
+        tick(CLOSE_TICKS)
+        assertEquals(State.CLOSED, shell.state)
+        assertSame(inventory, host.screen)
+        assertFalse(host.screensShown.any { host.isPhoneScreen(it) })
+    }
+
+    @Test
+    fun `Esc during the rise opens the pause menu and the device goes back down`() {
+        registerApps(1)
+        pressPhoneKeyInGame()
+        tick(1)
+        host.pressKey(ESC)
+        tick()
+        assertEquals(State.CLOSING, shell.state)
+        assertEquals(FakeShellHost.PAUSE, (host.screen as TestScreen).name)
+    }
+
+    @Test
+    fun `a mod refusing the phone's screen leaves the game with the mouse and the device going down`() {
+        registerApps(1)
+        pressPhoneKeyInGame()
+        host.refuseNextScreen = true
+        tick(OPEN_TICKS)
+        assertEquals(State.CLOSING, shell.state)
+        assertFalse(host.navigator.isOpen)
+        assertNull(host.screen)
+        closeFully()
+    }
+
+    @Test
+    fun `a mod replacing the phone's screen leaves its screen alone and the device going down`() {
+        registerApps(1)
+        pressPhoneKeyInGame()
+        val other = TestScreen("other")
+        host.replaceNextScreen = other
+        tick(OPEN_TICKS)
+        assertEquals(State.CLOSING, shell.state)
+        assertSame(other, host.screen)
+    }
+
+    // ---- The phone's screen shown again ----
+
+    @Test
+    fun `a dialog an app opens over the phone gives the phone back, standing, when it closes`() {
+        openOnRoot()
+        val phoneScreen = host.screen!!
+        val standing = pose!!
+        // ConfirmLinkScreen and the like: opened with the phone's screen as parent.
+        host.openOtherScreen("confirm link")
+        assertEquals(State.CLOSED, shell.state)
+        assertEquals(listOf("root:hidden"), log)
+        host.setScreen(phoneScreen)
+        assertEquals(State.OPEN, shell.state)
+        assertTrue(host.navigator.isOpen)
+        assertSame(root, host.navigator.shownScreen)
+        assertEquals(standing, pose)
+        // And the phone answers again.
+        host.pressKey(ESC)
+        assertEquals(State.CLOSING, shell.state)
+        assertNull(host.screen)
+    }
+
+    @Test
+    fun `a mod refusing the screen the phone came from can't leave the phone's screen up`() {
+        registerApps(1)
+        val inventory = host.openOtherScreen("inventory")
+        shell.open(returnTo = inventory)
+        tick(OPEN_TICKS)
+        assertTrue(phoneScreenShown)
+        host.refuseNextScreen = true
+        host.pressKey(ESC)
+        assertEquals(State.CLOSING, shell.state)
+        assertNull(host.screen)
+    }
+
+    // ---- Mouse button and disconnection ----
+
+    @Test
+    fun `a phone key on the left mouse button doesn't close the phone on the device`() {
+        host.phoneMouseButton = GLFW.GLFW_MOUSE_BUTTON_LEFT
+        openOnRoot()
+        host.pressKey(ESC)
+        closeFully()
+        pressPhoneKeyInGame()
+        tick(OPEN_TICKS)
+        clickHomeButton()
+        assertEquals(State.OPEN, shell.state)
+        assertTrue(host.navigator.isHome)
+    }
+
+    @Test
+    fun `a phone key on another mouse button closes the phone wherever it is clicked`() {
+        host.phoneMouseButton = GLFW.GLFW_MOUSE_BUTTON_RIGHT
+        registerApps(1)
+        openFully()
+        val (x, y) = iconCentre(0)
+        press(x, y, GLFW.GLFW_MOUSE_BUTTON_RIGHT)
+        assertEquals(State.CLOSING, shell.state)
+    }
+
+    @Test
+    fun `the player gone, the navigator is put away with the shell`() {
+        openOnRoot()
+        host.inWorld = false
+        tick()
+        assertEquals(State.CLOSED, shell.state)
+        assertFalse(host.navigator.isOpen)
+        assertEquals(listOf("root:hidden"), log)
     }
 }

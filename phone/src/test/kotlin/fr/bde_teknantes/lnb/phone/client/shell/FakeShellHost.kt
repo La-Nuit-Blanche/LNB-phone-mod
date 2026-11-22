@@ -42,8 +42,25 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
     /** Keys physically held down. */
     val keysDown = HashSet<Int>()
 
+    /**
+     * What a mod listening to `ScreenEvent.Opening` does to the next screen opened (not to going back to the game,
+     * which can't be refused): [refuseNextScreen] cancels it, [replaceNextScreen] swaps it for another.
+     */
+    var refuseNextScreen = false
+    var replaceNextScreen: Screen? = null
+
     override fun setScreen(screen: Screen?) {
-        val next = screen
+        var next = screen
+        if (next != null) {
+            if (refuseNextScreen) {
+                refuseNextScreen = false
+                return
+            }
+            replaceNextScreen?.let {
+                replaceNextScreen = null
+                next = it
+            }
+        }
         val old = this.screen
         // Minecraft calls removed() on the old screen before it takes the new one, then added() on the new one.
         if (old != null && old !== next && isPhoneScreen(old)) shell.onScreenRemoved()

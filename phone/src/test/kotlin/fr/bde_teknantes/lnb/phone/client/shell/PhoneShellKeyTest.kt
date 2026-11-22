@@ -233,11 +233,12 @@ internal class PhoneShellKeyTest : ShellTestBase() {
     }
 
     @Test
-    fun `keys sent to the shell while it isn't standing open are swallowed`() {
+    fun `keys sent to the shell while it isn't standing open are left to the game`() {
         openOn(Where.ROOT)
         host.pressKey(ESC)
         log.clear()
-        assertTrue(shell.keyPressed(GLFW.GLFW_KEY_A, 0, 0))
+        assertFalse(shell.keyPressed(GLFW.GLFW_KEY_A, 0, 0))
+        assertFalse(shell.keyPressed(ESC, 0, 0))
         assertEquals(emptyList<String>(), log)
         assertEquals(State.CLOSING, shell.state)
     }
