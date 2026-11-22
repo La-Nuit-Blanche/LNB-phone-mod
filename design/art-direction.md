@@ -1,32 +1,25 @@
 # LNB Phone: art direction
 
-Version 4. The user validates a storyboard canvas built from this document before any code is written; developers then build from it. Every value here is final unless the user changes it.
+Version 5. The user validated a storyboard canvas built from version 4, and ten development tasks then built the phone from it. Along the way developers and reviewers found passages that were wrong, contradicted each other, said nothing or could not be built as written, and decisions were made. Version 5 brings the document in line with what was built; where the two differ, the code is right. The Feed app (section 9) is not built yet and will be built from this document. Every value here is final unless the user changes it.
 
-## Changes since version 3
+## Changes since version 4
 
-- **Names swapped.** The bold name on a post is the player's real name from LNB Warden; the grey handle is `@` + the Minecraft username. Without a real name, the username is the bold name and there is no handle. The post header is now two lines (name line, handle line) so a long real name and a 16-character handle both fit (9.3).
-- **Pinning:** announcers and operators get a pin button in the action row of announcements; the operator command stays. Limit 3 pinned posts, with a confirmation when a 4th would replace the oldest (9.4).
-- **Deleting:** players can delete their own posts and replies; operators can delete any. Through a "more" menu and a confirmation dialog (9.9).
-- **Language rule:** English is the default; French for players whose game is in French (`fr_*`). Mockups stay in French (13.1).
-- **New section 17: interaction flows**, one numbered frame per step, for the storyboard canvas.
-- New kit components and states for the flows: danger button, button loading state, menu, dialog, tooltip, error snackbar, post highlight, over-limit highlight in the text area, "more" button, pin button (8.7).
-- Navigation rules made explicit: Esc closes the topmost menu or dialog, otherwise the phone; a click outside the device closes the phone; the phone reopens on the screen it was closed on (2.3).
-- Notification banner: the time is dropped (a banner is always "now"), the title names the event (`Nouvelle annonce`, `Nouvelle réponse`) and the text starts with the author's name (10.1).
-- Own anonymous posts show the author a private line "Publié anonymement par toi"; own posts with unseen replies show an accent marker on the reply count (9.3).
-- Feed error state renamed "Feed indisponible" (the problem is the Feed service, not the Minecraft server). New-post arrival specified for both feeds and for a list scrolled to the top (9.5).
-- Proofreading fixes: the stale "no mockup planned" line, stale cross-references, leftovers from the old name order, "unchanged" labels.
-- Sections from 17 on: 17 Interaction flows, 18 Mockup brief, 19 Open questions and assumptions.
+- **Rendering.** Shapes are computed at the screen's real resolution instead of coming from sprites (8.1, 16.2). Icons are exported at one density per GUI scale, now scales 2 to 9 (8.1, 16.2). The `person` icon exists at 12, 20 and 28 dp, one per avatar size (8.6, 16.2). App names are truncated when drawn instead of capped at 16 characters (7.2, 13.3).
+- **GUI scales 2 and up.** The phone supports every integer GUI scale from 2, not only 2 to 4: Minecraft's Auto picks 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K (Units, 8.1, 16.2). Scale 1 stays unsupported for apps; there, also no notification banner and no peek (the chime and the badge only), and Backspace goes home (8.1, 10.2, 2.3, P-15).
+- **Pixel rules at every scale.** Layout arithmetic of the shell rounds halves to even, the only rule that reproduces the positions of P-3.2 and P-12.4 (2.4, 14). A 1 dp hairline is 2 real pixels at GUI scale 3 and the 3 dp tab indicator is 4 pixels tall there (8.1, 8.7).
+- **Corner phone and hotbar.** The bottom-right phone overlaps the hotbar in any window narrower than about 474 GUI px, which includes the default 854 x 480 window at GUI scale 2. Accepted as it is (2.4).
 
 ## History
 
+- **Version 4:** names swapped (bold real name, grey `@username` handle, two-line post header); pinning (3 at most) and deleting (own posts and replies, operators any); the language rule (English by default, French for French game languages, mockups in French); interaction flows in a new section 17, with the mockup brief and the open questions moved to 18 and 19; the kit components and states they need (danger button, loading button, menu, dialog, tooltip, error snackbar, post highlight, over-limit highlight, more and pin buttons); explicit navigation rules (Esc closes the topmost menu or dialog, otherwise the phone; a click outside closes it; the phone reopens where it was); the banner without a time and with an event title; private lines on own anonymous posts and the unseen-replies marker; the "Feed indisponible" state and new-post arrival in both feeds; proofreading fixes.
 - **Version 3:** Annonces / Global tabs with Annonces first; fixed 48 dp tab indicator; French and English string table; identity from LNB Warden; operator line on anonymous posts; like and reply confirmed; thread screen; announcers and the announcer badge.
 - **Version 2:** one look (Slate); pixel shell with a smooth app layer in dp; the Feed app; smooth notification banner; status bar matches the app background inside apps; moon moved; bottom-right placement by default with a Settings switch.
 - **Version 1:** three variants of the phone; the user chose C "Slate".
 
 ## Units and coordinates
 
-- **GUI px**: the unit Minecraft multiplies by the GUI scale (2x to 4x). Used for the pixel shell.
-- **dp**: the unit of the smooth app layer. **2 dp = 1 GUI px.** At GUI scale 2, 3 and 4, 1 dp is 1, 1.5 and 2 real screen pixels.
+- **GUI px**: the unit Minecraft multiplies by the GUI scale (2x and up: Minecraft's Auto setting gives 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K). Used for the pixel shell.
+- **dp**: the unit of the smooth app layer. **2 dp = 1 GUI px.** At GUI scale `s`, 1 dp is `s / 2` real screen pixels: 1, 1.5 and 2 at scales 2, 3 and 4, 2.5 to 4.5 at scales 5 to 9.
 - Colours are sRGB hex. `#RRGGBBAA` is a colour with alpha.
 - **window** `(wx, wy)`: GUI px, origin at the top-left of the game window. `W`, `H` are the window size in GUI px.
 - **device-local** `(dx, dy)`: GUI px, origin at the top-left pixel of the 140x228 device.
@@ -175,6 +168,10 @@ Same device, same size, same sprites in both. **Default: bottom-right.** Each pl
 | Centred | `wx = floor((W - 140) / 2)`, `wy = floor((H - 228) / 2)` | full-window flat scrim `#0000004D`, no menu blur |
 
 At the minimum window 320 x 240: bottom-right puts the device at `(174, 6)`, centred at `(90, 6)`. In a 480 x 270 window (1920 x 1080 at GUI scale 4): bottom-right `(334, 36)`, centred `(170, 21)`. The notification peek always comes from the bottom-right, whatever the placement.
+
+In the bottom-right placement the device overlaps the hotbar in any window narrower than about 474 GUI px: the hotbar is 182 wide and centred, so its right edge `W / 2 + 91` is past the device's left edge `W - 146` when `W < 474`. That includes Minecraft's default 854 x 480 window at GUI scale 2 (427 x 240). Accepted as it is: the device is drawn over the hotbar there.
+
+**Rounding.** Positions of the pixel shell are whole GUI px. Layout arithmetic that has to land on one (a device mid-slide or mid-glide, a peek mid-rise, the scrim's alpha) rounds a half to the even neighbour (0.5 to 0, 1.5 to 2, 38.5 to 38). It is the only rule that reproduces this document's own example values: the scrim half-way in P-3.2 is `#00000026` (38.5 of `4D`'s 77; rounding halves up would give `#00000027`) and the device half-way in P-12.4 is at `y 28` (28.5; half up gives 29). The smooth layer's own rule is different and is in 8.1.
 
 ### 2.5 Home spacing grid (pixel)
 
@@ -506,10 +503,10 @@ Every app, built-in or third-party, draws inside the 256 x 370 dp viewport with 
 - Text is Inter rasterised at the exact pixel size for the current GUI scale, with the font's kerning; widths in dp, and so line breaks, are the same at every scale.
 - **No blur, no backdrop effects.** Shadows only from the pre-baked soft sprites: FAB, and the "sheet" shadow under the banner, snackbar, menu and dialog. No other element has a shadow.
 - No gradients in the kit.
-- Icons and the spinner are exported at **three densities, 1, 1.5 and 2 px per dp**, one per supported GUI scale, and drawn 1:1. Shadows are exported at 2 px per dp and drawn with linear filtering, no mipmaps.
-- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. An edge on an odd dp value is rounded half up at GUI scale 3, where 1 dp is 1.5 real pixels. Hairlines are 1 dp: 1 real pixel at GUI scale 2, 2 at GUI scales 3 and 4.
+- Icons and the spinner are exported at **eight densities, 1 to 4.5 px per dp in steps of 0.5**, one per GUI scale from 2 to 9, and drawn 1:1. Shadows are exported at 2 px per dp and drawn with linear filtering, no mipmaps.
+- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. At an odd GUI scale (3, 5, 7, 9) 1 dp is a half-integer of pixels, and an edge on an odd dp value is rounded half up to a whole pixel, the same way at every position: the 3 dp tab indicator at `y 41..43` is 4 real pixels tall at GUI scale 3, not 4.5. A line is its thickness in dp times `s / 2` pixels, rounded half up and at least 1: a 1 dp hairline is 1, 2, 2, 3, 3, 4, 4 and 5 real pixels at GUI scales 2 to 9.
 - The app layer is clipped to the viewport. The shell then paints its 4 screen corner pixels over it, giving the bottom corners a 1 GUI px notch on purpose.
-- GUI scale 1 is not supported for apps (1 dp would be half a pixel). At GUI scale 1 the shell and home screen work, and an opened app's viewport shows only the bitmap-font line `Échelle GUI : 2+` (string `gui.scale`), centred horizontally and vertically, in `#96A0B0`, on `bg`.
+- **Every integer GUI scale from 2 up is supported** (Auto gives 5, 6 or 9 on large screens). GUI scale 1 is not supported for apps (1 dp would be half a pixel). At GUI scale 1 the shell and home screen work, and an opened app's viewport shows only the bitmap-font line `Échelle GUI : 2+` (string `gui.scale`), centred horizontally and vertically, in `#96A0B0`, on `bg`. There the phone also shows no notification banner and no peek (the chime plays and the badge waits, 10.2), and Backspace goes to the home screen, the only way back there (2.3).
 
 ### 8.2 The seam between pixel status bar and smooth app
 
@@ -584,7 +581,7 @@ Text is left-aligned, sentence case. Every fixed-width slot is sized for the lon
 
 ### 8.6 Line icons
 
-- Grids: **12 dp** (only the filled megaphone in the announcer badge), **16 dp** (action row, pin, lock, more, trash, alert, arrows; stroke 1.5 dp), **20 dp** (header and row icons; stroke 2 dp), **24 dp** (FAB; stroke 2 dp), **40 dp** (empty states; stroke 2.5 dp).
+- Grids: **12 dp** (the filled megaphone in the announcer badge, `person` in a 16 dp avatar), **16 dp** (action row, pin, lock, more, trash, alert, arrows; stroke 1.5 dp), **20 dp** (header and row icons; stroke 2 dp), **24 dp** (FAB; stroke 2 dp), **28 dp** (`person` in a 48 dp avatar; stroke 2 dp), **40 dp** (empty states; stroke 2.5 dp). `person` is drawn at 12, 20 and 28 dp, so the anonymous avatar's icon is exported at the size it is drawn.
 - Live area: grid minus 2 dp on every side (20 dp icon draws inside 16 dp).
 - Round caps, round joins, 2 dp corner radius on drawn rectangles.
 - Outline style. Filled variants only for active states (`heart_filled`, `pin_filled`).
@@ -617,7 +614,7 @@ All positions are relative to the component unless stated. Hover tints are drawn
 | Inactive | label `text-2` |
 | Hover (inactive) | label `text-1`, whole tab `overlay-hover` |
 | Pressed (inactive) | label `text-1`, whole tab `overlay-pressed` |
-| Active | label `text-1`; indicator 3 dp tall pill at `y 41..43`, `accent`, **fixed width 48 dp for every tab**, centred on the tab (not on the label): with 2 tabs, `x 40..87` under the left tab and `x 168..215` under the right tab. The indicator never depends on label length |
+| Active | label `text-1`; indicator 3 dp tall pill at `y 41..43` (4 real pixels tall at GUI scale 3, see 8.1), `accent`, **fixed width 48 dp for every tab**, centred on the tab (not on the label): with 2 tabs, `x 40..87` under the left tab and `x 168..215` under the right tab. The indicator never depends on label length |
 | Unread dot | 6 dp `accent` circle, 4 dp right of the label, vertically centred on it (rule in 9.6) |
 | Bottom hairline | 1 dp at `y 43`, under the indicator |
 | Switch | indicator slides to the new tab in 150 ms; content swaps at once |
@@ -1211,14 +1208,14 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Empty-state texts (200 dp) | `Server announcements will show up here.` | wraps to 2 lines | up to 2 lines |
 | Dialog texts (200 dp) | `Its replies will be deleted too. This can't be undone.` | wraps to 2 lines | up to 3 lines |
 | Collapsed composer placeholder (208 dp) | `Répondre à` + a long name | truncates with `…` | |
-| Pixel label line (120 px) | `Réglages` / `Settings`, 8 characters | fits | app names max 16 characters |
+| Pixel label line (120 px) | `Réglages` / `Settings`, 8 characters | fits | app names of 16 characters or fewer recommended (7.2); the line cuts a longer name at 20 characters or 120 px |
 | Pixel `gui.scale` line (128 px) | `Échelle GUI : 2+`, 16 characters, about 92 px | fits | |
 
 ---
 
 ## 14. Motion
 
-The game ticks every 50 ms. Durations are whole ticks. Animations interpolate with `(tick + partialTick)`, use quadratic easing only. The pixel shell rounds positions to whole GUI px every frame. The smooth layer may use fractional dp positions and opacity.
+The game ticks every 50 ms. Durations are whole ticks. Animations interpolate with `(tick + partialTick)`, use quadratic easing only. The pixel shell rounds positions to whole GUI px every frame (halves to the even neighbour, 2.4). The smooth layer may use fractional dp positions and opacity.
 
 | Motion | Duration | Easing | Detail |
 |---|---|---|---|
@@ -1310,7 +1307,7 @@ Shadows, at 2 px per dp, black with the 45% opacity baked in:
 | `shadow/fab` | 72 x 72 (144 x 144) | none | soft round shadow for a 48 dp circle: 8 dp blur. Drawn centred on the circle and 2 dp lower |
 | `shadow/sheet` | 48 x 48 (96 x 96) | 22 | soft shadow for radius 10 to 14 rects (banner, snackbar, menu, dialog): 8 dp blur, the 2 dp drop baked in; drawn 8 dp larger than the element on each side |
 
-Icons and the spinner, white with alpha and tinted at draw time, at `<density>/icon<grid>/<name>.png` and `<density>/spinner.png`, where `<density>` is `1x`, `1_5x` or `2x` for GUI scale 2, 3 and 4. An icon's size in pixels is its grid times the density, and it is drawn 1:1.
+Icons and the spinner, white with alpha and tinted at draw time, at `<density>/icon<grid>/<name>.png` and `<density>/spinner.png`, where `<density>` is the pixels per dp: `1x`, `1_5x`, `2x`, `2_5x`, `3x`, `3_5x`, `4x` or `4_5x`, for GUI scale 2 to 9. An icon's size in pixels is its grid times the density, and it is drawn 1:1.
 
 | Icons | Grid dp | Content |
 |---|---|---|
@@ -1494,7 +1491,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P1 | home at GUI scale 1, hover Feed | GUI px `(16, 29)` | At GUI scale 1 the phone and its home screen still work. |
 | 2 | P1 | Feed opened: status bar, viewport `bg` with the bitmap line `Échelle GUI : 2+` centred in `#96A0B0` | same | Apps need GUI scale 2 or more; the app area says so. |
-| 3 | P1 | home button pressed, home screen | GUI px `(70, 218)` | The home button still works. |
+| 3 | P1 | home button pressed, home screen | GUI px `(70, 218)` | The home button still works, and so does Backspace. A notification here gives no banner and no peek, only the chime and the badge (10.2). |
 
 ### 17.2 Feed flows
 
