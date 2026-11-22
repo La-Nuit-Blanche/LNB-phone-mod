@@ -101,6 +101,41 @@ internal class PhoneShellPlacementTest : ShellTestBase() {
     }
 
     @Test
+    fun `a placement change during the rise turns the device without a jump`() {
+        registerApps(1)
+        pressPhoneKeyInGame()
+        tick(2)
+        val before = pose!!
+        assertEquals(DevicePose(334, 120, 0f), before)
+        centre()
+        assertEquals(before, pose)
+        tick(5)
+        assertEquals(DevicePose(170, 21, 1f), pose)
+        assertEquals(State.OPEN, shell.state)
+    }
+
+    @Test
+    fun `switching back mid-glide turns the device without a jump`() {
+        registerApps(1)
+        openFully()
+        centre()
+        tick(2)
+        val before = pose!!
+        assertEquals(DevicePose(229, 26, before.scrim), before)
+        corner()
+        assertEquals(before, pose)
+        // Then on to the corner, never through a pose further from it.
+        var last = before
+        repeat(5) {
+            tick()
+            val now = pose!!
+            assertTrue(now.x >= last.x && now.y >= last.y && now.scrim <= last.scrim, "$last then $now")
+            last = now
+        }
+        assertEquals(DevicePose(334, 36, 0f), pose)
+    }
+
+    @Test
     fun `changing something other than the placement doesn't move the device`() {
         registerApps(1)
         openFully()

@@ -215,15 +215,18 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         return DevicePose(position.x, position.y, PhoneLayout.scrimAmount(placement))
     }
 
-    /** The device's pose at [now], or null while it is away. */
-    fun currentPose(now: Float = now()): DevicePose? {
+    /**
+     * The device's pose at [now], or null while it is away. Rising or gliding, it moves towards where [placement] puts
+     * it: the current setting, except while that setting is being changed.
+     */
+    fun currentPose(now: Float = now(), placement: Placement = host.settings.current.placement): DevicePose? {
         if (state == State.CLOSED) return null
-        val moving = slide ?: return restingPose()
+        val moving = slide ?: return restingPose(placement)
         val progress = heldProgress ?: moving.progress(now)
         return if (state == State.CLOSING) {
             moving.pose(progress, Motion.snap(moving.fromX), guiHeight(), 0f)
         } else {
-            val target = restingPose()
+            val target = restingPose(placement)
             moving.pose(progress, target.x, target.y, target.scrim)
         }
     }
@@ -234,8 +237,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     private fun onSettingsChanged(old: PhoneSettings, new: PhoneSettings) {
         if (old.placement == new.placement || (state != State.OPEN && state != State.OPENING)) return
         val now = now()
-        // From where it is now: the pose under the old placement, or mid-way if it was already moving.
-        val from = slide?.let { currentPose(now) } ?: restingPose(old.placement)
+        // From where it is now: the pose under the old placement, or mid-way if it was already moving. The store holds
+        // the new placement already, so a move under way is measured towards the old one it was heading for.
+        val from = slide?.let { currentPose(now, old.placement) } ?: restingPose(old.placement)
         slide = DeviceSlide.glide(from, now)
     }
 
