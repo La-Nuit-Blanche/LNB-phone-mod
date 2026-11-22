@@ -142,6 +142,18 @@ class AppRegistryTest {
     }
 
     @Test
+    fun `only the phone registers ids in its namespace`() {
+        val registry = AppRegistry()
+        val other = PhoneApp(AppRegistry.SETTINGS_ID, Component.literal("Other"), settings.icon) { RecordingScreen("other", mutableListOf()) }
+        assertFalse(registry.register(other, "othermod"))
+        assertFalse(registry.register(other, null))
+        assertNull(registry[AppRegistry.SETTINGS_ID])
+
+        assertTrue(registry.register(settings, LnbPhone.ID))
+        assertSame(settings, registry[AppRegistry.SETTINGS_ID])
+    }
+
+    @Test
     fun `the Settings id is the phone's`() {
         assertEquals("${LnbPhone.ID}:settings", AppRegistry.SETTINGS_ID.toString())
     }

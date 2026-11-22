@@ -27,12 +27,20 @@ internal class AppRegistry {
 
     /**
      * Adds [app], unless its id is taken: then the first app stays and the newcomer is left out, so that two mods
-     * clashing on an id cost one app, not the game.
+     * clashing on an id cost one app, not the game. Ids in the phone's own namespace are kept for the phone's apps,
+     * so that no mod can take Settings' place by registering first.
      *
      * @return whether [app] was added.
      */
     fun register(app: PhoneApp, modId: String?): Boolean {
         check(!isFrozen) { "Phone apps are registered during RegisterPhoneAppsEvent only; ${app.id} came too late" }
+        if (app.id.namespace == LnbPhone.ID && modId != LnbPhone.ID) {
+            LnbPhone.LOGGER.error(
+                "Phone app {} from {} is left out: the {} namespace is kept for the phone's own apps",
+                app.id, modId ?: "an unknown mod", LnbPhone.ID,
+            )
+            return false
+        }
         val existing = byId[app.id]
         if (existing != null) {
             LnbPhone.LOGGER.error(
