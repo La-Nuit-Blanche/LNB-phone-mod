@@ -1,7 +1,6 @@
 package fr.bde_teknantes.lnb.phone.demo.client.capture
 
 import fr.bde_teknantes.lnb.phone.LnbPhone
-import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.debug.CaptureHooks
 import fr.bde_teknantes.lnb.phone.demo.ping.Ping
@@ -50,7 +49,7 @@ internal object PingScenario {
         openPhone()
         click { device(70, 218) }
         waitTicks(4)
-        mouseTo { icon(slotOf(Ping.APP_ID)) }
+        mouseTo { icon(HomeSlots.of(Ping.APP_ID)) }
         waitTicks(3)
         shot(name("01_home_hover"))
         mouseDown()
@@ -104,7 +103,7 @@ internal object PingScenario {
         shot(name("09_banner_on_home"))
         waitUntil { !CaptureHooks.bannerShown }
         waitTicks(4)
-        mouseTo { icon(slotOf(Ping.APP_ID)) }
+        mouseTo { icon(HomeSlots.of(Ping.APP_ID)) }
         waitTicks(2)
         shot(name("10_badge"))
         log("after the banner went")
@@ -156,7 +155,7 @@ internal object PingScenario {
         openPhone()
         click { device(70, 218) }
         waitTicks(4)
-        click { icon(slotOf(Ping.APP_ID)) }
+        click { icon(HomeSlots.of(Ping.APP_ID)) }
         waitTicks(8)
         mouseToApp(128, 72)
         waitTicks(3)
@@ -206,15 +205,7 @@ internal object PingScenario {
         return device(vx + 6 + 24 * (slot % 5) + 10, vy + 8 + 24 * (slot / 5) + 10)
     }
 
-    // The registry and the navigator are internal to the phone: development code reaches them by reflection.
-
-    /** Where the app [id] sits on the home screen, in home order. */
-    @Suppress("UNCHECKED_CAST")
-    private fun slotOf(id: ResourceLocation): Int {
-        val registry = LnbPhoneClient::class.java.getDeclaredField("apps").apply { isAccessible = true }.get(LnbPhoneClient)
-        val apps = registry.javaClass.getMethod("getApps").invoke(registry) as List<PhoneApp>
-        return apps.indexOfFirst { it.id == id }.also { check(it >= 0) { "$id isn't on the phone" } }
-    }
+    // The navigator is internal to the phone: development code reaches it by reflection.
 
     /** Opens the app [id] at [target], as opening one of its notifications does. */
     private fun openApp(id: ResourceLocation, target: String) {
