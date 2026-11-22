@@ -22,7 +22,8 @@ import java.util.IdentityHashMap
  * - [reset] (disconnection) forgets everything.
  *
  * Every call into an app's code goes through a guard: if it throws, the error is logged, the whole app is closed, the
- * phone goes home and listeners hear [NavigationListener.onAppFailed]. One broken app never takes the phone down.
+ * phone goes home and listeners hear [NavigationListener.onAppFailed]. A screen already off the stack is only logged.
+ * Either way the screen is never called again. One broken app never takes the phone down.
  *
  * Client thread only; [isClientThread] enforces it for the calls that change the state.
  */
@@ -327,13 +328,17 @@ internal class PhoneNavigator(
     private fun screenFailed(screen: AppScreen, what: String, error: Throwable) {
         screen.failed = true
         val host = screen.host
+        // A screen already off the stack (popped, replaced, or from an app that was left) takes only itself down: the
+        // likeliest bug there, onClosed freeing what the slide-out still draws, mustn't send the player home on every
+        // back.
+        val onStack = host != null && !host.closed && host.session === session
         LnbPhone.LOGGER.error(
-            "Phone app {} failed in {}.{}; the phone closes the app",
+            if (onStack) "Phone app {} failed in {}.{}; the phone closes the app"
+            else "Phone app {} failed in {}.{}, a screen already closed; it won't be called again",
             host?.session?.app?.id, screen.javaClass.name, what, error,
         )
-        val failing = host?.session ?: return
-        // A screen drawn during its slide-out belongs to a session that is already over: nothing left to close.
-        if (failing.ended || failing !== session) return
+        if (!onStack) return
+        val failing = host!!.session
         val outgoing = failing.screens.lastOrNull()
         val closing = endSession(failing)
         listeners.forEach { it.onTransition(Transition.INSTANT, outgoing) }

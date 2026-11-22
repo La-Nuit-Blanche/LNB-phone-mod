@@ -37,7 +37,9 @@ import fr.bde_teknantes.lnb.phone.client.apps.ScreenHost
  *
  * **Errors.** If any of these methods throws, the phone writes the error to the log, closes every screen of your app
  * and returns to the home screen; the rest of the phone and the game carry on, and the player can open the app again.
- * After throwing once, a screen is never called again.
+ * A screen that had already left the stack (popped or replaced, still drawn during its slide-out, or in its own
+ * [onClosed]) only takes itself down: the error is logged and the app carries on. Either way, after throwing once, a
+ * screen is never called again.
  *
  * Everything here runs on the client thread.
  */

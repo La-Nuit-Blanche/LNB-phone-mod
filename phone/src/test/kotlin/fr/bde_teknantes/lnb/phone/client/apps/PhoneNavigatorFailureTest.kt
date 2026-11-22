@@ -172,26 +172,43 @@ class PhoneNavigatorFailureTest {
     }
 
     @Test
-    fun `a popped screen that throws in onClosed still closes its app`() {
-        openStack(screen("root"), failingOn("a", "closed"))
+    fun `a popped screen that throws in onClosed takes only itself down`() {
+        val root = screen("root")
+        val a = failingOn("a", "closed")
+        openStack(root, a)
 
         assertTrue(navigator.back())
+        navigator.render(a, TestCanvas, 0f, 0f, 0f)
 
-        assertEquals(listOf("a:hidden", "a:closed", "root:closed"), log)
-        assertTrue(navigator.isHome)
-        assertFailedOnce()
+        assertEquals(listOf("a:hidden", "a:closed", "root:shown"), log)
+        assertSame(root, navigator.shownScreen)
+        assertEquals(listOf("@BACK from a"), heard)
     }
 
     @Test
-    fun `a replaced screen that throws in onClosed closes its app and the screen that replaced it`() {
+    fun `a popped screen that throws in onHidden gets no onClosed and the app carries on`() {
+        val root = screen("root")
+        openStack(root, failingOn("a", "hidden"))
+
+        assertTrue(navigator.back())
+
+        assertEquals(listOf("a:hidden", "root:shown"), log)
+        assertSame(root, navigator.shownScreen)
+    }
+
+    @Test
+    fun `a replaced screen that throws in onClosed leaves the screen that replaced it`() {
+        val root = screen("root")
         val a = failingOn("a", "closed")
-        openStack(screen("root"), a)
+        val new = screen("new")
+        openStack(root, a)
 
-        a.handle.replace(screen("new"))
+        a.handle.replace(new)
 
-        assertEquals(listOf("a:hidden", "a:closed", "new:closed", "root:closed"), log)
-        assertTrue(navigator.isHome)
-        assertFailedOnce()
+        assertEquals(listOf("a:hidden", "a:closed", "new:shown"), log)
+        assertEquals(listOf(root, new), navigator.screens)
+        assertSame(new, navigator.shownScreen)
+        assertEquals(listOf("@FORWARD from a"), heard)
     }
 
     @Test
@@ -274,17 +291,20 @@ class PhoneNavigatorFailureTest {
     }
 
     @Test
-    fun `a popped screen that throws while drawn sliding out closes its app`() {
+    fun `a popped screen that throws while drawn sliding out is only dropped`() {
+        val root = screen("root")
         val popped = failingOn("popped", "render")
-        openStack(screen("root"), popped)
+        openStack(root, popped)
         navigator.back()
         log.clear()
+        heard.clear()
 
         navigator.render(popped, TestCanvas, 0f, 0f, 0f)
+        navigator.render(popped, TestCanvas, 0f, 0f, 0f)
 
-        assertEquals(listOf("popped:render", "root:hidden", "root:closed"), log)
-        assertTrue(navigator.isHome)
-        assertFailedOnce()
+        assertEquals(listOf("popped:render"), log)
+        assertSame(root, navigator.shownScreen)
+        assertEquals(emptyList(), heard)
     }
 
     @Test
