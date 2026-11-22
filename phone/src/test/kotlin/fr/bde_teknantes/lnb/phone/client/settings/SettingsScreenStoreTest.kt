@@ -7,6 +7,7 @@ import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.KNOB_
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.KNOB_ON
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.PILL_CENTRE
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.PILL_CORNER
+import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.PREVIEW_Y
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.SOUNDS_Y
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsPlayer.Companion.TOGGLE_X
 import fr.bde_teknantes.lnb.phone.client.shell.Placement
@@ -138,25 +139,41 @@ class SettingsScreenStoreTest {
     }
 
     @Test
-    fun `a file that can't be written under the open screen costs no crash, the change holds, no entry is touched`() {
+    fun `a file that can't be written under the open screen costs no crash, the changes hold and reach it later`() {
         store("bob").update { it.copy(placement = Placement.CENTRE) }
+        val disk = RefusingDisk()
+        val here = PhoneSettingsStore(file, disk) { "alice" }
+        here.update { it.copy(preview = false) }
         val before = Files.readAllBytes(file)
-        val here = store()
         val heard = ArrayList<PhoneSettings>()
         here.addListener { _, new -> heard += new }
         val s = open(here)
-        assertTrue(file.toFile().setReadOnly())
-        try {
-            s.click(CENTRE_X, CENTRE_Y)
-            s.click(TOGGLE_X, SOUNDS_Y)
-            s.tick(4)
+
+        disk.refuseWrites = true
+        s.click(CENTRE_X, CENTRE_Y)
+        s.click(TOGGLE_X, SOUNDS_Y)
+        s.tick(4)
+        assertEquals(Triple(1, false, false), s.shown)
+        assertEquals(PhoneSettings(Placement.CENTRE, sounds = false, preview = false), here.current)
+        assertArrayEquals(before, Files.readAllBytes(file))
+        assertEquals(listOf(file), dir.listDirectoryEntries(), "no temporary file left")
+
+        // Writable again: the next change saves the earlier ones with it, and the screen never goes back to Coin.
+        disk.refuseWrites = false
+        s.click(TOGGLE_X, PREVIEW_Y)
+        repeat(4) {
+            s.tick()
             assertEquals(Triple(1, false, true), s.shown)
-            assertEquals(PhoneSettings(Placement.CENTRE, sounds = false), here.current)
-            assertEquals(listOf(PhoneSettings(Placement.CENTRE), PhoneSettings(Placement.CENTRE, sounds = false)), heard)
-            assertArrayEquals(before, Files.readAllBytes(file))
-            assertEquals(listOf(file), dir.listDirectoryEntries(), "no temporary file left")
-        } finally {
-            file.toFile().setWritable(true)
         }
+        assertEquals(PhoneSettings(Placement.CENTRE, sounds = false), store().current)
+        assertEquals(PhoneSettings(Placement.CENTRE), store("bob").current)
+        assertEquals(
+            listOf(
+                PhoneSettings(Placement.CENTRE, preview = false),
+                PhoneSettings(Placement.CENTRE, sounds = false, preview = false),
+                PhoneSettings(Placement.CENTRE, sounds = false),
+            ),
+            heard,
+        )
     }
 }
