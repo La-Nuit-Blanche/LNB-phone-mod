@@ -50,6 +50,17 @@ abstract class AppScreen {
     // Set when one of the screen's methods threw: the phone doesn't call it again.
     internal var failed = false
 
+    // Set by the phone around each keyPressed call.
+    internal var keyRepeat = false
+
+    /**
+     * While [keyPressed] runs: whether this call is the key repeating as the player holds it down (true), or a new
+     * press (false). A held key repeats about 20 times a second after a short delay, and a screen gets every repeat:
+     * text editing wants them (a held Backspace erases), an action usually doesn't (a held Enter must not send twenty
+     * times). The kit's widgets already act once per press.
+     */
+    protected val isKeyRepeat: Boolean get() = keyRepeat
+
     /**
      * The phone this screen is on, to open another screen, go back, go home or put the phone away. Available once
      * the phone has the screen (from [onShown] on, and in every input method), not in the constructor.
@@ -124,8 +135,8 @@ abstract class AppScreen {
     open fun mouseScrolled(x: Float, y: Float, scrollX: Float, scrollY: Float): Boolean = false
 
     /**
-     * A key was pressed (or repeats while held). Codes are GLFW's, as everywhere in Minecraft (`GLFW.GLFW_KEY_ENTER`);
-     * `Screen.hasControlDown()` and its siblings read the modifiers.
+     * A key was pressed, or repeats while held ([isKeyRepeat] tells which). Codes are GLFW's, as everywhere in
+     * Minecraft (`GLFW.GLFW_KEY_ENTER`); `Screen.hasControlDown()` and its siblings read the modifiers.
      *
      * The phone's own keys reach the screen first: Esc, Backspace and the key that opens the phone. Return true to
      * keep them, otherwise the phone does what they normally do (Esc and the phone key put the phone away, Backspace

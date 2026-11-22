@@ -565,7 +565,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         val app = showsApp()
         // Read before the app sees the key: the key may move the focus.
         val textFocus = app && navigator.hasTextFocus
-        val used = app && navigator.keyPressed(keyCode, scanCode, modifiers)
+        val used = app && navigator.keyPressed(keyCode, scanCode, modifiers, repeat)
         // The phone's own actions answer the first press only: a held key repeats, and the app gets the repeats.
         when {
             // The app closes its menu or dialog on Esc and keeps the key; otherwise Esc puts the phone away (2.3).

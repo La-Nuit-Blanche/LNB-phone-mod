@@ -23,8 +23,19 @@ import fr.bde_teknantes.lnb.phone.api.client.offset
  * **Your own widget** extends this class (or [Clickable] for something that reacts to clicks) and overrides [render],
  * drawing at (0, 0) in its own coordinates; its children are drawn on top. [isHovered], [isFocused] and [now] give
  * what drawing states and animations need; [KitDrawing] has the kit's focus ring and tints. Input methods receive
- * coordinates in the widget's own dp. The methods named `on...` are hooks: override them freely, the kit does its own
- * work around them.
+ * coordinates in the widget's own dp.
+ *
+ * **Hooks** are the members you may override, and every `open` member is one. The kit keeps its own work (focus,
+ * hover, presses, sounds) out of them, so an override never needs to call `super`; overriding one replaces only its
+ * default, the ordinary behaviour named in its documentation (drawing the children, finding what the pointer is on):
+ * - drawing: [render], [renderOver], [renderChildren];
+ * - size and layout: [preferredWidth], [preferredHeight], [heightFor], [layout], [update];
+ * - input: [mousePressed], [mouseReleased], [mouseDragged], [mouseScrolled], [keyPressed], [charTyped], with
+ *   [catchesPointer], [hitTest], [focusable], [acceptsText] and [focusChanged];
+ * - time and the tree: [onTick], [onPointerLost], [onChildrenChanged].
+ *
+ * Where the kit handles an input itself, its entry point is final and the class offers a narrower hook instead:
+ * [Clickable] takes the mouse and Enter / Space, and offers [Clickable.perform] and [Clickable.onKey].
  *
  * Widgets belong to the client thread, like screens. Adding and removing widgets is safe at any time, from any
  * callback, even while the screen is drawing.
@@ -213,7 +224,7 @@ abstract class Widget {
     /** Hook: draws above the children, for the rare widget that needs it (an indicator over its tabs). */
     open fun renderOver(canvas: AppCanvas) {}
 
-    /** Draws the children, each moved to its place. Override to clip or to skip some (a list does). */
+    /** Hook: draws the children, each moved to its place. Override to clip or to skip some (a list does). */
     protected open fun renderChildren(canvas: AppCanvas) {
         for (child in childList.toTypedArray()) child.draw(canvas)
     }
@@ -308,8 +319,17 @@ abstract class Widget {
     /** Whether the widget, focused, takes typed text: the phone then leaves Backspace and its own key to it. */
     open val acceptsText: Boolean get() = false
 
-    /** A key, while the widget has the focus; unused keys go to its parents, then to the screen. */
+    /**
+     * A key, while the widget has the focus; unused keys go to its parents, then to the screen. Held keys repeat:
+     * check [isKeyRepeat] before acting on a key that does something (Enter, Space), not before editing.
+     */
     open fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
+
+    /**
+     * While [keyPressed] runs: whether the key is repeating as the player holds it down, rather than newly pressed.
+     * See [AppScreen.isKeyRepeat][fr.bde_teknantes.lnb.phone.api.client.AppScreen.isKeyRepeat].
+     */
+    protected val isKeyRepeat: Boolean get() = screen?.keyRepeat == true
 
     /**
      * A typed character, while the widget has the focus: a whole code point (accents and dead keys arrive composed,

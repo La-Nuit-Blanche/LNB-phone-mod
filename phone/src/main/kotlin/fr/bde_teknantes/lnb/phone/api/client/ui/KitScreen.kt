@@ -391,8 +391,9 @@ abstract class KitScreen : AppScreen() {
             w = w.parent
         }
         if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-            // Under a menu or dialog nothing goes back: the dialog may be waiting for the server on this screen.
-            if (overlayOpen) return true
+            // Under a menu or dialog nothing goes back: the dialog may be waiting for the server on this screen. A
+            // held Backspace goes back once, as the phone does: its repeats are for text fields only.
+            if (overlayOpen || isKeyRepeat) return true
             return onBack()
         }
         if (overlayOpen) return false

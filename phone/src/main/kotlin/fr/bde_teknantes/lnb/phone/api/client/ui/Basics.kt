@@ -103,14 +103,9 @@ class ListRow(var title: String) : Clickable() {
     override val preferredHeight get() = if (subtitle != null) 56f else 48f
 
     override fun perform() {
-        // With a toggle and nothing else to do, the whole row switches it; the toggle plays no second tap.
+        // With a toggle and nothing else to do, the whole row switches it; the row's tap is the only one.
         val toggle = trailing as? Toggle
-        if (onClick == null && toggle != null) {
-            if (!silent) PhoneSounds.tap()
-            toggle.toggle()
-        } else {
-            super.perform()
-        }
+        if (onClick == null && toggle != null) toggle.toggle() else super.perform()
     }
 
     override fun layout() {

@@ -164,6 +164,35 @@ internal class PhoneShellKeyTest : ShellTestBase() {
     }
 
     @Test
+    fun `the app learns which presses are repeats, also on a screen pushed while the key is held`() {
+        val heard = ArrayList<String>()
+        val deeper = object : ScriptedScreen("deeper", log) {
+            override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+                heard += "deeper repeat=$isKeyRepeat"
+                return true
+            }
+        }
+        val first = object : ScriptedScreen("first", log) {
+            override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+                heard += "first repeat=$isKeyRepeat"
+                // Enter opens the next screen, as a row does.
+                if (!isKeyRepeat) handle.push(deeper)
+                return true
+            }
+        }
+        register(testApp("app") { first })
+        openFully()
+        clickIcon(0)
+        tick(3)
+        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
+        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
+        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
+        shell.keyReleased(GLFW.GLFW_KEY_ENTER, 0, 0)
+        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
+        assertEquals(listOf("first repeat=false", "deeper repeat=true", "deeper repeat=true", "deeper repeat=false"), heard)
+    }
+
+    @Test
     fun `while a field has the focus, no key goes on to the game, even one the app doesn't use`() {
         openOn(Where.ROOT)
         root.focus = true

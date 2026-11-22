@@ -80,12 +80,7 @@ class Button(label: String) : Clickable() {
 
     override val preferredHeight get() = HEIGHT
 
-    override fun perform() {
-        if (loading) return
-        super.perform()
-    }
-
-    override fun mousePressed(x: Float, y: Float, button: Int): Boolean = if (loading) true else super.mousePressed(x, y, button)
+    override val isBusy get() = loading
 
     override fun render(canvas: AppCanvas) {
         val look = interaction

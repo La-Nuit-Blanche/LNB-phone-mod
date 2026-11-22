@@ -69,23 +69,20 @@ class KitFromSettingsTest {
     }
 
     @Test
-    fun `the tap sound comes before the toggle flips, so it follows the setting as it was`() {
-        // The kit has no seam for sounds: with sounds on, PhoneSounds goes to Minecraft.getInstance(), which tests
-        // don't have, and throws. Where it throws shows the order. In the game, PhoneSounds reads the Sounds setting at
-        // that moment, before the store changes: switching sounds off plays a tap, switching them on plays none.
+    fun `the tap follows the sound setting as the click leaves it`() {
+        // The click acts first and taps after: switching sounds off is silent, switching them on is heard.
         val store = PhoneSettingsStore(dir.resolve("lnbphone-client.json")) { "alice" }
         val s = SettingsPlayer(store).apply { frame() }
-        PhoneSounds.forcedEnabled = true
+        PhoneSounds.setting = { store.current.sounds }
         for (x in listOf(40f, TOGGLE_X)) {
-            val thrown = assertThrows(NullPointerException::class.java) { s.click(x, SOUNDS_Y) }
-            assertTrue(thrown.stackTrace.any { it.className.endsWith(".PhoneSounds") }, "thrown while playing the tap")
-            assertTrue(s.sounds.checked, "not flipped yet when the tap played (click at x $x)")
+            KitFakes.sounds.clear()
+            s.click(x, SOUNDS_Y)
+            assertFalse(store.current.sounds)
+            assertEquals(emptyList<PhoneSounds.Sound>(), KitFakes.sounds, "switched off at x $x: no tap")
+            s.click(x, SOUNDS_Y)
             assertTrue(store.current.sounds)
+            assertEquals(listOf(PhoneSounds.Sound.TAP), KitFakes.sounds, "switched on at x $x: one tap")
         }
-        // Silent, the same clicks go through.
-        PhoneSounds.forcedEnabled = false
-        s.click(40f, SOUNDS_Y)
-        assertFalse(store.current.sounds)
     }
 
     @Test

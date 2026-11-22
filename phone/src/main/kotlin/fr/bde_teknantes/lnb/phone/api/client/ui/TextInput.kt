@@ -217,7 +217,8 @@ sealed class TextInput(val state: TextState) : Widget() {
             }
             EditCommand.PASTE -> s.insert(clipboard)
             EditCommand.NEWLINE -> s.insert("\n")
-            EditCommand.SUBMIT -> onSubmit?.invoke()
+            // Once per press: a held Enter types nothing, and must not send twenty times a second.
+            EditCommand.SUBMIT -> if (!isKeyRepeat) onSubmit?.invoke()
         }
     }
 

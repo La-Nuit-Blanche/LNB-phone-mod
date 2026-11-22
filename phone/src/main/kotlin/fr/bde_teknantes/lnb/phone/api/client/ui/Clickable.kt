@@ -16,11 +16,14 @@ enum class Interaction { NORMAL, HOVER, PRESSED, DISABLED }
  *
  * - hover while the pointer is on it; pressed while the left button is held on it, and for at least 100 ms in all;
  * - a click is a press and a release on the visible part of it; dragging off before releasing cancels;
- * - focused from the keyboard, Enter or Space click it;
+ * - focused from the keyboard, Enter or Space click it, once per press: holding the key doesn't click again;
  * - disabled, it draws [Interaction.DISABLED], ignores clicks and answers them with the "can't" sound.
  *
- * Every click plays the tap sound unless [silent]. On its own (no drawing) it makes an invisible clickable area, for
- * a row whose whole width should react.
+ * A click runs [perform] (which calls [onClick]), then plays the tap sound unless [silent]. On its own (no drawing) it
+ * makes an invisible clickable area, for a row whose whole width should react.
+ *
+ * The pointer and key handling is the kit's and can't be overridden: a subclass changes what a click does in
+ * [perform], and reacts to other keys in [onKey].
  */
 open class Clickable() : Widget() {
     /** A clickable that runs [onClick] when clicked. */
@@ -48,6 +51,12 @@ open class Clickable() : Widget() {
 
     override val focusable get() = isEnabled
 
+    /**
+     * Whether presses are taken but do nothing for now: no pressed look, no click, no sound. A button whose action is
+     * under way ([Button.loading]) is busy.
+     */
+    protected open val isBusy: Boolean get() = false
+
     /** Whether the pressed look is due now. */
     val isPressed: Boolean get() = isEnabled && press.isPressed(now, isPointerOver)
 
@@ -69,41 +78,52 @@ open class Clickable() : Widget() {
 
     /** Clicks the widget as the player would (sound and pressed look included), if enabled. */
     fun click() {
-        if (!isEnabled) return
+        if (!isEnabled || isBusy) return
         press.flash(now)
-        perform()
+        activate()
     }
 
-    /** Hook: runs the click, playing the tap and calling [onClick]. Override to act before or instead. */
+    /**
+     * Hook: what a click does; by default, calls [onClick]. Override it to act otherwise (a row that switches its
+     * toggle). The tap sound comes after it, so a click that turns sounds on is heard and one that turns them off isn't.
+     */
     protected open fun perform() {
-        if (!silent) PhoneSounds.tap()
         onClick?.invoke()
     }
 
-    override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
+    /** Hook: a key other than Enter and Space (which click), while the widget has the focus. True if used. */
+    protected open fun onKey(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
+
+    private fun activate() {
+        perform()
+        if (!silent) PhoneSounds.tap()
+    }
+
+    final override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return false
         if (!isEnabled) {
             PhoneSounds.error()
             return true
         }
-        press.press(now)
+        if (!isBusy) press.press(now)
         return true
     }
 
-    override fun mouseReleased(x: Float, y: Float, button: Int): Boolean {
+    final override fun mouseReleased(x: Float, y: Float, button: Int): Boolean {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !press.holding) return false
         // A click only on what the player can see of it: not hidden since the press, not scrolled away or covered.
         val over = isShowing && isPointerOver
-        if (press.release(now, over) && isEnabled) perform()
+        if (press.release(now, over) && isEnabled && !isBusy) activate()
         return true
     }
 
-    override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+    final override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
-            click()
+            // Once per press: a held Space flipping a switch twenty times a second rewrites a setting as often.
+            if (!isKeyRepeat) click()
             return isEnabled
         }
-        return false
+        return onKey(keyCode, scanCode, modifiers)
     }
 
     override fun kitPointerLost() = press.cancel()

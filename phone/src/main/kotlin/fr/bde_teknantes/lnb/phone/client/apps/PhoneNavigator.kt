@@ -230,8 +230,18 @@ internal class PhoneNavigator(
     fun mouseScrolled(x: Float, y: Float, scrollX: Float, scrollY: Float): Boolean =
         dispatch("mouseScrolled") { it.mouseScrolled(x, y, scrollX, scrollY) }
 
-    fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean =
-        dispatch("keyPressed") { it.keyPressed(keyCode, scanCode, modifiers) }
+    fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = keyPressed(keyCode, scanCode, modifiers, repeat = false)
+
+    /** A key press, or with [repeat] the key repeating as it is held: the screen reads it as [AppScreen.isKeyRepeat]. */
+    fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int, repeat: Boolean): Boolean =
+        dispatch("keyPressed") {
+            it.keyRepeat = repeat
+            try {
+                it.keyPressed(keyCode, scanCode, modifiers)
+            } finally {
+                it.keyRepeat = false
+            }
+        }
 
     fun charTyped(codePoint: Char, modifiers: Int): Boolean =
         dispatch("charTyped") { it.charTyped(codePoint, modifiers) }
