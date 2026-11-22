@@ -58,13 +58,19 @@ class NotificationBanner {
      *
      * An [AppIcon.Item] icon draws its tile only here: the item itself is Minecraft item rendering, which [render]
      * adds after the canvas ends.
+     *
+     * @param progress how far out the banner is ([BannerTimeline.progress]): its shadow fades with it, since the
+     * shadow reaches below the card and would otherwise show as a band at the top of the viewport while the banner is
+     * hidden above it.
      */
-    fun draw(canvas: SmoothCanvas, x: Float, y: Float, content: BannerContent, look: BannerLook) {
+    fun draw(canvas: SmoothCanvas, x: Float, y: Float, content: BannerContent, look: BannerLook, progress: Float = 1f) {
         val m = BannerLayout.SHADOW_MARGIN
-        shadow(canvas, x - m, y - m, BannerLayout.WIDTH + 2 * m, BannerLayout.HEIGHT + 2 * m)
+        val shadowAlpha = (BannerLayout.shadowOpacity(progress) * 255f).roundToInt()
+        if (shadowAlpha > 0) shadow(canvas, x - m, y - m, BannerLayout.WIDTH + 2 * m, BannerLayout.HEIGHT + 2 * m, (shadowAlpha shl 24) or 0xFFFFFF)
 
         // The pressed overlay and the edge are faint white over an opaque fill, so they are blended here into opaque
-        // colours: the same pixels, and the canvas's shader drops fragments under 10 % alpha, which would lose them.
+        // colours: the same pixels, and the canvas's shader on this branch drops fragments under 10 % alpha. The edge
+        // goes back to real alpha once the banner is drawn with the fixed canvas.
         val fill = when (look) {
             BannerLook.NORMAL -> SURFACE_2
             BannerLook.HOVER -> SURFACE_3
@@ -90,12 +96,15 @@ class NotificationBanner {
     /**
      * Draws the banner at ([x], [y]) dp inside the rectangle at ([left], [top]), [widthGui] x [heightGui] GUI px, which
      * clips it: the app viewport over the open phone, or the screen of the peeking phone. Begins and ends a canvas of
-     * its own, so call it outside any other canvas (after the app's).
+     * its own, so call it outside any other canvas (after the app's). [progress] as for [draw].
      */
-    fun render(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int, x: Float, y: Float, content: BannerContent, look: BannerLook) {
+    fun render(
+        graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int,
+        x: Float, y: Float, content: BannerContent, look: BannerLook, progress: Float = 1f,
+    ) {
         canvas.begin(graphics, left, top, widthGui, heightGui)
         try {
-            draw(canvas, x, y, content, look)
+            draw(canvas, x, y, content, look, progress)
         } finally {
             canvas.end()
         }
@@ -109,7 +118,7 @@ class NotificationBanner {
         graphics.disableScissor()
     }
 
-    private fun shadow(canvas: SmoothCanvas, x: Float, y: Float, w: Float, h: Float) {
+    private fun shadow(canvas: SmoothCanvas, x: Float, y: Float, w: Float, h: Float, color: Int) {
         // Nine-slice from UVs: corners of SHADOW_BORDER dp kept, edges and middle stretched.
         val b = BannerLayout.SHADOW_BORDER
         val uv = b / BannerLayout.SHADOW_SPRITE
@@ -119,7 +128,7 @@ class NotificationBanner {
         for (row in 0..2) for (col in 0..2) {
             canvas.image(
                 SHEET_SHADOW, xs[col], ys[row], xs[col + 1] - xs[col], ys[row + 1] - ys[row],
-                us[col], us[row], us[col + 1], us[row + 1], WHITE, linear = true,
+                us[col], us[row], us[col + 1], us[row + 1], color, linear = true,
             )
         }
     }

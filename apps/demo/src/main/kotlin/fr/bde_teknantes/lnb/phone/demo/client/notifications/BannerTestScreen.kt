@@ -88,12 +88,11 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
 
     private fun frames(graphics: GuiGraphics) {
         // Resting, then half-way in position (P-10.2: y -36), whatever the easing.
-        val positions = listOf(BannerLayout.inPhoneY(1f), BannerLayout.inPhoneY(0.5f))
-        positions.forEachIndexed { i, y ->
+        listOf(1f, 0.5f).forEachIndexed { i, progress ->
             val left = i * 136
             graphics.blitSprite(WALLPAPER, left, 0, 128, 196)
             graphics.fill(left, 0, left + 128, 11, STATUS_HOME)
-            banner.render(graphics, left, 11, 128, 185, BannerLayout.IN_PHONE_X, y, reply, BannerLook.NORMAL)
+            banner.render(graphics, left, 11, 128, 185, BannerLayout.IN_PHONE_X, BannerLayout.inPhoneY(progress), reply, BannerLook.NORMAL, progress)
         }
     }
 

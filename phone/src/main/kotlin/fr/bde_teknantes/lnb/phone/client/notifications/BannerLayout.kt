@@ -49,6 +49,12 @@ object BannerLayout {
     /** The banner's top over the open phone, app-local, for a [BannerTimeline.progress] of 0 (hidden) to 1 (resting). */
     fun inPhoneY(progress: Float): Float = IN_PHONE_HIDDEN_Y + (IN_PHONE_Y - IN_PHONE_HIDDEN_Y) * progress
 
+    /**
+     * How opaque the shadow is for a [BannerTimeline.progress] of 0 (hidden) to 1 (resting): it fades in and out with
+     * the slide, so the 10 dp it reaches below the card don't show while the card is still above the viewport.
+     */
+    fun shadowOpacity(progress: Float): Float = progress.coerceIn(0f, 1f)
+
     /** Whether the banner-local point ([x], [y]) is on the banner: what a click must hit. */
     fun contains(x: Float, y: Float): Boolean = x >= 0f && x < WIDTH && y >= 0f && y < HEIGHT
 

@@ -193,4 +193,14 @@ class BannerLayoutTest {
         assertEquals(2, result.size)
         assertTrue(result.all { bodyWidth(it, InterMetrics.REGULAR) <= BannerLayout.TEXT_WIDTH + 1e-3f })
     }
+
+    @Test
+    fun `the shadow fades with the slide, none while hidden`() {
+        assertEquals(0f, BannerLayout.shadowOpacity(0f))
+        assertEquals(0.5f, BannerLayout.shadowOpacity(0.5f))
+        assertEquals(1f, BannerLayout.shadowOpacity(1f))
+        // Out-of-range progress (a timeline asked before its start or after its end) stays in range.
+        assertEquals(0f, BannerLayout.shadowOpacity(-0.2f))
+        assertEquals(1f, BannerLayout.shadowOpacity(1.3f))
+    }
 }
