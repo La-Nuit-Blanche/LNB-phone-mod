@@ -10,9 +10,16 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.demo.ping.SendPingPayload
 import fr.bde_teknantes.lnb.phone.demo.ping.client.PingClient
+import io.netty.buffer.ByteBuf
 import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
+import net.minecraft.network.codec.ByteBufCodecs
+import net.minecraft.network.codec.StreamCodec
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.level.ServerPlayer
 import net.neoforged.bus.api.IEventBus
+import net.neoforged.neoforge.network.PacketDistributor
 import net.neoforged.neoforge.network.handling.IPayloadContext
 import java.util.concurrent.CompletableFuture
 
@@ -80,6 +87,40 @@ class SearchScreen : KitScreen() {
         }
     }
 }
+
+// ---- Player text as a translation key ----
+
+// Wrong: the player's text is used as the key. A player who writes "death.attack.lava" makes the notification read as
+// that string of the game, in every recipient's language; any key of any mod works the same.
+fun carelessNotificationText(sender: ServerPlayer, text: String): Component = Component.translatable(text)
+
+// Right: the key is yours, and the player's words go in as arguments, shown as they are.
+fun notificationText(sender: ServerPlayer, text: String): Component =
+    Component.translatable("notif.lnbphone_demo.ping.text", sender.gameProfile.name, text)
+
+// ---- A target taken for a permission ----
+
+/** A request to delete a post, for the example below. */
+data class DeletePostPayload(val post: Long) : CustomPacketPayload {
+    override fun type() = TYPE
+
+    companion object {
+        val TYPE = CustomPacketPayload.Type<DeletePostPayload>(ResourceLocation.fromNamespaceAndPath("lnbphone_demo", "delete_post"))
+    }
+}
+
+// Wrong: the screen acts because a notification led there. Any server-side code can notify your app's id with any
+// target, so landing on this screen proves nothing about what the player may do.
+class CarelessDeleteScreen(private val post: Long) : KitScreen() {
+    override fun onScreenShown() {
+        PacketDistributor.sendToServer(DeletePostPayload(post))
+    }
+}
+
+// ---- What a client sends ----
+
+// Wrong: STRING_UTF8 reads up to 32767 characters, whatever the app allows, and the handler takes it as it comes.
+val CARELESS_TEXT_CODEC: StreamCodec<ByteBuf, String> = ByteBufCodecs.STRING_UTF8
 
 // ---- Interfaces the phone implements ----
 

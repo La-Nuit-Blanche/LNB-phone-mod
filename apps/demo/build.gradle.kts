@@ -20,9 +20,14 @@ neoForge {
     }
 }
 
-// GuideSamplesTest checks the code samples of docs/writing-an-app.md against the files they quote.
+// GuideSamplesTest checks the code samples of docs/writing-an-app.md against the files they quote: the guide and every
+// file one of its samples names are inputs, so the test runs again when any of them changes.
+val guide = rootProject.file("docs/writing-an-app.md")
+val guideSources = provider {
+    Regex("<!-- sample: (\\S+) -->").findAll(guide.readText()).map { rootProject.file(it.groupValues[1]) }.filter { it.isFile }.toList()
+}
 tasks.test {
     systemProperty("lnbphone.repoRoot", rootDir.absolutePath)
-    inputs.dir(rootProject.file("docs")).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("src"), rootProject.file("settings.gradle.kts")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(guide).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(guideSources).withPathSensitivity(PathSensitivity.RELATIVE)
 }
