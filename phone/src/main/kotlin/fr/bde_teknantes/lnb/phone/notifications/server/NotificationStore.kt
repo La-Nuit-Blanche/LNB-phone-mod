@@ -40,7 +40,8 @@ class NotificationStore(private val capacity: Int = NotificationList.CAPACITY) {
     fun of(player: UUID): List<PhoneNotification> = players[player]?.all.orEmpty()
 
     /**
-     * Creates a notification for [player] with the next id; the oldest of theirs is dropped past the capacity.
+     * Creates a notification for [player] with the next id; past the capacity, one is dropped by [NotificationList]'s
+     * rule (the oldest of the mod holding the most).
      * Arguments are stored as given: [NotificationLimits] is applied before.
      */
     fun add(

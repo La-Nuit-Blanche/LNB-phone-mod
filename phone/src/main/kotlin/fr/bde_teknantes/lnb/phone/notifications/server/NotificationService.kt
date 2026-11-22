@@ -39,10 +39,17 @@ internal interface NotificationHost {
  *
  * @param millis a monotonic clock in milliseconds, for the rate limiter.
  */
-internal class NotificationService(millis: () -> Long = { System.nanoTime() / 1_000_000 }) {
+internal class NotificationService(private val millis: () -> Long = { System.nanoTime() / 1_000_000 }) {
     // Clients clear an app's notifications when the player opens it: a few times a minute in normal play. Anything far
     // beyond is a modified client, and is ignored rather than allowed to keep the server busy.
     private val clientRequests = RateLimiter<UUID>(burst = 10, perSecond = 2.0, clock = millis)
+
+    // A backstop against an app that loops (a bug, or a modified client the app doesn't limit): per player and per mod,
+    // a burst of 20, then one every 3 seconds. Far above what a real app sends one player, and it keeps such a loop
+    // from sending the player a packet, a banner and a chime per call. Other mods' notifications are already safe from
+    // it ([fr.bde_teknantes.lnb.phone.notifications.NotificationList]).
+    private val appSends = RateLimiter<Pair<UUID, String>>(burst = APP_BURST, perSecond = APP_PER_SECOND, clock = millis)
+    private val lastFloodWarning = HashMap<String, Long>()
 
     // Players whose client dropped out of step (a request was refused) and get the full list again at the next
     // resync(): at most once per resync period, so a flood of requests can't be turned into a flood of syncs.
@@ -50,7 +57,8 @@ internal class NotificationService(millis: () -> Long = { System.nanoTime() / 1_
 
     /**
      * Stores a notification for each of [players] and sends it to those connected. A player who has never joined
-     * gets it at their first login (if within [NotificationStore.MAX_AGE_MS]). Returns how many were stored.
+     * gets it at their first login (if within [NotificationStore.MAX_AGE_MS]). A player for whom [appId]'s mod is over
+     * its rate ([APP_BURST], then [APP_PER_SECOND]) is skipped. Returns how many were stored.
      */
     fun send(host: NotificationHost, players: Collection<UUID>, appId: ResourceLocation, title: Component, text: Component, target: String?): Int {
         val data = host.data ?: return unavailable("send a notification")
@@ -61,14 +69,32 @@ internal class NotificationService(millis: () -> Long = { System.nanoTime() / 1_
             LnbPhone.LOGGER.warn("A phone notification from {} is too large to send and was dropped", appId)
             return 0
         }
-        val distinct = players.toSet()
-        for (player in distinct) {
+        var stored = 0
+        var refused = 0
+        for (player in players.toSet()) {
+            if (!appSends.tryAcquire(player to appId.namespace)) {
+                refused++
+                continue
+            }
             val online = host.isOnline(player)
             val notification = data.store.add(player, appId, title, text, target, now, delivered = online)
             if (online) host.send(player, NotificationAddedPayload(notification))
+            stored++
         }
-        if (distinct.isNotEmpty()) data.setDirty()
-        return distinct.size
+        if (stored > 0) data.setDirty()
+        if (refused > 0) warnFlood(appId, refused)
+        return stored
+    }
+
+    private fun warnFlood(appId: ResourceLocation, refused: Int) {
+        val now = millis()
+        val last = lastFloodWarning[appId.namespace]
+        if (last != null && now - last < FLOOD_WARNING_MS) return
+        lastFloodWarning[appId.namespace] = now
+        LnbPhone.LOGGER.warn(
+            "Phone notifications from {} dropped for {} player(s): more than {} at once, then one every {} s, per player",
+            appId, refused, APP_BURST, APP_SECONDS_PER_NOTIFICATION,
+        )
     }
 
     /** [send] to every player who has played on this world, connected or not; not to players who join later. */
@@ -129,8 +155,12 @@ internal class NotificationService(millis: () -> Long = { System.nanoTime() / 1_
         if (data.store.remove(player, id) != null) data.setDirty()
     }
 
-    /** Sends the full list again to connected players whose client is out of step. Called every few seconds. */
+    /**
+     * Sends the full list again to connected players whose client is out of step, and forgets the send allowances that
+     * have filled up again. Called every few seconds.
+     */
     fun resync(host: NotificationHost) {
+        appSends.forgetIdle()
         if (outOfStep.isEmpty()) return
         val data = host.data ?: return
         val players = outOfStep.toList()
@@ -173,5 +203,16 @@ internal class NotificationService(millis: () -> Long = { System.nanoTime() / 1_
          * packet's 1 MiB.
          */
         const val MAX_ENCODED_BYTES = 8 * 1024
+
+        /** Notifications one mod may send one player at once, before [APP_PER_SECOND] applies. */
+        const val APP_BURST = 20
+
+        /** Then one every this many seconds. */
+        const val APP_SECONDS_PER_NOTIFICATION = 3
+
+        /** [APP_SECONDS_PER_NOTIFICATION] as a rate. */
+        const val APP_PER_SECOND = 1.0 / APP_SECONDS_PER_NOTIFICATION
+
+        private const val FLOOD_WARNING_MS = 60_000L
     }
 }

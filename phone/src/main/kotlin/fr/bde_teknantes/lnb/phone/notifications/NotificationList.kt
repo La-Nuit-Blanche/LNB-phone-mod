@@ -3,9 +3,16 @@ package fr.bde_teknantes.lnb.phone.notifications
 import net.minecraft.resources.ResourceLocation
 
 /**
- * One player's notifications, oldest first (by [PhoneNotification.id]), at most [capacity] of them: adding one more
- * drops the oldest. Plain logic, used by the server's store and by the client's mirror of it, which apply the same
- * rules to the same changes and so stay identical.
+ * One player's notifications, oldest first (by [PhoneNotification.id]), at most [capacity] of them. Plain logic, used
+ * by the server's store and by the client's mirror of it, which apply the same rules to the same changes and so stay
+ * identical.
+ *
+ * **Who loses a slot when the list is full.** The apps share the [capacity] slots, counted per mod: by the namespace
+ * of the app id, so that a mod's apps, or a mod sending under many paths of its own, count as one. Past the capacity,
+ * the oldest notification of the mod that holds the most is dropped (of the mods tied for the most, the one whose
+ * notification is the oldest). So one app alone may use every slot, and an app that floods the list only pushes out
+ * its own notifications: another mod's are dropped only once it holds as many as the busiest one. With several mods,
+ * each keeps at least its fair share of the slots, and what one mod leaves unused stays usable by the others.
  *
  * Not thread-safe: each side touches it from one thread (the server thread, the client thread).
  */
@@ -40,8 +47,8 @@ class NotificationList(val capacity: Int = CAPACITY) {
 
     /**
      * Adds [notification], or replaces the one with the same id (so receiving the same notification twice changes
-     * nothing). Past [capacity], the oldest are dropped, possibly [notification] itself if it is older than all the
-     * others. Returns what was dropped.
+     * nothing). Past [capacity], one is dropped by the rule above: possibly [notification] itself, if it is the oldest
+     * of the busiest mod. Returns what was dropped.
      */
     fun add(notification: PhoneNotification): List<PhoneNotification> {
         val index = indexOf(notification.id)
@@ -53,7 +60,10 @@ class NotificationList(val capacity: Int = CAPACITY) {
         return trim()
     }
 
-    /** Replaces everything with [notifications] (any order), keeping the newest [capacity]. Returns what was dropped. */
+    /**
+     * Replaces everything with [notifications] (any order), dropping the excess past [capacity] by the rule above, one
+     * at a time. Returns what was dropped.
+     */
     fun replaceAll(notifications: Collection<PhoneNotification>): List<PhoneNotification> {
         items.clear()
         notifications.distinctBy { it.id }.sortedBy { it.id }.let(items::addAll)
@@ -93,10 +103,17 @@ class NotificationList(val capacity: Int = CAPACITY) {
 
     private fun trim(): List<PhoneNotification> {
         if (items.size <= capacity) return emptyList()
-        val excess = items.subList(0, items.size - capacity)
-        val dropped = excess.toList()
-        excess.clear()
+        val dropped = ArrayList<PhoneNotification>()
+        while (items.size > capacity) dropped += items.removeAt(evictionIndex())
         return dropped
+    }
+
+    /** The index of the oldest notification of the mod holding the most, ties going to the oldest notification. */
+    private fun evictionIndex(): Int {
+        val counts = items.groupingBy { it.appId.namespace }.eachCount()
+        val most = counts.values.max()
+        // Items are oldest first: the first one from a mod at the top count is the oldest among the tied mods.
+        return items.indexOfFirst { counts.getValue(it.appId.namespace) == most }
     }
 
     private fun indexOf(id: Long): Int = items.binarySearch { it.id.compareTo(id) }
