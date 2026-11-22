@@ -32,10 +32,4 @@ description='''${mod_description}'''
     ordering="NONE"
     side="BOTH"
 
-# The phone this app runs in. AFTER, so the phone is set up before the app registers with it.
-[[dependencies.${mod_id}]]
-    modId="lnbphone"
-    type="required"
-    versionRange="${lnbphone_version_range}"
-    ordering="AFTER"
-    side="BOTH"
+# The dependency on lnbphone is appended by the lnbphone.app plugin, with the range of the phone built against.
