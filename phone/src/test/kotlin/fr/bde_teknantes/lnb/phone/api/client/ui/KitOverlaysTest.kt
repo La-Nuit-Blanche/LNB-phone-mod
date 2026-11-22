@@ -81,6 +81,13 @@ class KitOverlaysTest {
         }
 
         @Test
+        fun `a click on the menu's own padding keeps it open`() {
+            screen.click(150f, 43f)
+            assertTrue(screen.isMenuOpen)
+            assertTrue(ran.isEmpty())
+        }
+
+        @Test
         fun `the wheel does nothing while a menu is open`() {
             assertTrue(screen.wheel(20f, 200f, -1f))
             assertTrue(screen.isMenuOpen)
@@ -156,6 +163,13 @@ class KitOverlaysTest {
             screen.click(128f, 20f)
             assertEquals(1, cancels)
             assertFalse(screen.isDialogOpen)
+        }
+
+        @Test
+        fun `a click on the card's text does nothing`() {
+            screen.click(60f, cardTop + 20f)
+            assertEquals(0, cancels)
+            assertTrue(screen.isDialogOpen)
         }
 
         @Test

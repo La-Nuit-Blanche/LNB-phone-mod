@@ -50,6 +50,9 @@ internal class Menu(items: List<MenuItem>, private val box: Box, private val ope
 
         override val catchesPointer get() = true
 
+        // A press on the panel's padding stops here: unused, it would reach the catcher and close the menu.
+        override fun mousePressed(x: Float, y: Float, button: Int): Boolean = true
+
         override fun render(canvas: AppCanvas) {
             canvas.drawShadow(Shadow.SHEET, 0f, 0f, width, height)
             canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, Colors.SURFACE_3)

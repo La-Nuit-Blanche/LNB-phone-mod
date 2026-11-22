@@ -134,6 +134,9 @@ class Dialog(
 
         override val catchesPointer get() = true
 
+        // A press on the card (its text, its padding) stops here: unused, it would reach the scrim and cancel.
+        override fun mousePressed(x: Float, y: Float, button: Int): Boolean = true
+
         override fun render(canvas: AppCanvas) {
             canvas.drawShadow(Shadow.SHEET, 0f, 0f, width, height)
             canvas.fillRoundRect(0f, 0f, width, height, Radius.LARGE, Colors.SURFACE_2)
