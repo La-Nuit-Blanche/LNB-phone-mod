@@ -8,7 +8,7 @@ import java.awt.geom.RoundRectangle2D
 // longer images: the drawing surface computes them at the screen's real resolution. What remains:
 //
 //   smooth/<density>/icon<grid>/<name>.png   line icons, white, one set per density, drawn 1:1 at the matching
-//   smooth/<density>/spinner.png             GUI scale (1x at scale 2, 1_5x at scale 3, 2x at scale 4)
+//   smooth/<density>/spinner.png             GUI scale (1x at scale 2, 1_5x at scale 3 ... 4_5x at scale 9)
 //   smooth/shadow/<name>.png                 black soft shadows, 2 px per dp, stretched with linear filtering
 //
 // Every PNG has a .png.mcmeta that turns linear filtering on.
@@ -27,8 +27,14 @@ data class Density(val folder: String, val pxPerDp: Double) {
 
 /** What the smooth set is exported as. The defaults are the single source of truth for the committed assets. */
 data class SmoothFormat(
-    /** One per GUI scale that runs apps: a 16 dp icon is 16, 24 and 32 px. */
-    val iconDensities: List<Density> = listOf(Density("1x", 1.0), Density("1_5x", 1.5), Density("2x", 2.0)),
+    /**
+     * One per GUI scale that runs apps, 2 to 9 (Minecraft's "auto" picks up to 9 on a 4K screen): half the GUI
+     * scale in px per dp, folders `1x`, `1_5x` ... `4_5x`. A 16 dp icon is 16 px at scale 2 and 72 px at scale 9.
+     */
+    val iconDensities: List<Density> = (2..9).map { scale ->
+        val folder = if (scale % 2 == 0) "${scale / 2}x" else "${scale / 2}_5x"
+        Density(folder, scale / 2.0)
+    },
     /** Shadows are blurred anyway, so one density stretched with linear filtering serves every scale. */
     val shadowDensity: Density = Density("shadow", 2.0),
 )
