@@ -19,3 +19,10 @@ neoForge {
         }
     }
 }
+
+// GuideSamplesTest checks the code samples of docs/writing-an-app.md against the files they quote.
+tasks.test {
+    systemProperty("lnbphone.repoRoot", rootDir.absolutePath)
+    inputs.dir(rootProject.file("docs")).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("src"), rootProject.file("settings.gradle.kts")).withPathSensitivity(PathSensitivity.RELATIVE)
+}
