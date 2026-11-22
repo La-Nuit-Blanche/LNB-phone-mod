@@ -1,14 +1,27 @@
 package fr.bde_teknantes.lnb.phone.client
 
+import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistration
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
+import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import net.minecraft.client.Minecraft
+import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
+import net.neoforged.fml.loading.FMLPaths
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
+import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers
 import net.neoforged.neoforge.common.NeoForge
 
 /** Client-only listeners and state. Loaded only on the physical client. */
@@ -19,12 +32,35 @@ object LnbPhoneClient {
     /** What the phone shows. Lives as long as the game: the phone reopens where it was left, until disconnection. */
     internal val navigator = PhoneNavigator(apps) { Minecraft.getInstance().isSameThread }
 
+    /** The phone settings of the player on this computer: placement, sounds, notification preview. */
+    internal val settings = PhoneSettingsStore(FMLPaths.CONFIGDIR.get().resolve("lnbphone-client.json")) {
+        Minecraft.getInstance().user.profileId.toString()
+    }
+
     // Takes the mod bus because client setup (key mappings, screens) is registered there, not on NeoForge's bus.
     fun init(modBus: IEventBus) {
         modBus.addListener(::onClientSetup)
-        // The smooth layer's fonts and atlas come from resources: drop them when resource packs change.
-        modBus.addListener(RegisterClientReloadListenersEvent::class.java) { it.registerReloadListener(SmoothResources) }
+        modBus.addListener(RegisterKeyMappingsEvent::class.java, PhoneKeys::register)
+        modBus.addListener(RegisterClientReloadListenersEvent::class.java) {
+            // The smooth layer's fonts and atlas, and the composed app icons, come from resources: drop them when
+            // resource packs change.
+            it.registerReloadListener(SmoothResources)
+            it.registerReloadListener(AppIcons)
+        }
+        modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->
+            // The phone while it slides, over the whole HUD; once it stands open, its screen draws it.
+            event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "phone")) { graphics, _ ->
+                if (Minecraft.getInstance().screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
+            }
+        }
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) { PhoneShell.tick() }
+        NeoForge.EVENT_BUS.addListener(RenderGuiLayerEvent.Pre::class.java) { event ->
+            // Other screens hide the crosshair under their dark background; the phone keeps the world clear, so it
+            // hides it itself while the cursor is free.
+            if (event.name == VanillaGuiLayers.CROSSHAIR && Minecraft.getInstance().screen is PhoneScreen) event.isCanceled = true
+        }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        PhoneShell.init()
     }
 
     private fun onClientSetup(event: FMLClientSetupEvent) {
@@ -35,6 +71,9 @@ object LnbPhoneClient {
     private fun onLoggingOut(event: ClientPlayerNetworkEvent.LoggingOut) {
         // The phone keeps its screens until the player disconnects (art direction 2.3). execute runs at once on the
         // client thread, and queues there from any other.
-        Minecraft.getInstance().execute { navigator.reset() }
+        Minecraft.getInstance().execute {
+            navigator.reset()
+            PhoneShell.reset()
+        }
     }
 }
