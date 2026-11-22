@@ -38,14 +38,18 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
     val deferred = ArrayList<() -> Unit>()
     var phoneKey = GLFW.GLFW_KEY_UP
     var phoneMouseButton: Int? = null
-    private var pendingClicks = 0
+
+    /** Keys physically held down. */
+    val keysDown = HashSet<Int>()
 
     override fun setScreen(screen: Screen?) {
+        val next = screen
         val old = this.screen
-        // Minecraft calls removed() on the old screen before it takes the new one.
-        if (old != null && old !== screen && isPhoneScreen(old)) shell.onScreenRemoved()
-        this.screen = screen
-        screensShown += screen
+        // Minecraft calls removed() on the old screen before it takes the new one, then added() on the new one.
+        if (old != null && old !== next && isPhoneScreen(old)) shell.onScreenRemoved()
+        this.screen = next
+        screensShown += next
+        if (next != null && isPhoneScreen(next)) shell.onScreenShown()
     }
 
     override fun createPhoneScreen(): Screen = TestScreen(PHONE)
@@ -56,15 +60,11 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         deferred += task
     }
 
-    override fun consumePhoneKeyClick(): Boolean {
-        if (pendingClicks == 0) return false
-        pendingClicks--
-        return true
-    }
-
-    override fun isPhoneKey(keyCode: Int, scanCode: Int) = keyCode == phoneKey
+    override fun isPhoneKey(keyCode: Int, scanCode: Int, withModifier: Boolean) = keyCode == phoneKey
 
     override fun isPhoneMouseButton(button: Int) = button == phoneMouseButton
+
+    override fun isPhoneKeyDown() = phoneKey in keysDown
 
     override fun play(sound: ShellSound) {
         sounds += sound
@@ -75,12 +75,42 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         while (deferred.isNotEmpty()) deferred.removeAt(0)()
     }
 
-    /**
-     * A key press as Minecraft's keyboard handler routes it: to the open screen first (only the phone's screen reacts
-     * here); if no screen kept it and the game has the mouse afterwards, the key reaches the game: Esc opens the pause
-     * menu, the phone key counts a click for the next tick.
-     */
+    /** A quick tap of a key: pressed, then released. */
     fun pressKey(keyCode: Int) {
+        keyDown(keyCode)
+        releaseKey(keyCode)
+    }
+
+    /** A key pressed and held long enough to send [repeats] key repeats, not released. */
+    fun holdKey(keyCode: Int, repeats: Int) {
+        keyDown(keyCode)
+        repeatKey(keyCode, repeats)
+    }
+
+    /** [times] key repeats of a key still held (about 30 a second in Minecraft). */
+    fun repeatKey(keyCode: Int, times: Int) {
+        check(keyCode in keysDown) { "A key repeats only while held" }
+        repeat(times) { keyEvent(keyCode, repeat = true) }
+    }
+
+    fun keyDown(keyCode: Int) {
+        keysDown += keyCode
+        keyEvent(keyCode, repeat = false)
+    }
+
+    /** The key comes up; the phone's screen hears it if it is the open screen, as screens do. */
+    fun releaseKey(keyCode: Int) {
+        keysDown -= keyCode
+        if (isPhoneScreen(screen)) shell.keyReleased(keyCode, 0, 0)
+    }
+
+    /**
+     * A key press or repeat as Minecraft's keyboard handler routes it: to the open screen first, which can't tell a
+     * repeat from a press (only the phone's screen reacts here); if no screen kept it and the game has the mouse
+     * afterwards, the key reaches the game: Esc opens the pause menu (repeats too, as in Minecraft), and a press of the
+     * phone key, never a repeat, reaches the shell through the input event.
+     */
+    private fun keyEvent(keyCode: Int, repeat: Boolean) {
         val open = screen
         if (open != null) {
             val kept = isPhoneScreen(open) && shell.keyPressed(keyCode, 0, 0)
@@ -89,7 +119,7 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         if (screen != null) return
         when (keyCode) {
             GLFW.GLFW_KEY_ESCAPE -> setScreen(TestScreen(PAUSE))
-            phoneKey -> pendingClicks++
+            phoneKey -> if (!repeat) shell.phoneKeyPressedInGame()
         }
     }
 

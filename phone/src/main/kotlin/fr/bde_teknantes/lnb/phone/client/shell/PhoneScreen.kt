@@ -39,7 +39,13 @@ internal class PhoneScreen : Screen(Component.translatable("gui.lnbphone.title")
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int) = PhoneShell.keyPressed(keyCode, scanCode, modifiers)
 
+    override fun keyReleased(keyCode: Int, scanCode: Int, modifiers: Int) = PhoneShell.keyReleased(keyCode, scanCode, modifiers)
+
     override fun charTyped(codePoint: Char, modifiers: Int) = PhoneShell.charTyped(codePoint, modifiers)
+
+    // Every time the screen becomes the game's screen: when the phone opens it, and when a dialog it opened closes back
+    // to it.
+    override fun added() = PhoneShell.onScreenShown()
 
     override fun removed() = PhoneShell.onScreenRemoved()
 }

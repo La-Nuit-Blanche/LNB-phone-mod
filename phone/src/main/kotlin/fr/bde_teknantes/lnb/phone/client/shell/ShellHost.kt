@@ -40,12 +40,16 @@ internal interface ShellHost {
     /** Runs [task] on the client thread after the current call has returned (on the next frame). */
     fun later(task: () -> Unit)
 
-    /** Takes one press of the phone key made while the game had the mouse; false once none are left. */
-    fun consumePhoneKeyClick(): Boolean
-
-    fun isPhoneKey(keyCode: Int, scanCode: Int): Boolean
+    /**
+     * Whether [keyCode] is the phone key, as a screen receives it. [withModifier]: only if the key's modifier (Ctrl,
+     * Shift, Alt) is held too, as for a press; a release is recognised without it.
+     */
+    fun isPhoneKey(keyCode: Int, scanCode: Int, withModifier: Boolean = true): Boolean
 
     fun isPhoneMouseButton(button: Int): Boolean
+
+    /** Whether the phone key is physically held down right now. */
+    fun isPhoneKeyDown(): Boolean
 
     fun play(sound: ShellSound)
 }
@@ -75,11 +79,12 @@ internal object MinecraftShellHost : ShellHost {
     // tell, not execute: execute would run it at once on the client thread, inside the navigator's callback.
     override fun later(task: () -> Unit) = mc.tell { task() }
 
-    override fun consumePhoneKeyClick() = PhoneKeys.OPEN.consumeClick()
+    override fun isPhoneKey(keyCode: Int, scanCode: Int, withModifier: Boolean) =
+        PhoneKeys.OPEN.matches(keyCode, scanCode) && (!withModifier || PhoneKeys.modifierHeld())
 
-    override fun isPhoneKey(keyCode: Int, scanCode: Int) = PhoneKeys.OPEN.matches(keyCode, scanCode)
+    override fun isPhoneMouseButton(button: Int) = PhoneKeys.OPEN.matchesMouse(button) && PhoneKeys.modifierHeld()
 
-    override fun isPhoneMouseButton(button: Int) = PhoneKeys.OPEN.matchesMouse(button)
+    override fun isPhoneKeyDown(): Boolean = PhoneKeys.isPhysicallyDown()
 
     override fun play(sound: ShellSound) = when (sound) {
         ShellSound.OPEN -> PhoneSounds.open()

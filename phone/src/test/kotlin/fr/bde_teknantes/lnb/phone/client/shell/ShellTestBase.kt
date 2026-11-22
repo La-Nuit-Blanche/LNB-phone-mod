@@ -43,10 +43,9 @@ internal abstract class ShellTestBase {
 
     fun tick(times: Int = 1) = repeat(times) { shell.tick() }
 
-    /** The phone key pressed while the game has the mouse, then the tick that reads it. */
+    /** The phone key tapped while the game has the mouse: the shell hears the press at once, from the input event. */
     fun pressPhoneKeyInGame() {
         host.pressKey(host.phoneKey)
-        tick()
     }
 
     /** Opens the phone with its key and waits until it stands open with its screen. */

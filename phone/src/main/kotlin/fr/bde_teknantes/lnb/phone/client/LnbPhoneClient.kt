@@ -56,8 +56,11 @@ object LnbPhoneClient {
         }
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {
             PhoneSounds.tick()
+            PhoneKeys.discardClicks()
             PhoneShell.tick()
         }
+        NeoForge.EVENT_BUS.addListener(PhoneKeys::onKey)
+        NeoForge.EVENT_BUS.addListener(PhoneKeys::onMouseButton)
         NeoForge.EVENT_BUS.addListener(RenderGuiLayerEvent.Pre::class.java) { event ->
             // Other screens hide the crosshair under their dark background; the phone keeps the world clear, so it
             // hides it itself while the cursor is free.

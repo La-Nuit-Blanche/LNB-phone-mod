@@ -75,6 +75,14 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     // Mouse buttons pressed on the app viewport, whose drags and release go to the app wherever the pointer goes.
     private val viewportButtons = HashSet<Int>()
 
+    // Keys pressed in the phone's screen whose release it hasn't seen: a second press of one is a key repeat, which
+    // screens get like a press. The phone acts on the first press only.
+    private val keysHeld = HashSet<Int>()
+
+    // The phone key, still held from the press that brought the phone out when its screen opened: its repeats (and
+    // the characters they type) are for neither the phone nor the app, until it is released.
+    private var phoneKeyLatched = false
+
     /** Unseen counts by app, read once a tick, and when each badge last started to pulse. */
     internal val counts = HashMap<ResourceLocation, Int>()
     internal val pulseStart = HashMap<ResourceLocation, Long>()
@@ -124,6 +132,14 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (state == State.CLOSED || state == State.CLOSING) open() else close()
     }
 
+    /**
+     * The phone key went down while no screen was open: a real press, never a key repeat (holding the key must not
+     * open and close the phone over and over). The host calls it straight from the input event.
+     */
+    fun phoneKeyPressedInGame() {
+        if (host.screen == null && host.inWorld) toggle()
+    }
+
     /** Disconnection: everything forgotten at once, with no animation. */
     fun reset() {
         state = State.CLOSED
@@ -159,14 +175,17 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         navigator.close()
     }
 
+    /** The phone's screen became the game's screen: what it hears of the keyboard starts over. */
+    fun onScreenShown() {
+        keysHeld.clear()
+        phoneKeyLatched = host.isPhoneKeyDown()
+    }
+
     // ---- Ticks ----
 
     fun tick() {
         ticks++
         if (state != State.CLOSED && !host.inWorld) reset()
-        while (host.consumePhoneKeyClick()) {
-            if (host.screen == null && host.inWorld) toggle()
-        }
         updateCounts()
         if (heldProgress == null) finishAnimations()
         if (navigator.isOpen && appsSupported()) navigator.tick()
@@ -276,14 +295,15 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
 
     fun mouseClicked(x: Double, y: Double, button: Int): Boolean {
         val pose = currentPose() ?: return false
-        if (host.isPhoneMouseButton(button)) {
-            close()
-            return true
-        }
         val dx = x - pose.x
         val dy = y - pose.y
         val px = floor(dx).toInt()
         val py = floor(dy).toInt()
+        // A phone key on a mouse button closes the phone, except the left button on the device, which works the phone.
+        if (host.isPhoneMouseButton(button) && !(button == GLFW.GLFW_MOUSE_BUTTON_LEFT && Device.inDevice(px, py))) {
+            close()
+            return true
+        }
         val now = now()
         when {
             // A click anywhere outside the device puts it away, in both placements (2.3).
@@ -360,24 +380,36 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     }
 
     fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        val repeat = !keysHeld.add(keyCode)
         if (state != State.OPEN) return true
+        val phoneKey = host.isPhoneKey(keyCode, scanCode)
+        if (phoneKey && phoneKeyLatched) return true
         val app = showsApp()
         // Read before the app sees the key: the key may move the focus.
         val textFocus = app && navigator.hasTextFocus
         val used = app && navigator.keyPressed(keyCode, scanCode, modifiers)
+        // The phone's own actions answer the first press only: a held key repeats, and the app gets the repeats.
         when {
             // The app closes its menu or dialog on Esc and keeps the key; otherwise Esc puts the phone away (2.3).
-            keyCode == GLFW.GLFW_KEY_ESCAPE -> if (!used) close()
+            keyCode == GLFW.GLFW_KEY_ESCAPE -> if (!used && !repeat) close()
             // While a text field has the focus, the phone key and Backspace belong to it.
-            host.isPhoneKey(keyCode, scanCode) -> if (!used && !textFocus) close()
-            keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus) navigator.back()
+            phoneKey -> if (!used && !textFocus && !repeat) close()
+            keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus && !repeat) navigator.back()
             else -> return used
         }
         // Always true for the phone's own keys, so the game doesn't act on them as well (pause on Esc, the key mapping).
         return true
     }
 
-    fun charTyped(codePoint: Char, modifiers: Int): Boolean = showsApp() && navigator.charTyped(codePoint, modifiers)
+    fun keyReleased(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        keysHeld.remove(keyCode)
+        // Without its modifier: Ctrl may come up before the key itself.
+        if (host.isPhoneKey(keyCode, scanCode, withModifier = false)) phoneKeyLatched = false
+        return false
+    }
+
+    fun charTyped(codePoint: Char, modifiers: Int): Boolean =
+        state == State.OPEN && !phoneKeyLatched && showsApp() && navigator.charTyped(codePoint, modifiers)
 
     private fun clearPointer() {
         pressedApp = null

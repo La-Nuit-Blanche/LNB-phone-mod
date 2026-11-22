@@ -104,6 +104,7 @@ internal class PhoneShellNavigationTest : ShellTestBase() {
         // Reopened on the app, which puts the phone away from its first tick.
         root.onTick = { root.handle.close() }
         pressPhoneKeyInGame()
+        tick()
         root.onTick = {}
         assertFalse(host.navigator.isOpen)
         val here = pose!!
