@@ -22,16 +22,18 @@ import fr.bde_teknantes.lnb.phone.client.apps.ScreenHost
  * **Coordinates** are in dp, local to the app viewport: (0, 0) is its top-left corner and it measures
  * [AppCanvas.WIDTH] x [AppCanvas.HEIGHT] dp (see [AppCanvas]).
  *
- * **Lifecycle.** A screen is created by your code, then given to the phone (by [PhoneApp]'s factory or [Phone.push]).
- * From then on:
+ * **Lifecycle.** A screen is created by your code, then given to the phone (by [PhoneApp]'s factories,
+ * [Phone.push] or [Phone.replace]). From then on:
  * - [onShown] when it becomes the screen the player sees: when it opens, when the screen above it is popped, when
  *   the phone is opened again on it;
  * - [onHidden] when it stops being seen but stays alive: a screen is pushed above it, or the phone is put away;
- * - [onClosed], once, when it leaves the phone for good: popped, the player went home or disconnected, or the app
- *   failed. A closed screen is never shown again.
+ * - [onClosed], once, when it leaves the phone for good: popped or replaced, the player went home or disconnected, the
+ *   app was opened again (from home or a notification), or the app failed. A closed screen is never shown again.
  *
  * [onShown] and [onHidden] alternate, starting with [onShown]; a screen that is shown when it closes gets [onHidden]
- * before [onClosed]. While a screen is shown, it gets [tick] and the player's input.
+ * before [onClosed]. A screen may also close without ever being shown: one placed under the top of a stack opened for a
+ * notification ([AppTargetScreens]), when the player leaves before going back to it. While a screen is shown, it gets
+ * [tick] and the player's input.
  *
  * **Errors.** If any of these methods throws, the phone writes the error to the log, closes every screen of your app
  * and returns to the home screen; the rest of the phone and the game carry on, and the player can open the app again.

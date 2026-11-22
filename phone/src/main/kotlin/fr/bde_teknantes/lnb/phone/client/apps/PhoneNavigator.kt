@@ -5,13 +5,16 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import net.minecraft.resources.ResourceLocation
+import java.util.Collections
+import java.util.IdentityHashMap
 
 /**
  * What the phone shows, independently of how it is drawn: the home screen, or one app with its stack of screens; and
  * whether the phone is open. Plain logic, so it can be tested without a game window.
  *
  * Rules (art direction 2.3):
- * - Opening an app starts it afresh from its root screen; the app that was open, if any, is closed.
+ * - Opening an app starts it afresh, from its root screen or, for a notification with a target, from the stack the
+ *   app gives for it; the app that was open, if any, is closed, even when it is the same app.
  * - [back] (Backspace, or the header back button through [fr.bde_teknantes.lnb.phone.api.client.Phone.pop]) goes
  *   back one screen; on an app's root screen it does nothing.
  * - [home] closes the app instantly.
@@ -75,30 +78,35 @@ internal class PhoneNavigator(
         syncVisibility()
     }
 
-    /** Opens the registered app [id], for a notification. Returns false if there is no such app or it failed to start. */
-    fun openApp(id: ResourceLocation): Boolean {
+    /**
+     * Opens the registered app [id], at [target] if given: the call for a notification the player opened. Returns
+     * false if there is no such app or it failed to start.
+     */
+    fun openApp(id: ResourceLocation, target: String? = null): Boolean {
         val app = registry[id] ?: run {
             LnbPhone.LOGGER.warn("There is no phone app {} to open", id)
             return false
         }
-        return openApp(app)
+        return openApp(app, target)
     }
 
     /**
-     * Starts [app] from its root screen, closing the app that was open (even if it is [app] itself). If the app can't
-     * give a root screen, nothing changes and false is returned.
+     * Starts [app] afresh, closing the app that was open (even if it is [app] itself). With a [target] the app knows,
+     * it starts on the stack of screens it gives for it ([PhoneApp.createTargetScreens]); otherwise, on its root
+     * screen. If the app can't give its screens, nothing changes and false is returned.
      */
-    fun openApp(app: PhoneApp): Boolean {
+    fun openApp(app: PhoneApp, target: String? = null): Boolean {
         checkThread()
-        val root = try {
-            app.createRootScreen()
+        val stack = try {
+            startingScreens(app, target)
         } catch (e: Throwable) {
             rethrowFatal(e)
-            appFailed(app, "creating its first screen", e)
+            appFailed(app, "creating its screens" + target?.let { " for target \"$it\"" }.orEmpty(), e)
             return false
         }
-        if (root.host != null) {
-            appFailed(app, "creating its first screen", IllegalStateException(REUSED_SCREEN))
+        val unique = Collections.newSetFromMap(IdentityHashMap<AppScreen, Boolean>())
+        if (!stack.all { it.host == null && unique.add(it) }) {
+            appFailed(app, "creating its screens", IllegalStateException(REUSED_SCREEN))
             return false
         }
         val previous = session
@@ -106,7 +114,7 @@ internal class PhoneNavigator(
         val closing = previous?.let(::endSession).orEmpty()
         val opened = AppSession(app)
         session = opened
-        attach(root, opened)
+        stack.forEach { attach(it, opened) }
         listeners.forEach { it.onTransition(Transition.FORWARD, outgoing) }
         listeners.forEach { it.onAppOpened(app) }
         closeScreens(closing)
@@ -156,14 +164,24 @@ internal class PhoneNavigator(
         val index = stack.indexOf(from.screen)
         if (index <= 0) return false
         val outgoing = stack.last()
-        val removed = stack.subList(index, stack.size)
-        val closing = removed.reversed()
-        removed.clear()
-        closing.forEach { it.host!!.closed = true }
+        val closing = detachFrom(stack, index)
         listeners.forEach { it.onTransition(Transition.BACK, outgoing) }
         closeScreens(closing)
         syncVisibility()
         return true
+    }
+
+    internal fun replace(from: ScreenHost, screen: AppScreen) {
+        checkThread()
+        if (ignored(from, "replace")) return
+        require(screen.host == null) { REUSED_SCREEN }
+        val stack = from.session.screens
+        val outgoing = stack.last()
+        val closing = detachFrom(stack, stack.indexOf(from.screen))
+        attach(screen, from.session)
+        listeners.forEach { it.onTransition(Transition.FORWARD, outgoing) }
+        closeScreens(closing)
+        syncVisibility()
     }
 
     internal fun home(from: ScreenHost) {
@@ -214,9 +232,26 @@ internal class PhoneNavigator(
         return guard(screen, what, false) { action(screen) }
     }
 
+    private fun startingScreens(app: PhoneApp, target: String?): List<AppScreen> {
+        if (target != null) {
+            val screens = app.createTargetScreens(target)
+            if (screens.isNotEmpty()) return screens
+        }
+        return listOf(app.createRootScreen())
+    }
+
     private fun attach(screen: AppScreen, session: AppSession) {
         screen.host = ScreenHost(this, session, screen)
         session.screens += screen
+    }
+
+    /** Takes the screens from [index] up out of [stack], detached at once and returned top first for [closeScreens]. */
+    private fun detachFrom(stack: MutableList<AppScreen>, index: Int): List<AppScreen> {
+        val removed = stack.subList(index, stack.size)
+        val closing = removed.reversed()
+        removed.clear()
+        closing.forEach { it.host!!.closed = true }
+        return closing
     }
 
     /** Ends [ending]: its screens are detached at once and returned top first, for [closeScreens] to notify. */

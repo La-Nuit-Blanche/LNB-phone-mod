@@ -31,6 +31,16 @@ interface Phone {
      */
     fun pop()
 
+    /**
+     * Swaps this screen for [screen], which slides in from the right and takes its place in the stack: back from
+     * [screen] leads to the screen that was under this one. For a compose screen that gives way to the post it just
+     * created, or a loading screen to what it loaded. Screens pushed above this one close too; on the root screen,
+     * [screen] becomes the new root.
+     *
+     * This screen is closed, so its handle does nothing afterwards. [screen] must be a new instance, as for [push].
+     */
+    fun replace(screen: AppScreen)
+
     /** Leaves the app for the home screen, instantly. Every screen of the app is closed. */
     fun home()
 

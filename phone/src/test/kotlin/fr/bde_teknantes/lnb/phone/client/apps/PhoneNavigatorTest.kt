@@ -160,6 +160,77 @@ class PhoneNavigatorTest {
     }
 
     @Test
+    fun `a target opens the stack the app gives for it`() {
+        val feed = screen("feed")
+        val thread = screen("thread")
+        val app = testApp("app", targets = { if (it == "thread:1") listOf(feed, thread) else emptyList() }) { screen("root") }
+        registry.register(app, "test")
+        navigator.open()
+
+        assertTrue(navigator.openApp(appId("app"), "thread:1"))
+
+        assertEquals(listOf(feed, thread), navigator.screens)
+        assertEquals(listOf("thread:shown"), log)
+        assertTrue(navigator.back())
+        assertEquals(listOf("thread:shown", "thread:hidden", "thread:closed", "feed:shown"), log)
+    }
+
+    @Test
+    fun `an unknown target or an app without targets opens the root screen`() {
+        navigator.open()
+        assertTrue(navigator.openApp(testApp("app", targets = { emptyList() }) { screen("root") }, "nope"))
+        assertEquals("root", navigator.currentScreen.toString())
+        assertTrue(navigator.openApp(testApp("plain") { screen("plain root") }, "thread:1"))
+        assertEquals("plain root", navigator.currentScreen.toString())
+    }
+
+    @Test
+    fun `opening a target while the app is open starts it afresh`() {
+        val root = openOn(screen("root"))
+        val thread = screen("thread")
+        assertTrue(navigator.openApp(testApp("app", targets = { listOf(thread) }) { screen("unused") }, "thread:1"))
+        assertEquals(listOf("root:shown", "root:hidden", "root:closed", "thread:shown"), log)
+        root.handle.push(screen("late"))
+        assertEquals(listOf(thread), navigator.screens)
+    }
+
+    @Test
+    fun `a target stack that repeats a screen fails to open`() {
+        navigator.open()
+        val twice = screen("twice")
+        assertFalse(navigator.openApp(testApp("app", targets = { listOf(twice, twice) }), "x"))
+        assertTrue(navigator.isHome)
+        assertEquals(listOf("failed app"), heard)
+    }
+
+    @Test
+    fun `replace swaps the screen in place`() {
+        val root = openOn(screen("root"))
+        val compose = screen("compose")
+        root.handle.push(compose)
+        val thread = screen("thread")
+        log.clear()
+
+        compose.handle.replace(thread)
+
+        assertEquals(listOf(root, thread), navigator.screens)
+        assertEquals(listOf("compose:hidden", "compose:closed", "thread:shown"), log)
+        compose.handle.push(screen("late"))
+        assertEquals(listOf(root, thread), navigator.screens)
+        navigator.back()
+        assertSame(root, navigator.currentScreen)
+    }
+
+    @Test
+    fun `replace on the root screen makes a new root`() {
+        val loading = openOn(screen("loading"))
+        val loaded = screen("loaded")
+        loading.handle.replace(loaded)
+        assertEquals(listOf(loaded), navigator.screens)
+        assertFalse(navigator.canGoBack)
+    }
+
+    @Test
     fun `calls from another thread throw`() {
         val offThread = PhoneNavigator(registry) { false }
         assertThrows(IllegalStateException::class.java) { offThread.open() }

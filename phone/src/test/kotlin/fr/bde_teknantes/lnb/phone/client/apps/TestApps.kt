@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.client.apps
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 import fr.bde_teknantes.lnb.phone.api.client.AppIcon
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
+import fr.bde_teknantes.lnb.phone.api.client.AppTargetScreens
 import fr.bde_teknantes.lnb.phone.api.client.Phone
 import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.api.client.TileColor
@@ -11,10 +12,15 @@ import net.minecraft.resources.ResourceLocation
 
 internal fun appId(path: String): ResourceLocation = ResourceLocation.fromNamespaceAndPath("test", path)
 
-internal fun testApp(path: String, root: () -> AppScreen = { RecordingScreen(path, mutableListOf()) }) = PhoneApp(
+internal fun testApp(
+    path: String,
+    targets: ((String) -> List<AppScreen>)? = null,
+    root: () -> AppScreen = { RecordingScreen(path, mutableListOf()) },
+) = PhoneApp(
     appId(path),
     Component.literal(path),
     AppIcon.Glyph(TileColor.AZURE, appId("textures/gui/$path.png")),
+    targets?.let { create -> AppTargetScreens { create(it) } },
 ) { root() }
 
 internal object TestCanvas : AppCanvas {

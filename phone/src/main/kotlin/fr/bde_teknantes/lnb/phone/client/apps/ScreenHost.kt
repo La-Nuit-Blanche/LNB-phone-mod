@@ -17,7 +17,9 @@ internal class ScreenHost(
         navigator.pop(this)
     }
 
-    override fun home() = navigator.home(this)
+    override fun replace(screen: AppScreen) = navigator.replace(this, screen)
+
+    override fun home() =navigator.home(this)
 
     override fun close() = navigator.close(this)
 }

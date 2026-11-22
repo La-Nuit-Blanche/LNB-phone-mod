@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.api.client
 
+import fr.bde_teknantes.lnb.phone.api.AppTarget
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 
@@ -28,23 +29,32 @@ import net.minecraft.resources.ResourceLocation
  * translatable component and give the key in both `en_us.json` and `fr_fr.json`. At most 16 characters in each
  * language: longer names are cut on the home screen.
  * @property icon The app's icon on the home screen and on its notifications.
+ * @param targetScreens Only for apps whose notifications point somewhere precise (see [AppTarget]); leave it out
+ * otherwise, and notifications open the app on its first screen.
  * @param rootScreen Creates the first screen of the app, each time the player opens it.
  */
 class PhoneApp(
     val id: ResourceLocation,
     val name: Component,
     val icon: AppIcon,
+    private val targetScreens: AppTargetScreens? = null,
     private val rootScreen: AppScreenFactory,
 ) {
-    /** A new instance of the app's first screen. Called by the phone each time the app is opened. */
+    /** A new instance of the app's first screen. Called by the phone each time the app is opened from home. */
     fun createRootScreen(): AppScreen = rootScreen.create()
+
+    /**
+     * The screens to open for [target], root first, or an empty list when the app has none for it (it then opens on
+     * its first screen). Called by the phone when the player opens a notification that carries a target.
+     */
+    fun createTargetScreens(target: String): List<AppScreen> = targetScreens?.create(target).orEmpty()
 
     override fun toString() = "PhoneApp($id)"
 }
 
 /**
  * Creates the first screen of an app. A lambda will do: `PhoneApp(id, name, icon) { NotesScreen() }`, or a
- * constructor reference: `PhoneApp(id, name, icon, ::NotesScreen)`.
+ * constructor reference: `PhoneApp(id, name, icon, rootScreen = ::NotesScreen)`.
  */
 fun interface AppScreenFactory {
     /**
@@ -53,4 +63,25 @@ fun interface AppScreenFactory {
      * your own.
      */
     fun create(): AppScreen
+}
+
+/**
+ * Turns a notification's target into the screens to show. See [AppTarget] for what a target is.
+ *
+ * ```kotlin
+ * PhoneApp(id, name, icon, targetScreens = { target ->
+ *     val post = target.removePrefix("thread:").toLongOrNull()
+ *     // Back from the thread leads to the feed, as if the player had opened the thread from there.
+ *     if (post == null) emptyList() else listOf(FeedScreen(), ThreadScreen(post))
+ * }) { FeedScreen() }
+ * ```
+ */
+fun interface AppTargetScreens {
+    /**
+     * Returns the stack of screens to open for [target], its root first and the screen the player lands on last.
+     * Each one must be a **new** screen, as for [AppScreenFactory.create]. Return an empty list for a target you
+     * don't know (an older notification, say): the app then opens on its first screen. Throwing counts as a failure
+     * of the app (see [AppScreen]).
+     */
+    fun create(target: String): List<AppScreen>
 }
