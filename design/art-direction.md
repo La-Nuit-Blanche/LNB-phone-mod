@@ -364,7 +364,7 @@ On a 20 x 20 canvas:
 - 16 x 16 PNG, hard pixels, no partial alpha. Main shape inside the 12 x 12 safe area `(2,2)..(13,13)`; tails and beaks may reach the edge.
 - At most 4 inks from the list below. Do not draw shadows.
 - An ItemStack may replace the glyph (16 x 16 at `(2,2)`, no auto-shade).
-- App names: at most 16 characters, in both languages.
+- App names: 16 characters or fewer recommended, in both languages. The limit is not enforced: a name too long for the label line (section 6) is truncated when drawn.
 
 | Ink | Hex |
 |---|---|
@@ -502,11 +502,12 @@ Every app, built-in or third-party, draws inside the 256 x 370 dp viewport with 
 
 ### 8.1 Rendering rules
 
-- Anti-aliased shapes, real alpha, true rounded corners. Rounded rects, pills and circles come from tinted white mask sprites (section 16.2), never computed per frame.
+- Anti-aliased shapes, real alpha, true rounded corners. Rounded rects, pills, circles and their strokes are coverage masks the drawing surface computes at the screen's real resolution, once per size and cached, never per frame. (Changed after the rendering spike: pre-made sprites at 2 px per dp made 1 dp strokes soft at GUI scale 3.)
+- Text is Inter rasterised at the exact pixel size for the current GUI scale, with the font's kerning; widths in dp, and so line breaks, are the same at every scale.
 - **No blur, no backdrop effects.** Shadows only from the pre-baked soft sprites: FAB, and the "sheet" shadow under the banner, snackbar, menu and dialog. No other element has a shadow.
 - No gradients in the kit.
-- All smooth sprites are exported at **2 px per dp** (the GUI scale 4 resolution) and drawn with linear filtering, no mipmaps.
-- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. Hairlines are 1 dp, rounded to the nearest whole real pixel and never below 1 real pixel.
+- Icons and the spinner are exported at **three densities, 1, 1.5 and 2 px per dp**, one per supported GUI scale, and drawn 1:1. Shadows are exported at 2 px per dp and drawn with linear filtering, no mipmaps.
+- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. An edge on an odd dp value is rounded half up at GUI scale 3, where 1 dp is 1.5 real pixels. Hairlines are 1 dp: 1 real pixel at GUI scale 2, 2 at GUI scales 3 and 4.
 - The app layer is clipped to the viewport. The shell then paints its 4 screen corner pixels over it, giving the bottom corners a 1 GUI px notch on purpose.
 - GUI scale 1 is not supported for apps (1 dp would be half a pixel). At GUI scale 1 the shell and home screen work, and an opened app's viewport shows only the bitmap-font line `Échelle GUI : 2+` (string `gui.scale`), centred horizontally and vertically, in `#96A0B0`, on `bg`.
 
@@ -1298,27 +1299,29 @@ Code fills (no sprite): status strip, LED, battery fill, icon tile and bands, la
 
 ### 16.2 Smooth sprites (apps and banner)
 
-Folder `assets/lnbphone/textures/gui/smooth/`, exported at **2 px per dp**, linear filtering, no mipmaps. Shapes and icons are white with alpha and tinted at draw time. Nine-slice borders are given in dp (px = 2 x dp).
+Folder `assets/lnbphone/textures/gui/smooth/`. Standalone textures with linear filtering and no mipmaps, not GUI atlas sprites. All of them are drawn by the generator in `tools/sprites`.
+
+Shapes (rounded rects, pills, circles, strokes, the avatar's circle) are not sprites: the drawing surface computes them at the screen's real resolution (section 8.1).
+
+Shadows, at 2 px per dp, black with the 45% opacity baked in:
 
 | Sprite | Size dp (px) | Nine-slice border dp | Content |
 |---|---|---|---|
-| `shape/r10` | 24 x 24 (48 x 48) | 10 | filled rounded rect, radius 10 |
-| `shape/r10_stroke1` | 24 x 24 (48 x 48) | 10 | 1 dp inner stroke, radius 10 |
-| `shape/r10_stroke2` | 24 x 24 (48 x 48) | 10 | 2 dp inner stroke, radius 10 |
-| `shape/r14` | 32 x 32 (64 x 64) | 14 | filled, radius 14 |
-| `shape/r14_stroke1` | 32 x 32 (64 x 64) | 14 | 1 dp inner stroke, radius 14 |
-| `shape/pill` | 48 x 48 (96 x 96) | 24 | filled circle; stretched into pills; also discs, the FAB and the announcer badge |
-| `shape/pill_stroke1` | 48 x 48 (96 x 96) | 24 | 1 dp inner stroke |
-| `shape/pill_stroke2` | 48 x 48 (96 x 96) | 24 | 2 dp inner stroke (focus ring) |
-| `shape/avatar_mask` | 48 x 48 (96 x 96) | none, scaled to 16 / 32 / 48 dp | circle alpha mask |
-| `shadow/fab` | 72 x 72 (144 x 144) | none | soft round shadow for a 48 dp circle: 8 dp blur, `#000000` at 45% |
-| `shadow/sheet` | 48 x 48 (96 x 96) | 22 | soft shadow for radius 10 to 14 rects (banner, snackbar, menu, dialog): 8 dp blur, 2 dp down, `#000000` at 45%; drawn 8 dp larger than the element on each side |
-| `icon12/megaphone_filled` | 12 x 12 (24 x 24) | none | solid silhouette, announcer badge |
-| `icon16/reply`, `heart`, `heart_filled`, `pin`, `pin_filled`, `lock`, `more`, `trash`, `alert`, `arrow_up` | 16 x 16 (32 x 32) each | none | stroke 1.5 dp |
-| `icon20/back`, `close`, `person`, `globe`, `megaphone`, `inbox` | 20 x 20 (40 x 40) each | none | stroke 2 dp |
-| `icon24/compose` | 24 x 24 (48 x 48) | none | stroke 2 dp |
-| `icon40/inbox`, `megaphone`, `globe` | 40 x 40 (80 x 80) each | none | stroke 2.5 dp, empty and error states |
-| `spinner` | 20 x 20 (40 x 40) | none | 90 degree arc on a 25% ring, 2 dp stroke, rotated at draw time (drawn at 16 dp inside buttons) |
+| `shadow/fab` | 72 x 72 (144 x 144) | none | soft round shadow for a 48 dp circle: 8 dp blur. Drawn centred on the circle and 2 dp lower |
+| `shadow/sheet` | 48 x 48 (96 x 96) | 22 | soft shadow for radius 10 to 14 rects (banner, snackbar, menu, dialog): 8 dp blur, the 2 dp drop baked in; drawn 8 dp larger than the element on each side |
+
+Icons and the spinner, white with alpha and tinted at draw time, at `<density>/icon<grid>/<name>.png` and `<density>/spinner.png`, where `<density>` is `1x`, `1_5x` or `2x` for GUI scale 2, 3 and 4. An icon's size in pixels is its grid times the density, and it is drawn 1:1.
+
+| Icons | Grid dp | Content |
+|---|---|---|
+| `icon12/megaphone_filled` | 12 | solid silhouette, announcer badge |
+| `icon12/person` | 12 | stroke 1.5 dp, anonymous avatar at 16 dp |
+| `icon16/reply`, `heart`, `heart_filled`, `pin`, `pin_filled`, `lock`, `more`, `trash`, `alert`, `arrow_up` | 16 | stroke 1.5 dp. `heart_filled` is filled and stroked, so it keeps the outline heart's size |
+| `icon20/back`, `close`, `person`, `globe`, `megaphone`, `inbox` | 20 | stroke 2 dp |
+| `icon24/compose` | 24 | stroke 2 dp |
+| `icon28/person` | 28 | stroke 2 dp, anonymous avatar at 48 dp |
+| `icon40/inbox`, `megaphone`, `globe` | 40 | stroke 2.5 dp, empty and error states |
+| `spinner` | 20 | 90 degree arc on a 25% ring, 2 dp stroke, rotated at draw time (drawn at 16 dp inside buttons) |
 
 Fonts: `assets/lnbphone/font/inter_regular.ttf`, `assets/lnbphone/font/inter_semibold.ttf`, with the OFL licence text alongside.
 
