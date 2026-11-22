@@ -1,14 +1,12 @@
 package fr.bde_teknantes.lnb.phone.demo.client.capture
 
 import fr.bde_teknantes.lnb.phone.LnbPhone
-import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.debug.CaptureHooks
 import fr.bde_teknantes.lnb.phone.demo.ping.Ping
 import fr.bde_teknantes.lnb.phone.demo.ping.PingTarget
 import fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession
 import fr.bde_teknantes.lnb.phone.demo.ping.SendPingPayload
 import net.minecraft.client.Minecraft
-import net.minecraft.resources.ResourceLocation
 import net.neoforged.neoforge.network.PacketDistributor
 import org.lwjgl.glfw.GLFW
 import java.util.UUID
@@ -22,7 +20,7 @@ import java.util.UUID
  * and 4, and in French at 3.
  *
  * Pings that must arrive while the player is elsewhere are sent as the screen sends them, from a step of the script.
- * The player who isn't online is reached through the navigator (internal to the phone, so by reflection), opening
+ * The player who isn't online is reached through the capture hooks (the navigator is internal to the phone), opening
  * Ping at a target that names them, as one of their old notifications would.
  */
 internal object PingScenario {
@@ -121,7 +119,7 @@ internal object PingScenario {
         log("back home after the banner")
 
         // Refused: a player who isn't online. The error names them; the text comes back to the field.
-        run { openApp(Ping.APP_ID, PingTarget(GHOST, "Ghost").toString()) }
+        run { check(CaptureHooks.openApp(Ping.APP_ID, PingTarget(GHOST, "Ghost").toString())) { "The phone refused to open Ping at the ghost" } }
         waitTicks(8)
         type("Where are you")
         key(GLFW.GLFW_KEY_ENTER)
@@ -203,15 +201,6 @@ internal object PingScenario {
     private fun icon(slot: Int): Pair<Int, Int> {
         val (vx, vy) = CaptureHooks.viewportOffset.let { it[0] to it[1] }
         return device(vx + 6 + 24 * (slot % 5) + 10, vy + 8 + 24 * (slot / 5) + 10)
-    }
-
-    // The navigator is internal to the phone: development code reaches it by reflection.
-
-    /** Opens the app [id] at [target], as opening one of its notifications does. */
-    private fun openApp(id: ResourceLocation, target: String) {
-        val navigator = LnbPhoneClient::class.java.getDeclaredField("navigator").apply { isAccessible = true }.get(LnbPhoneClient)
-        val opened = navigator.javaClass.getMethod("openApp", ResourceLocation::class.java, String::class.java).invoke(navigator, id, target)
-        check(opened == true) { "The phone refused to open $id at $target" }
     }
 
     /** A player who never joined. */

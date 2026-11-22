@@ -76,6 +76,19 @@ object CaptureHooks {
         LnbPhoneClient.settings.update { it.copy(preview = on) }
     }
 
+    /**
+     * Opens the app [id] at [target], as opening one of its notifications does (an app at a target the player could
+     * only reach that way: an old notification naming someone who left). False if the phone refused, and always in
+     * production.
+     */
+    fun openApp(id: ResourceLocation, target: String): Boolean {
+        if (!enabled) return false
+        return LnbPhoneClient.navigator.openApp(id, target)
+    }
+
+    /** Where the app [id] sits on the home screen, counted in home order from 0; -1 when it isn't on the phone. */
+    fun homeSlot(id: ResourceLocation): Int = LnbPhoneClient.apps.apps.indexOfFirst { it.id == id }
+
     /** How many unread notifications the client's store holds for [app]. */
     fun unreadCount(app: ResourceLocation): Int = LnbPhoneClient.notifications.unreadCount(app)
 
