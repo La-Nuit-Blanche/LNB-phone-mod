@@ -28,6 +28,7 @@ object CaptureScenarios {
         "notifications" to NotificationScenarios::notifications,
         "notifications-persist" to NotificationScenarios::persistence,
         "notifications-review" to NotificationScenarios::review,
+        "emoji" to EmojiScenario::script,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()

@@ -19,7 +19,8 @@ import net.minecraft.world.item.Items
  * Test sheet for the notification banner (task 6), sized for the window at GUI scale 4 (640 x 480 dp).
  *
  * - [Mode.STATES]: on the app background, the banner's states (normal, hover, pressed) with the storyboard's texts,
- *   then the edge cases: characters the font lacks, a long title, an item icon, a one-line text, no text.
+ *   then the edge cases: characters the fonts lack and emoji, a long title, an item icon, a one-line text, no text,
+ *   and emoji in a title and a text.
  * - [Mode.FRAMES]: P-10 steps 3 and 2 on the home wallpaper (no icons yet: the home screen is task 4): resting at
  *   app-local (8, 4), and half-way down its slide at `y -36`, clipped to the viewport.
  */
@@ -47,6 +48,10 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         AppIcon.Glyph(TileColor.VIOLET, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "textures/gui/sprites/icon/quests.png")),
         "Marie-Charlotte de La Villemarqué a répondu",
         "Supercalifragilisticexpidelilicieusementinterminable mot sans espace pour la coupure",
+    )
+    private val emoji = BannerContent(
+        feed, "Camille 🌸 Roux 🎉",
+        "Soirée au spawn ce soir 🎉 On part au Nether 🔥 vers 21:00, ramenez des potions 🧪 et à manger 🍗.",
     )
     private val item = BannerContent(AppIcon.Item(TileColor.ORANGE, ItemStack(Items.DIAMOND)), "Vente conclue", "Ton annonce a trouvé preneur.")
     private val noText = BannerContent(
@@ -76,7 +81,7 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         canvas.end()
         val rows = listOf(
             listOf(reply to BannerLook.NORMAL, announcement to BannerLook.HOVER, pvp to BannerLook.PRESSED, glyphless to BannerLook.NORMAL),
-            listOf(longTitle to BannerLook.NORMAL, item to BannerLook.NORMAL, noText to BannerLook.NORMAL),
+            listOf(longTitle to BannerLook.NORMAL, item to BannerLook.NORMAL, noText to BannerLook.NORMAL, emoji to BannerLook.NORMAL),
         )
         rows.forEachIndexed { column, list ->
             list.forEachIndexed { i, (content, look) ->
