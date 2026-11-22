@@ -15,6 +15,9 @@ object CaptureScenarios {
     private val scenarios: Map<String, () -> CaptureScript> = linkedMapOf(
         "smooth" to ::smooth,
         "banner" to ::banner,
+        "shell" to ShellScenarios::shell,
+        "shell-pages" to ShellScenarios::shellPages,
+        "shell-window" to ShellScenarios::shellWindow,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()
