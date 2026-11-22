@@ -412,6 +412,14 @@ class SmoothCanvas {
         private var warnedAbandoned = false
 
         /**
+         * Prepares the smooth layer for the current GUI scale ahead of time: loads the fonts, rasterises the common
+         * characters in every text style, and the kit's shapes. Call it on the render thread when the phone is about
+         * to open (the phone key), so its first frames do not hitch. Returns the time it took, in nanoseconds.
+         */
+        fun prewarm(): Long =
+            SmoothResources.prewarm(Minecraft.getInstance().window.guiScale.roundToInt().coerceAtLeast(1))
+
+        /**
          * Ends a canvas still drawing at the end of a frame (its [end] skipped by an exception), so its scissor does
          * not clip the next frame's world and HUD to the phone's viewport. Called by the phone after every frame.
          */

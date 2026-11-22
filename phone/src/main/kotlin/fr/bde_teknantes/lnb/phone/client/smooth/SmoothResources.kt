@@ -7,6 +7,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.DefaultPlayerSkin
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.packs.resources.Resource
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import org.lwjgl.opengl.GL11
@@ -88,8 +89,11 @@ object SmoothResources : ResourceManagerReloadListener {
         fontFailures[weight]?.let { throw it }
         val location = FONT_FILES.getValue(weight)
         val stack = Minecraft.getInstance().resourceManager.getResourceStack(location).asReversed()
-        val font = Fallback.firstLoading(stack, { SmoothFont.load(it.open(), "$location from ${it.sourcePackId()}") }) { resource, e ->
-            LnbPhone.LOGGER.error("Unusable font {} in resource pack '{}', trying the next one down", location, resource.sourcePackId(), e)
+        val load = { resource: Resource -> SmoothFont.load(resource.open(), "$location from ${resource.sourcePackId()}") }
+        val font = Fallback.firstLoading(stack, load) { resource, e ->
+            LnbPhone.LOGGER.error(
+                "Unusable font {} in resource pack '{}', trying the next one down", location, resource.sourcePackId(), e,
+            )
         }
         if (font == null) {
             // Not even the jar's copy: remember it rather than reading every pack again on every frame.
@@ -139,6 +143,50 @@ object SmoothResources : ResourceManagerReloadListener {
         }
 
         internal fun clear() = glyphs.clear()
+    }
+
+    /** Every character the phone's French and English text commonly uses. */
+    private const val COMMON_CHARACTERS = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`" +
+        "abcdefghijklmnopqrstuvwxyz{|}~àâäçéèêëîïôöùûüÿœæÀÂÄÇÉÈÊËÎÏÔÖÙÛÜŸŒÆ«»’…·–—"
+
+    /** Kit shapes (art direction 8.5 to 8.7), in dp: width, height, radius, stroke. Their tiles do not depend on width. */
+    private val KIT_SHAPES = listOf(
+        floatArrayOf(64f, 40f, 10f, 0f), floatArrayOf(64f, 40f, 10f, 1f), floatArrayOf(64f, 40f, 10f, 2f),
+        floatArrayOf(64f, 64f, 14f, 0f), floatArrayOf(64f, 64f, 14f, 1f),
+        floatArrayOf(64f, 32f, 16f, 0f), floatArrayOf(64f, 32f, 16f, 1f), floatArrayOf(64f, 32f, 16f, 2f),
+        floatArrayOf(36f, 20f, 10f, 0f), floatArrayOf(32f, 16f, 8f, 0f), floatArrayOf(48f, 3f, 1.5f, 0f),
+        floatArrayOf(6f, 6f, 3f, 0f), floatArrayOf(8f, 8f, 4f, 0f), floatArrayOf(16f, 16f, 8f, 0f),
+        floatArrayOf(28f, 28f, 14f, 0f), floatArrayOf(32f, 32f, 16f, 0f), floatArrayOf(48f, 48f, 24f, 0f),
+    )
+
+    /**
+     * Loads the fonts and rasterises, for GUI scale [guiScale], the common characters in every style of the type
+     * ramp and the kit's shape tiles, so the first frames of the phone do not hitch on them. Returns the time taken.
+     */
+    fun prewarm(guiScale: Int): Long {
+        RenderThread.check("Pre-warming the smooth layer")
+        val start = System.nanoTime()
+        useScale(guiScale)
+        val grid = PixelGrid(guiScale)
+        val styles = listOf(
+            TextStyles.TITLE_L, TextStyles.TITLE_M, TextStyles.BODY, TextStyles.BODY_STRONG, TextStyles.LABEL,
+            TextStyles.CAPTION, TextStyles.CAPTION_STRONG, TextStyles.MICRO,
+        )
+        for (style in styles.distinctBy { it.weight to it.size }) {
+            val set = glyphs(style.weight, grid.toPx(style.size), SmoothFont.Hinting.LIGHT, 1)
+            COMMON_CHARACTERS.codePoints().forEach { set.get(it, 0) }
+        }
+        for ((w, h, radiusDp, strokeDp) in KIT_SHAPES) {
+            // As SmoothCanvas.roundRect sizes them, at an even dp position.
+            val pw = grid.snap(w)
+            val ph = grid.snap(h)
+            val radius = minOf(grid.toPx(radiusDp), minOf(pw, ph) / 2f)
+            val stroke = if (strokeDp > 0f) grid.strokePx(strokeDp) else 0
+            val corner = NineSlice.cornerSize(radius, stroke)
+            shape(NineSlice.tileSize(pw, corner), NineSlice.tileSize(ph, corner), radius, stroke)
+        }
+        solid()
+        return System.nanoTime() - start
     }
 
     /** A region holding one fully opaque white texel, for plain rectangles. */

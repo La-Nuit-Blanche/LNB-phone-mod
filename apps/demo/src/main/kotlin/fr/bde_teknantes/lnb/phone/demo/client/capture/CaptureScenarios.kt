@@ -1,5 +1,7 @@
 package fr.bde_teknantes.lnb.phone.demo.client.capture
 
+import fr.bde_teknantes.lnb.phone.LnbPhone
+import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.demo.client.smooth.SmoothTestScreen
 
 /**
@@ -29,6 +31,8 @@ object CaptureScenarios {
     private fun smooth() = CaptureScript().apply {
         for (scale in 2..4) {
             guiScale(scale)
+            // As the phone key will: the test sheet's first frame then shows what is left to do cold.
+            run { LnbPhone.LOGGER.info("Smooth layer pre-warmed for GUI {} in {} us", scale, SmoothCanvas.prewarm() / 1000) }
             screen { SmoothTestScreen() }
             waitTicks(20)
             shot("smooth_gui$scale")
