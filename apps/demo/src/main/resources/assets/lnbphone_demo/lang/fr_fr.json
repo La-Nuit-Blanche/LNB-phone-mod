@@ -1,3 +1,10 @@
 {
-  "app.lnbphone_demo.hello": "Bonjour"
+  "app.lnbphone_demo.hello": "Bonjour",
+  "app.lnbphone_demo.sample.feed": "Feed",
+  "app.lnbphone_demo.sample.messages": "Messages",
+  "app.lnbphone_demo.sample.wallet": "Portefeuille",
+  "app.lnbphone_demo.sample.quests": "Quêtes",
+  "app.lnbphone_demo.sample.settings": "Réglages",
+  "app.lnbphone_demo.sample.map": "Carte",
+  "app.lnbphone_demo.sample.filler": "Appli %s"
 }

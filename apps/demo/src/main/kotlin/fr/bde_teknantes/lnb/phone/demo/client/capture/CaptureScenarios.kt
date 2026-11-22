@@ -9,6 +9,9 @@ import fr.bde_teknantes.lnb.phone.demo.client.smooth.SmoothTestScreen
 object CaptureScenarios {
     private val scenarios: Map<String, () -> CaptureScript> = linkedMapOf(
         "smooth" to ::smooth,
+        "shell" to ShellScenarios::shell,
+        "shell-pages" to ShellScenarios::shellPages,
+        "shell-window" to ShellScenarios::shellWindow,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()

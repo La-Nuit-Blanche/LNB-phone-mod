@@ -1,8 +1,11 @@
 package fr.bde_teknantes.lnb.phone.demo.client.capture
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.MouseHandler
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.world.level.GameType
+import org.lwjgl.glfw.GLFW
+import java.lang.reflect.Method
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -87,5 +90,79 @@ class CaptureScript {
             action()
             true
         }
+    }
+
+    /** Switches the game's language (`en_us`, `fr_fr`...) and reloads resources, as the language screen does. */
+    fun language(code: String) = apply {
+        run {
+            val mc = Minecraft.getInstance()
+            mc.options.languageCode = code
+            mc.languageManager.setSelected(code)
+        }
+        reloadResources()
+    }
+
+    // ---- Input, through the same handlers GLFW's callbacks call ----
+
+    /** Presses [key] (a GLFW key code) on this tick and releases it on the next one, as a player would. */
+    fun key(key: Int, modifiers: Int = 0) = apply {
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            mc.keyboardHandler.keyPress(mc.window.window, key, GLFW.glfwGetKeyScancode(key), GLFW.GLFW_PRESS, modifiers)
+            true
+        }
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            mc.keyboardHandler.keyPress(mc.window.window, key, GLFW.glfwGetKeyScancode(key), GLFW.GLFW_RELEASE, modifiers)
+            true
+        }
+    }
+
+    /**
+     * Moves the pointer to the middle of the GUI pixel [position] gives, window GUI px, computed when the step runs
+     * (the phone may have moved since the script was built).
+     */
+    fun mouseTo(position: () -> Pair<Int, Int>) = apply {
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            val (x, y) = position()
+            val scale = mc.window.screenWidth.toDouble() / mc.window.guiScaledWidth
+            ON_MOVE.invoke(mc.mouseHandler, mc.window.window, (x + 0.5) * scale, (y + 0.5) * scale)
+            true
+        }
+    }
+
+    fun mouseDown(button: Int = GLFW.GLFW_MOUSE_BUTTON_LEFT) = mouseButton(button, GLFW.GLFW_PRESS)
+
+    fun mouseUp(button: Int = GLFW.GLFW_MOUSE_BUTTON_LEFT) = mouseButton(button, GLFW.GLFW_RELEASE)
+
+    /** Turns the mouse wheel by [notches] where the pointer is (positive away from the player). */
+    fun scroll(notches: Double) = apply {
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            ON_SCROLL.invoke(mc.mouseHandler, mc.window.window, 0.0, notches)
+            true
+        }
+    }
+
+    private fun mouseButton(button: Int, action: Int) = apply {
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            ON_PRESS.invoke(mc.mouseHandler, mc.window.window, button, action, 0)
+            true
+        }
+    }
+
+    private companion object {
+        // MouseHandler's GLFW callbacks are private; the game runs with Mojang's names, in development and in production.
+        val ON_MOVE: Method = MouseHandler::class.java.getDeclaredMethod(
+            "onMove", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        val ON_PRESS: Method = MouseHandler::class.java.getDeclaredMethod(
+            "onPress", Long::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        val ON_SCROLL: Method = MouseHandler::class.java.getDeclaredMethod(
+            "onScroll", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
     }
 }
