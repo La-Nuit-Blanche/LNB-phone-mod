@@ -5,6 +5,7 @@ import fr.bde_teknantes.lnb.phone.LnbPhone
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
 import net.minecraft.client.Minecraft
+import net.minecraft.client.resources.DefaultPlayerSkin
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
@@ -41,6 +42,7 @@ object SmoothResources : ResourceManagerReloadListener {
     private val avatars = HashMap<Pair<ResourceLocation, Int>, MaskAtlas.Region>()
     private val skinFaces = HashMap<ResourceLocation, IntArray>()
     private val skinRetries = HashMap<ResourceLocation, Long>()
+    private val skinFirstSeen = HashMap<ResourceLocation, Long>()
 
     /** Called just before the atlas is cleared, so quads already queued against it are drawn first. */
     internal var beforeAtlasClear: (() -> Unit)? = null
@@ -172,51 +174,54 @@ object SmoothResources : ResourceManagerReloadListener {
     }
 
     /**
-     * Reads the skin back from the GPU once and composites the hat over the face. Skins are uploaded asynchronously,
-     * so an unfinished one (any face pixel not opaque: Minecraft makes the face area opaque when it loads a skin) is
-     * retried later instead of being cached.
+     * The skin's face with its hat, read back from the GPU once it is really there. Skin textures are registered
+     * before their pixels arrive and show Steve's skin meanwhile (and nothing at all before that), so a read that is
+     * not opaque, or that is exactly Steve's face for a skin that is not Steve's, is retried later instead of being
+     * cached ([SkinReadiness]).
      */
     private fun skinFace(skin: ResourceLocation): IntArray? {
         skinFaces[skin]?.let { return it }
         val now = System.nanoTime()
         skinRetries[skin]?.let { if (now < it) return null }
-        val texture = Minecraft.getInstance().textureManager.getTexture(skin)
-        texture.bind()
-        val width = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH)
-        val height = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT)
-        if (width < 64 || height < 32 || width % 64 != 0) {
-            skinRetries[skin] = now + SKIN_RETRY_NANOS
-            return null
-        }
-        val texel = width / 64
-        val face = NativeImage(width, height, false).use { image ->
-            image.downloadTexture(0, false)
-            IntArray(64) { i ->
-                val x = i % 8
-                val y = i / 8
-                val base = argb(image.getPixelRGBA((8 + x) * texel, (8 + y) * texel))
-                val hat = argb(image.getPixelRGBA((40 + x) * texel, (8 + y) * texel))
-                over(hat, base)
-            }
-        }
-        if (face.any { it ushr 24 != 0xFF }) {
+        val firstSeen = skinFirstSeen.getOrPut(skin) { now }
+        val face = readFace(skin)
+        val placeholder = DefaultPlayerSkin.getDefaultTexture()
+        val placeholderFace = if (skin == placeholder || face == null) null else placeholderFace(placeholder)
+        val ready = SkinReadiness.isReady(
+            face = face,
+            placeholderFace = placeholderFace,
+            waitedNanos = now - firstSeen,
+        )
+        if (!ready || face == null) {
             skinRetries[skin] = now + SKIN_RETRY_NANOS
             return null
         }
         skinRetries.remove(skin)
+        skinFirstSeen.remove(skin)
         skinFaces[skin] = face
         return face
     }
 
-    private fun argb(abgr: Int): Int = (abgr and 0xFF00FF00.toInt()) or ((abgr shr 16) and 0xFF) or ((abgr and 0xFF) shl 16)
+    private fun placeholderFace(placeholder: ResourceLocation): IntArray? =
+        skinFaces[placeholder] ?: readFace(placeholder)?.also { skinFaces[placeholder] = it }
 
-    /** [top] composited over the opaque [bottom]. */
-    private fun over(top: Int, bottom: Int): Int {
-        val a = top ushr 24
-        if (a == 0) return bottom or (0xFF shl 24)
-        fun channel(shift: Int) = (((top shr shift) and 0xFF) * a + ((bottom shr shift) and 0xFF) * (255 - a) + 127) / 255
-        return (0xFF shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
+    /** The texture's 8 x 8 face layer and hat layer as ARGB, or null when it is not a skin-sized texture. */
+    private fun readFace(location: ResourceLocation): IntArray? {
+        val texture = Minecraft.getInstance().textureManager.getTexture(location)
+        texture.bind()
+        val width = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH)
+        val height = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT)
+        if (width < 64 || height < 32 || width % 64 != 0) return null
+        val texel = width / 64
+        return NativeImage(width, height, false).use { image ->
+            image.downloadTexture(0, false)
+            val base = IntArray(64) { argb(image.getPixelRGBA((8 + it % 8) * texel, (8 + it / 8) * texel)) }
+            val hat = IntArray(64) { argb(image.getPixelRGBA((40 + it % 8) * texel, (8 + it / 8) * texel)) }
+            SkinReadiness.composite(base, hat)
+        }
     }
+
+    private fun argb(abgr: Int): Int = (abgr and 0xFF00FF00.toInt()) or ((abgr shr 16) and 0xFF) or ((abgr and 0xFF) shl 16)
 
     /** Room in the atlas, or null (logged once) for something larger than a page, which clearing would not help. */
     private fun allocate(width: Int, height: Int): MaskAtlas.Region? {
@@ -234,7 +239,10 @@ object SmoothResources : ResourceManagerReloadListener {
             // Filling up again within seconds means one screen needs more than the atlas holds: every frame redraws
             // everything from scratch.
             warnedThrash = true
-            LnbPhone.LOGGER.warn("Smooth atlas filled twice within {} s at GUI scale {}: a screen uses more glyphs and shapes than it holds", THRASH_NANOS / 1_000_000_000, guiScale)
+            LnbPhone.LOGGER.warn(
+                "Smooth atlas filled twice within {} s at GUI scale {}: a screen uses more glyphs and shapes than it holds",
+                THRASH_NANOS / 1_000_000_000, guiScale,
+            )
         }
         lastAtlasClear = now
         beforeAtlasClear?.invoke()
@@ -258,5 +266,6 @@ object SmoothResources : ResourceManagerReloadListener {
         fontFailures.clear()
         skinFaces.clear()
         skinRetries.clear()
+        skinFirstSeen.clear()
     }
 }
