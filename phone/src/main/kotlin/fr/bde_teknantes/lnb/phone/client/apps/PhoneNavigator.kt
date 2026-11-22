@@ -83,7 +83,7 @@ internal class PhoneNavigator(
 
     /**
      * Opens the registered app [id], at [target] if given: the call for a notification the player opened. Returns
-     * false if there is no such app or it failed to start.
+     * false if there is no such app or it failed to start; true as [openApp] does.
      */
     fun openApp(id: ResourceLocation, target: String? = null): Boolean {
         checkThread()
@@ -98,6 +98,10 @@ internal class PhoneNavigator(
      * Starts [app] afresh, closing the app that was open (even if it is [app] itself). With a [target] the app knows,
      * it starts on the stack of screens it gives for it ([PhoneApp.createTargetScreens]); otherwise, on its root
      * screen. If the app can't give its screens, nothing changes and false is returned.
+     *
+     * True means the request was accepted and the app's screens are in place, not that the app is on screen now: its
+     * first onShown may still fail (closing it at once), and a screen or listener may navigate elsewhere meanwhile.
+     * Read the state afterwards ([currentApp], [shownScreen]) when it matters.
      */
     fun openApp(app: PhoneApp, target: String? = null): Boolean {
         checkThread()
@@ -409,9 +413,23 @@ internal enum class Transition {
     INSTANT,
 }
 
-/** Hears what the navigator does: the phone's screen, for drawing; notifications, to clear an app's badge. */
+/**
+ * Hears what the navigator does: the phone's screen, for drawing; notifications, to clear an app's badge.
+ *
+ * - Don't navigate synchronously from a callback (open, close, openApp, home...): the navigator is in the middle of
+ *   a change, and other listeners have not heard it yet. If a reaction must navigate, defer it (to the next tick, or
+ *   with `Minecraft.getInstance().execute`).
+ * - Read the navigator's state when you act ([PhoneNavigator.currentScreen], [PhoneNavigator.shownScreen],
+ *   [PhoneNavigator.isOpen]) rather than rebuilding it from the sequence of events: when screens navigate from their
+ *   own callbacks, events can arrive in an order that only the final state makes sense of.
+ * - A callback that throws is logged and skipped; it doesn't stop the navigation or the other listeners.
+ */
 internal interface NavigationListener {
-    /** What the phone shows changed. [outgoing] was shown before, null for the home screen; it may be closed already. */
+    /**
+     * What the phone shows changed. [outgoing] was shown before, null for the home screen; it may be closed already.
+     * Also heard while the phone is put away (an app opened for a peek before [PhoneNavigator.open], a reset): there
+     * is nothing to animate then.
+     */
     fun onTransition(transition: Transition, outgoing: AppScreen?) {}
 
     /** [app] was opened, by any route (home icon, banner, peek). */
