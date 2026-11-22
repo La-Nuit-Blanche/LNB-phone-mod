@@ -12,7 +12,7 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * right edge with [atRight]).
  *
  * ```kotlin
- * val publish = Button(tr("compose.post")) { send() }.apply { fixedWidth = 88f }
+ * val publish = Button(I18n.get("feed.compose.post")) { send() }.apply { fixedWidth = 88f }
  * publish.enabled = TextLimits.canSend(draft.text, 280)
  * ```
  */

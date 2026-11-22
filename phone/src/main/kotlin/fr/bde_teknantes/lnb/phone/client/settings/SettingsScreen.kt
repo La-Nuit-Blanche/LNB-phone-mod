@@ -46,9 +46,9 @@ internal class SettingsScreen(private val choices: SettingsChoices) : KitScreen(
         // Rows 49 dp apart with the hairline between them, as section 12 places them: a row's own divider would sit
         // on its last line, 1 dp higher.
         add(toggleRow(tr("sounds"), sounds).at(0f, 145f))
-        add(Divider().at(x, 193f, 256f - x, 1f))
+        add(Divider().apply { start = x }.at(0f, 193f))
         add(toggleRow(tr("preview"), preview).at(0f, 194f))
-        add(Divider().at(x, 242f, 256f - x, 1f))
+        add(Divider().apply { start = x }.at(0f, 242f))
     }
 
     // The store may change while the screen is up (the placement set from elsewhere): show what it holds.

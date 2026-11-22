@@ -156,4 +156,14 @@ class KitWidgetsTest {
         assertEquals("ab\ncd", area.text)
         assertEquals(TextState.DEFAULT_MAX_LENGTH, TextState.singleLine().maxLength)
     }
+
+    @Test
+    fun `a label inset lines up with the rows of a full-width list`() {
+        val list = screen.add(ScrollList().at(0f, 0f, 256f, 200f))
+        list.add(Label("Début").apply { inset = Spacing.SCREEN_PADDING; maxLines = 2 })
+        list.add(Label("Fin").apply { inset = Spacing.SCREEN_PADDING; align = Label.Align.END })
+        screen.frame()
+        assertEquals(12f, screen.canvas.texts.single { it.text == "Début" }.x)
+        assertEquals(256f - 12f - 3 * 6.5f, screen.canvas.texts.single { it.text == "Fin" }.x)
+    }
 }

@@ -261,7 +261,8 @@ transparent), the main shape inside the 12 x 12 square from (2, 2) to (13, 13), 
 ### 4. The first screen: a list
 
 Ping opens on the players online. A `KitScreen` creates its widgets in its constructor, places them with `at(x, y)`
-(top-left corner, in dp; width and height when the widget has no natural size) and `add`s them:
+(top-left corner, in dp; add width and height when the widget has no natural size) and `add`s them. Settings are
+properties, set in any order, before or after `at` and `add`: a widget placed without a size follows its natural size.
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PlayersScreen.kt -->
 ```kotlin

@@ -8,14 +8,15 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * takes the full width.
  *
  * ```kotlin
- * add(Header(tr("thread.title")).at(0f, 0f))                                       // back button on its own
+ * add(Header(I18n.get("feed.thread.title")).at(0f, 0f))                            // back button on its own
  * add(Header(null).apply {                                                          // Compose: close, no title,
  *     leading = IconButton(Icon.CLOSE) { phone.pop() }                              // and a primary button
- *     trailing = Button(tr("compose.post")) { send() }.apply { fixedWidth = 88f }
+ *     trailing = Button(I18n.get("feed.compose.post")) { send() }.apply { fixedWidth = 88f }
  * }.at(0f, 0f))
  * ```
  *
- * The back button calls the screen's [KitScreen.onBack] before going back, as Backspace does.
+ * The back button shows by itself whenever there is a screen to go back to, and calls the screen's [KitScreen.onBack]
+ * before going back, as Backspace does.
  *
  * @param title The title, cut with an ellipsis before the trailing button; null for none.
  */

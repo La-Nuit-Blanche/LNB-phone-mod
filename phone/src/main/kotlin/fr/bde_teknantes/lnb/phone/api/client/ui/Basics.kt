@@ -6,6 +6,9 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * A piece of text, in [TextStyle.BODY] and [Colors.TEXT_1] unless told otherwise. One line by default, cut with an
  * ellipsis when too long for its width; with [maxLines] above 1, it wraps on words and its height follows (so it can
  * sit in a [ScrollList]).
+ *
+ * The text starts at the widget's left edge: placed on a screen, put the label at the margin (x 12); in a list, which
+ * gives its rows the full width, give it an [inset] of [Spacing.SCREEN_PADDING] so it lines up with the rows' text.
  */
 class Label(var text: String) : Widget() {
     /** Where the text sits horizontally. Complete for good: a `when` over it needs no `else`. */
@@ -16,22 +19,27 @@ class Label(var text: String) : Widget() {
     var maxLines: Int = 1
     var align: Align = Align.START
 
-    override val preferredWidth get() = TextMetrics.measure(text, style)
+    /** Space kept free at the left and at the right, in dp; none by default. */
+    var inset: Float = 0f
+
+    override val preferredWidth get() = TextMetrics.measure(text, style) + 2 * inset
     override val preferredHeight get() = style.lineHeight
 
     override fun heightFor(width: Float): Float =
         if (maxLines == 1) style.lineHeight else lines(TextMetrics, width).size * style.lineHeight
 
-    private fun lines(measurer: TextMeasurer, width: Float): List<String> =
-        if (maxLines == 1) listOf(measurer.truncate(text, style, width)) else measurer.wrap(text, style, width, maxLines)
+    private fun lines(measurer: TextMeasurer, width: Float): List<String> {
+        val room = width - 2 * inset
+        return if (maxLines == 1) listOf(measurer.truncate(text, style, room)) else measurer.wrap(text, style, room, maxLines)
+    }
 
     override fun render(canvas: AppCanvas) {
         lines(canvas, width).forEachIndexed { i, line ->
             val w = canvas.measure(line, style)
             val x = when (align) {
-                Align.START -> 0f
+                Align.START -> inset
                 Align.CENTER -> (width - w) / 2f
-                Align.END -> width - w
+                Align.END -> width - inset - w
             }
             canvas.drawText(line, x, i * style.lineHeight, style, color)
         }
@@ -52,16 +60,23 @@ class IconView(var icon: Icon) : Widget() {
 }
 
 /**
- * A 1 dp divider (art direction 8.7) at the top of the widget, across its width; with [inset], it starts at x 56, as
- * between rows that have an avatar or icon.
+ * A 1 dp divider (art direction 8.7) at the top of the widget, from [start] to its right edge: full width between
+ * sections; from x 12 ([Spacing.SCREEN_PADDING]) under rows without a leading element, from x 56
+ * ([Spacing.CONTENT_X]) under rows with an avatar or an icon, as a [ListRow]'s own divider does. 256 dp wide unless
+ * told otherwise.
+ *
+ * ```kotlin
+ * add(Divider().apply { start = Spacing.SCREEN_PADDING }.at(0f, 193f))
+ * ```
  */
 class Divider : Widget() {
-    var inset = false
+    /** Where the line starts, in dp from the widget's left edge: 0 by default. */
+    var start = 0f
 
     override val preferredWidth get() = 256f
     override val preferredHeight get() = 1f
 
-    override fun render(canvas: AppCanvas) = canvas.hairline(if (inset) Spacing.CONTENT_X else 0f, width, 0f)
+    override fun render(canvas: AppCanvas) = canvas.hairline(start, width, 0f)
 }
 
 /**
@@ -70,15 +85,19 @@ class Divider : Widget() {
  * - With a title only: 48 dp, the title in [TextStyle.BODY_STRONG].
  * - With a [subtitle]: 56 dp, the subtitle in grey under the title.
  * - [leading]: a 32 dp [Avatar] or an [IconView] (20 dp), in a 32 dp box at x 12; the text then starts at x 56.
- * - [trailing]: a [Toggle], an [IconView] of [Icon.CHEVRON], or a grey [Label], right-aligned at x 244.
+ * - [trailing]: a [Toggle], an [IconView] of [Icon.CHEVRON], or a [Label], right-aligned at x 244. Give a chevron
+ *   [Colors.TEXT_2] and a label [TextStyle.CAPTION] in [Colors.TEXT_2], as art direction 8.7 draws them: the row
+ *   shows them as they are.
  *
  * A row with a trailing toggle and no [onClick] of its own is a setting's row: it owns the toggle. A click anywhere on
  * the row, the toggle included, switches it; the row lights up as one, and is one Tab stop (Space switches). With an
  * [onClick], the row opens something and the toggle is a target of its own: a click on the toggle switches it, a click
  * elsewhere runs [onClick], and Tab stops at the row, then at the toggle.
  *
- * The row lights up under the pointer and when pressed; it ends with a divider (from x 56 with a leading element)
- * unless [divider] is false.
+ * The row lights up under the pointer and when pressed. Its [divider] is its own last dp row, inside its 48 or 56 dp,
+ * from x 56 with a leading element and x 12 without. Rows stacked in a [ScrollList] want just that. Rows that must
+ * stand 49 dp apart with the line between them (Settings, art direction 12) set [divider] to false and get a [Divider]
+ * under each.
  */
 class ListRow(var title: String) : Clickable(), ToggleOwner {
     /** A row that runs [onClick] when clicked. */
@@ -86,7 +105,10 @@ class ListRow(var title: String) : Clickable(), ToggleOwner {
         this.onClick = onClick
     }
 
+    /** A grey line under the title; the row is then 56 dp tall. */
     var subtitle: String? = null
+
+    /** Whether the row draws its own divider on its last dp row (see above). */
     var divider = true
 
     var leading: Widget? = null

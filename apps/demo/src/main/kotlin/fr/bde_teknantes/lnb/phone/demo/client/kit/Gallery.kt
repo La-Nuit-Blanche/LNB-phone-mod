@@ -27,6 +27,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
 import fr.bde_teknantes.lnb.phone.api.client.ui.SegmentedControl
 import fr.bde_teknantes.lnb.phone.api.client.ui.SkeletonPost
 import fr.bde_teknantes.lnb.phone.api.client.ui.Spacer
+import fr.bde_teknantes.lnb.phone.api.client.ui.Spacing
 import fr.bde_teknantes.lnb.phone.api.client.ui.Spinner
 import fr.bde_teknantes.lnb.phone.api.client.ui.SpinnerRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Tabs
@@ -251,7 +252,7 @@ object Gallery {
         }, 12f, 8f, 4f))
         list.add(Divider())
         list.add(Spacer(16f))
-        list.add(Divider().apply { inset = true })
+        list.add(Divider().apply { start = Spacing.CONTENT_X })
     }
 
     /** A label with padding, as a list row. */
