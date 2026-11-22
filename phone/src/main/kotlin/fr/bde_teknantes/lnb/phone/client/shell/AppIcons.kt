@@ -48,7 +48,8 @@ internal object AppIcons : ResourceManagerReloadListener {
         try {
             val resource = Minecraft.getInstance().resourceManager.getResource(location).orElse(null)
                 ?: throw IllegalStateException("no such resource")
-            NativeImage.read(resource.open()).use { image ->
+            // NativeImage.read leaves the stream open: closed here, or each reload would leak (and lock) the file.
+            resource.open().use(NativeImage::read).use { image ->
                 if (image.width < IconComposer.GLYPH_SIZE || image.height < IconComposer.GLYPH_SIZE) {
                     throw IllegalStateException("${image.width} x ${image.height} pixels, smaller than 16 x 16")
                 }
