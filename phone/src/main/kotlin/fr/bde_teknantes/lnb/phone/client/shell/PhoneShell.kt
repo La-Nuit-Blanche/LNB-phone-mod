@@ -1,32 +1,44 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
-import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.NavigationListener
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.apps.Transition
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettings
-import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.resources.ResourceLocation
 import org.lwjgl.glfw.GLFW
 import kotlin.math.floor
 
+/** The phone in the game. */
+internal object PhoneShell : PhoneShellCore(MinecraftShellHost) {
+    /**
+     * Draws the phone if it is out. [interactive] when the phone's screen has the mouse: hover states follow
+     * ([mouseX], [mouseY]), window GUI px.
+     */
+    fun render(graphics: GuiGraphics, interactive: Boolean, mouseX: Double, mouseY: Double) {
+        val now = now()
+        val pose = currentPose(now) ?: return
+        ShellRenderer.render(graphics, pose, now, if (interactive && state == PhoneShellCore.State.OPEN) Pointer(mouseX, mouseY) else null)
+    }
+}
+
 /**
  * The phone as the player sees it: put away, sliding up, open, sliding down; where the device stands; what the
- * viewport is animating; what the pointer is pressing. It drives the [PhoneNavigator] and listens to it.
+ * viewport is animating; what the pointer is pressing. It drives the [PhoneNavigator] and listens to it. What it needs
+ * from the game comes through [host], so that tests can run it without one.
  *
  * The device only takes the mouse once it has finished sliding up (art direction 17, P-1): while it moves, the game
- * keeps the mouse and the device is drawn over the HUD; once it stands, [PhoneScreen] opens, frees the cursor and
+ * keeps the mouse and the device is drawn over the HUD; once it stands, the phone's screen opens, frees the cursor and
  * stops the player. Closing gives the mouse back at once and the device slides down over the HUD.
  *
  * Client thread only.
  */
-internal object PhoneShell : NavigationListener {
+internal open class PhoneShellCore(private val host: ShellHost) : NavigationListener {
     enum class State { CLOSED, OPENING, OPEN, CLOSING }
 
-    private val navigator: PhoneNavigator get() = LnbPhoneClient.navigator
+    private val navigator: PhoneNavigator get() = host.navigator
 
     var state = State.CLOSED
         private set
@@ -75,7 +87,7 @@ internal object PhoneShell : NavigationListener {
 
     fun init() {
         navigator.addListener(this)
-        LnbPhoneClient.settings.addListener(::onSettingsChanged)
+        host.settings.addListener(::onSettingsChanged)
     }
 
     // ---- Opening and closing ----
@@ -88,17 +100,16 @@ internal object PhoneShell : NavigationListener {
      */
     fun open(returnTo: Screen? = null) {
         if (state == State.OPEN || state == State.OPENING) return
-        val mc = Minecraft.getInstance()
-        if (mc.player == null) return
+        if (!host.inWorld) return
         this.returnTo = returnTo
-        if (mc.screen != null) mc.setScreen(null)
+        if (host.screen != null) host.setScreen(null)
         val now = now()
         val from = if (state == State.CLOSING) currentPose(now) else null
         val target = restingPose()
         slide = DeviceSlide.open(from ?: DevicePose(target.x, guiHeight(), 0f), now)
         state = State.OPENING
         navigator.open()
-        PhoneSounds.open()
+        host.play(ShellSound.OPEN)
     }
 
     /** Puts the phone away: it slides down, and the next [open] shows the same screen. */
@@ -128,13 +139,13 @@ internal object PhoneShell : NavigationListener {
         slide = DeviceSlide.close(currentPose(now) ?: restingPose().let { DevicePose(it.x, guiHeight(), 0f) }, now)
         state = State.CLOSING
         clearPointer()
-        PhoneSounds.close()
-        val mc = Minecraft.getInstance()
+        host.play(ShellSound.CLOSE)
+        val screen = host.screen
         val back = returnTo
         returnTo = null
         // State first: the phone screen's removed() then knows the shell closed it. Closed while still rising, the
         // phone has no screen yet, but the one it was opened from comes back all the same.
-        if (mc.screen is PhoneScreen || (mc.screen == null && back != null)) mc.setScreen(back)
+        if (host.isPhoneScreen(screen) || (screen == null && back != null)) host.setScreen(back)
     }
 
     /** The phone's screen was replaced by another one (death screen, another mod's screen): put away at once. */
@@ -152,27 +163,25 @@ internal object PhoneShell : NavigationListener {
 
     fun tick() {
         ticks++
-        PhoneSounds.tick()
-        val mc = Minecraft.getInstance()
-        if (state != State.CLOSED && mc.player == null) reset()
-        while (PhoneKeys.OPEN.consumeClick()) {
-            if (mc.screen == null && mc.player != null) toggle()
+        if (state != State.CLOSED && !host.inWorld) reset()
+        while (host.consumePhoneKeyClick()) {
+            if (host.screen == null && host.inWorld) toggle()
         }
         updateCounts()
-        if (heldProgress == null) finishAnimations(mc)
+        if (heldProgress == null) finishAnimations()
         if (navigator.isOpen && appsSupported()) navigator.tick()
     }
 
-    private fun finishAnimations(mc: Minecraft) {
+    private fun finishAnimations() {
         val now = ticks.toFloat()
         if (screenSlide?.isDone(now) == true) clearSlide()
         val current = slide ?: return
         if (!current.isDone(now)) return
         slide = null
         when (state) {
-            State.OPENING -> if (mc.screen == null) {
+            State.OPENING -> if (host.screen == null) {
                 state = State.OPEN
-                mc.setScreen(PhoneScreen())
+                host.setScreen(host.createPhoneScreen())
             } else {
                 // Something else took the screen while the phone rose (the pause menu, the inventory): stand down.
                 state = State.CLOSED
@@ -185,7 +194,7 @@ internal object PhoneShell : NavigationListener {
     }
 
     private fun updateCounts() {
-        for (app in LnbPhoneClient.apps.apps) {
+        for (app in host.apps.apps) {
             val count = PhoneBadges.count(app.id)
             val before = counts.put(app.id, count) ?: 0
             if (count > before) pulseStart[app.id] = ticks
@@ -194,14 +203,14 @@ internal object PhoneShell : NavigationListener {
 
     // ---- Where the device is ----
 
-    fun now(): Float = ticks + Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true)
+    fun now(): Float = ticks + host.partialTick
 
-    internal fun guiWidth() = Minecraft.getInstance().window.guiScaledWidth
+    internal fun guiWidth() = host.guiWidth
 
-    internal fun guiHeight() = Minecraft.getInstance().window.guiScaledHeight
+    internal fun guiHeight() = host.guiHeight
 
     /** Where the device stands when open, in the current placement and window. */
-    private fun restingPose(placement: Placement = LnbPhoneClient.settings.current.placement): DevicePose {
+    private fun restingPose(placement: Placement = host.settings.current.placement): DevicePose {
         val position = PhoneLayout.devicePosition(placement, guiWidth(), guiHeight())
         return DevicePose(position.x, position.y, PhoneLayout.scrimAmount(placement))
     }
@@ -243,7 +252,7 @@ internal object PhoneShell : NavigationListener {
     override fun onPhoneClosed() {
         // An app put the phone away (Phone.close). Not from inside the navigator's callback: on the next frame.
         if (state == State.OPEN || state == State.OPENING) {
-            Minecraft.getInstance().tell {
+            host.later {
                 if ((state == State.OPEN || state == State.OPENING) && !navigator.isOpen) startClosing()
             }
         }
@@ -257,13 +266,13 @@ internal object PhoneShell : NavigationListener {
     // ---- Input from the phone's screen ----
 
     /** Whether apps can be shown: not at GUI scale 1, where 1 dp would be half a pixel (art direction 8.1). */
-    fun appsSupported(): Boolean = Minecraft.getInstance().window.guiScale >= 2.0
+    fun appsSupported(): Boolean = host.guiScale >= 2.0
 
     private fun showsApp() = !navigator.isHome && appsSupported()
 
     fun mouseClicked(x: Double, y: Double, button: Int): Boolean {
         val pose = currentPose() ?: return false
-        if (PhoneKeys.OPEN.matchesMouse(button)) {
+        if (host.isPhoneMouseButton(button)) {
             close()
             return true
         }
@@ -305,7 +314,7 @@ internal object PhoneShell : NavigationListener {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && homeButtonHeld) {
             homeButtonHeld = false
             if (Device.inHomeButton(floor(dx).toInt(), floor(dy).toInt())) {
-                PhoneSounds.tap()
+                host.play(ShellSound.TAP)
                 navigator.home()
             }
         }
@@ -317,9 +326,9 @@ internal object PhoneShell : NavigationListener {
             } else {
                 null
             }
-            val app = LnbPhoneClient.apps.apps.getOrNull(pressed)
+            val app = host.apps.apps.getOrNull(pressed)
             if (under == pressed && app != null && navigator.isHome) {
-                PhoneSounds.tap()
+                host.play(ShellSound.TAP)
                 navigator.openApp(app)
             }
         }
@@ -356,7 +365,7 @@ internal object PhoneShell : NavigationListener {
             // The app closes its menu or dialog on Esc and keeps the key; otherwise Esc puts the phone away (2.3).
             keyCode == GLFW.GLFW_KEY_ESCAPE -> if (!used) close()
             // While a text field has the focus, the phone key and Backspace belong to it.
-            PhoneKeys.OPEN.matches(keyCode, scanCode) -> if (!used && !textFocus) close()
+            host.isPhoneKey(keyCode, scanCode) -> if (!used && !textFocus) close()
             keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus) navigator.back()
             else -> return used
         }
@@ -379,7 +388,7 @@ internal object PhoneShell : NavigationListener {
 
     private fun dpY(y: Double, pose: DevicePose) = ((y - pose.y - Device.VIEWPORT_Y) * 2).toFloat()
 
-    internal fun appCount() = LnbPhoneClient.apps.apps.size
+    internal fun appCount() = host.apps.apps.size
 
     /** The home page shown, kept inside the pages there are. */
     internal fun page(): Int = page.coerceIn(0, HomeGrid.pageCount(appCount()) - 1)
@@ -391,18 +400,6 @@ internal object PhoneShell : NavigationListener {
     internal fun homeButtonPressedShown(now: Float): Boolean {
         if (homeButtonShown && !homeButtonHeld && now >= homeButtonStart + Motion.PRESS_MIN_TICKS) homeButtonShown = false
         return homeButtonShown
-    }
-
-    // ---- Drawing ----
-
-    /**
-     * Draws the phone if it is out. [interactive] when the phone's screen has the mouse: hover states follow
-     * ([mouseX], [mouseY]), window GUI px.
-     */
-    fun render(graphics: GuiGraphics, interactive: Boolean, mouseX: Double, mouseY: Double) {
-        val now = now()
-        val pose = currentPose(now) ?: return
-        ShellRenderer.render(graphics, pose, now, if (interactive && state == State.OPEN) Pointer(mouseX, mouseY) else null)
     }
 }
 

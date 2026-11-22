@@ -9,6 +9,7 @@ import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
@@ -53,7 +54,10 @@ object LnbPhoneClient {
                 if (Minecraft.getInstance().screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
             }
         }
-        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) { PhoneShell.tick() }
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {
+            PhoneSounds.tick()
+            PhoneShell.tick()
+        }
         NeoForge.EVENT_BUS.addListener(RenderGuiLayerEvent.Pre::class.java) { event ->
             // Other screens hide the crosshair under their dark background; the phone keeps the world clear, so it
             // hides it itself while the cursor is free.

@@ -5,6 +5,7 @@ import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
 import fr.bde_teknantes.lnb.phone.client.shell.Device
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneShellCore
 import fr.bde_teknantes.lnb.phone.client.shell.Placement
 import fr.bde_teknantes.lnb.phone.client.shell.ShellRenderer
 import net.minecraft.resources.ResourceLocation
@@ -43,10 +44,10 @@ object CaptureHooks {
     }
 
     /** Whether the phone stands open with its screen (the slide up is over). */
-    val isOpen: Boolean get() = PhoneShell.state == PhoneShell.State.OPEN
+    val isOpen: Boolean get() = PhoneShell.state == PhoneShellCore.State.OPEN
 
     /** Whether the phone is put away (the slide down is over). */
-    val isClosed: Boolean get() = PhoneShell.state == PhoneShell.State.CLOSED
+    val isClosed: Boolean get() = PhoneShell.state == PhoneShellCore.State.CLOSED
 
     /** The device's top-left corner in window GUI px as `[x, y]`, or null while it is away. */
     fun devicePosition(): IntArray? = PhoneShell.currentPose()?.let { intArrayOf(it.x, it.y) }
