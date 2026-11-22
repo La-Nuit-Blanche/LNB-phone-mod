@@ -11,6 +11,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import net.neoforged.fml.ModList
 import net.neoforged.neoforge.server.ServerLifecycleHooks
 import java.util.UUID
 
@@ -201,6 +202,11 @@ object PhoneNotifications {
     /** A notification checked and limited in the caller's thread, ready for the server thread. */
     private class Request(val appId: ResourceLocation, title: Component, text: Component, target: String?) {
         val target: String? = NotificationLimits.checkAddress(appId, target)
+
+        init {
+            NotificationLimits.checkSender(appId) { ModList.get().isLoaded(it) }
+        }
+
         val title: Component = NotificationLimits.title(title)
         val text: Component = NotificationLimits.text(text)
     }

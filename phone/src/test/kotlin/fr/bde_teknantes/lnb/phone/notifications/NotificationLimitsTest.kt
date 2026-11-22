@@ -406,4 +406,15 @@ class NotificationLimitsTest {
         assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkTarget("") }
         assertEquals("thread:1", NotificationLimits.checkTarget("thread:1"))
     }
+
+    @Test
+    fun `only an app id in a loaded mod's namespace may send`() {
+        val loaded = setOf("lnbfeed", "minecraft", "neoforge")
+        NotificationLimits.checkSender(ResourceLocation.fromNamespaceAndPath("lnbfeed", "feed")) { it in loaded }
+        for (namespace in listOf("other", "minecraft", "neoforge")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                NotificationLimits.checkSender(ResourceLocation.fromNamespaceAndPath(namespace, "feed")) { it in loaded }
+            }
+        }
+    }
 }

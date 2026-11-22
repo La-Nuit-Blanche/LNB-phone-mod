@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.notifications
 
+import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.AppTarget
 import fr.bde_teknantes.lnb.phone.api.PhoneNotifications
 import fr.bde_teknantes.lnb.phone.notifications.server.ServerThread
@@ -123,7 +124,8 @@ class ServerThreadTest {
 
     // ---- The public API, without a server ----
 
-    private val feed = ResourceLocation.fromNamespaceAndPath("test", "feed")
+    // In the phone's namespace: send only takes app ids of loaded mods, and the phone is loaded in tests.
+    private val feed = ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "feed")
 
     @Test
     fun `bad arguments throw in the caller's thread, even without a server`() {
@@ -140,6 +142,12 @@ class ServerThreadTest {
         assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearTargetForEveryone(feed, long) }
         assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.sendToEveryone(feed, Component.empty(), Component.empty(), long) }
         assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(listOf(player), longApp, Component.empty(), Component.empty()) }
+        // An app id outside the namespace of a loaded mod can't send, whatever the form.
+        for (id in listOf("test:feed", "minecraft:feed", "neoforge:feed").map(ResourceLocation::parse)) {
+            assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(player, id, Component.empty(), Component.empty()) }
+            assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(listOf(player), id, Component.empty(), Component.empty(), "t") }
+            assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.sendToEveryone(id, Component.empty(), Component.empty()) }
+        }
     }
 
     @Test

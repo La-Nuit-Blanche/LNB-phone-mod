@@ -49,6 +49,22 @@ object NotificationLimits {
         }
     }
 
+    /** Namespaces that are loaded mods but never phone apps. */
+    private val NOT_APPS = setOf("minecraft", "neoforge")
+
+    /**
+     * Checks that [appId] can be a phone app's on this server: its namespace must be a loaded mod
+     * ([isLoadedMod]), and not Minecraft or NeoForge. Phone apps register on the client only, so the server can't
+     * know an app's exact id; but an app is a mod required on both sides, so its namespace is loaded here. This keeps
+     * an app id built from player input in a namespace of its own from getting a share of the player's slots of its
+     * own ([NotificationList]). Throws [IllegalArgumentException] otherwise.
+     */
+    fun checkSender(appId: ResourceLocation, isLoadedMod: (String) -> Boolean) {
+        require(appId.namespace !in NOT_APPS && isLoadedMod(appId.namespace)) {
+            "App id $appId isn't in the namespace of a loaded mod: use your mod id as the namespace of your app's id"
+        }
+    }
+
     /**
      * Checks [appId] and the [target] of a notification being sent: throws [IllegalArgumentException] when one is too
      * long. An empty target counts as none (the notification opens the app's first screen).
