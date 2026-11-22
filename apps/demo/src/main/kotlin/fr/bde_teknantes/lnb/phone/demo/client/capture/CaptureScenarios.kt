@@ -17,6 +17,7 @@ object CaptureScenarios {
     private val scenarios: Map<String, () -> CaptureScript> = linkedMapOf(
         "smooth" to ::smooth,
         "kit" to { kit(2..4) },
+        "kit-phone" to KitPhoneScenario::script,
         "banner" to ::banner,
         "shell" to ShellScenarios::shell,
         "shell-pages" to ShellScenarios::shellPages,

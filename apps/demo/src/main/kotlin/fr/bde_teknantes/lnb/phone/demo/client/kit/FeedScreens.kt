@@ -62,6 +62,20 @@ class FeedScreen(
     /** The cards shown, for capture scripts. */
     val cards = ArrayList<PostCard>()
 
+    override fun onScreenShown() {
+        current = this
+    }
+
+    override fun onScreenHidden() {
+        if (current === this) current = null
+    }
+
+    companion object {
+        /** The feed while it is the screen shown, for capture scripts. */
+        var current: FeedScreen? = null
+            private set
+    }
+
     init {
         fill()
     }

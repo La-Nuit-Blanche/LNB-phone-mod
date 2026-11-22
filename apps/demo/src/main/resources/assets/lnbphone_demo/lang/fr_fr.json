@@ -66,5 +66,6 @@
   "app.lnbphone_demo.sample.quests": "Quêtes",
   "app.lnbphone_demo.sample.settings": "Réglages",
   "app.lnbphone_demo.sample.map": "Carte",
-  "app.lnbphone_demo.sample.filler": "Appli %s"
+  "app.lnbphone_demo.sample.filler": "Appli %s",
+  "app.lnbphone_demo.feed_sample": "Feed (exemple)"
 }

@@ -89,6 +89,23 @@ object KitPages {
  * there. Its screens are the same ones the capture harness shows side by side.
  */
 class KitIndexScreen : KitScreen() {
+    /** Opens page [index] of [KitPages.all], as a click on its row does: for capture scripts. */
+    fun open(index: Int) = phone.push(KitPages.all[index].create())
+
+    override fun onScreenShown() {
+        current = this
+    }
+
+    override fun onScreenHidden() {
+        if (current === this) current = null
+    }
+
+    companion object {
+        /** The index while it is the screen shown, for capture scripts. */
+        var current: KitIndexScreen? = null
+            private set
+    }
+
     init {
         add(Header(I18n.get("app.lnbphone_demo.kit")).at(0f, 0f))
         val list = add(ScrollList().at(0f, 44f, 256f, 326f))
