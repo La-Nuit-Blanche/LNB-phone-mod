@@ -176,4 +176,25 @@ class SettingsScreenStoreTest {
             heard,
         )
     }
+
+    @Test
+    fun `a file that can't be read for a moment under the open screen is left alone, not set aside`() {
+        store("bob").update { it.copy(sounds = false) }
+        val disk = RefusingDisk()
+        val here = PhoneSettingsStore(file, disk) { "alice" }
+        val s = open(here)
+        val before = Files.readAllBytes(file)
+
+        disk.refuseReads = true
+        s.click(CENTRE_X, CENTRE_Y)
+        s.tick(4)
+        assertEquals(Triple(1, true, true), s.shown)
+        assertArrayEquals(before, Files.readAllBytes(file))
+        assertEquals(listOf(file), dir.listDirectoryEntries())
+
+        disk.refuseReads = false
+        s.click(TOGGLE_X, SOUNDS_Y)
+        assertEquals(PhoneSettings(Placement.CENTRE, sounds = false), store().current)
+        assertEquals(PhoneSettings(sounds = false), store("bob").current)
+    }
 }

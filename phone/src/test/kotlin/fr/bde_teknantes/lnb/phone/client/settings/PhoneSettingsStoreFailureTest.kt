@@ -105,6 +105,63 @@ class PhoneSettingsStoreFailureTest {
     }
 
     @Test
+    fun `a file that can't be read for a moment is neither set aside nor rewritten, and the change waits for the next save`() {
+        store("bob").update { it.copy(placement = Placement.CENTRE) }
+        val store = store()
+        store.update { it.copy(preview = false) }
+        val before = Files.readAllBytes(file)
+        val heard = heard(store)
+
+        disk.refuseReads = true
+        store.update { it.copy(sounds = false) }
+        assertEquals(PhoneSettings(sounds = false, preview = false), store.current)
+        assertEquals(listOf(PhoneSettings(preview = false) to PhoneSettings(sounds = false, preview = false)), heard)
+        assertArrayEquals(before, Files.readAllBytes(file))
+        assertEquals(listOf(file), dir.listDirectoryEntries(), "nothing set aside, no temporary file")
+
+        disk.refuseReads = false
+        store.update { it.copy(placement = Placement.CENTRE) }
+        assertEquals(PhoneSettings(Placement.CENTRE, sounds = false, preview = false), onDisk())
+        assertEquals(PhoneSettings(Placement.CENTRE), onDisk("bob"), "the other account kept")
+        assertEquals(listOf(file), dir.listDirectoryEntries())
+    }
+
+    @Test
+    fun `a file that can't be read on first use shows the defaults, and the first change keeps everything in it`() {
+        store("bob").update { it.copy(sounds = false) }
+        store().update { it.copy(placement = Placement.CENTRE) }
+        val before = Files.readAllBytes(file)
+
+        disk.refuseReads = true
+        val store = store()
+        assertEquals(PhoneSettings(), store.current)
+        assertArrayEquals(before, Files.readAllBytes(file))
+
+        disk.refuseReads = false
+        val heard = heard(store)
+        store.update { it.copy(preview = false) }
+        // What the file held comes back with the change, and the phone hears it.
+        assertEquals(PhoneSettings(Placement.CENTRE, preview = false), store.current)
+        assertEquals(listOf(PhoneSettings() to PhoneSettings(Placement.CENTRE, preview = false)), heard)
+        assertEquals(PhoneSettings(Placement.CENTRE, preview = false), onDisk())
+        assertEquals(PhoneSettings(sounds = false), onDisk("bob"))
+        assertEquals(listOf(file), dir.listDirectoryEntries())
+    }
+
+    @Test
+    fun `a file read in full that isn't text is still set aside as broken`() {
+        val garbage = byteArrayOf(0x7B, 0xFF.toByte(), 0xFE.toByte(), 0x00, 0x7D)
+        Files.write(file, garbage)
+        val store = store()
+        assertEquals(PhoneSettings(), store.current)
+        store.update { it.copy(sounds = false) }
+        assertEquals(PhoneSettings(sounds = false), onDisk())
+        val aside = dir.listDirectoryEntries().filter { it != file }
+        assertEquals(1, aside.size)
+        assertArrayEquals(garbage, Files.readAllBytes(aside.single()))
+    }
+
+    @Test
     fun `nothing is written while nothing changes, even with a change waiting`() {
         val store = store()
         disk.refuseWrites = true

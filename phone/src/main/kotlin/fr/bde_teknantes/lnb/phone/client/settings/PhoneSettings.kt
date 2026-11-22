@@ -6,6 +6,8 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.client.shell.Placement
+import java.io.IOException
+import java.nio.charset.CharacterCodingException
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.util.EnumSet
@@ -35,8 +37,9 @@ internal data class PhoneSettings(
  * kept.
  *
  * A change the player made stays in effect for the session until it reaches the disk, and reaches it at the next save
- * that succeeds: a file that can't be written for a moment (a sync client holding it, a read-only copy, a full disk)
- * costs nothing but the delay. A file that can't be read is moved aside before it is replaced, so nobody's settings
+ * that succeeds: a file that can't be written or read for a moment (a sync client holding it, a read-only copy, a full
+ * disk) is left exactly as it is meanwhile. (If it can't be read on first use, the defaults show until the next change
+ * reads it.) A file that can be read but not understood is moved aside before it is replaced, so nobody's settings
  * are lost to a stray edit.
  *
  * The one place the shell, the notification banner and the Settings app read and write settings. Client thread only.
@@ -90,12 +93,14 @@ internal class PhoneSettingsStore(
 
     /**
      * Writes every unsaved field into the file as it is now and takes the result as what this game holds: the file's
-     * other entries and fields, which another game may have changed, with this session's changes on top.
+     * other entries and fields, which another game may have changed, with this session's changes on top. When the file
+     * can't be read right now, nothing is written and the changes wait for the next save.
      */
     private fun save() {
         val root = when (val found = read()) {
             is Read.Found -> found.root
             Read.Missing -> JsonObject()
+            Read.Unavailable -> return
             Read.Broken -> {
                 moveAside()
                 JsonObject()
@@ -119,20 +124,35 @@ internal class PhoneSettingsStore(
     private sealed interface Read {
         class Found(val root: JsonObject) : Read
 
+        /** No file yet. */
         data object Missing : Read
 
+        /** The file is there but couldn't be read just now: leave it alone. */
+        data object Unavailable : Read
+
+        /** The file was read but isn't settings: it may be set aside and replaced. */
         data object Broken : Read
     }
 
     // A missing or broken file costs the settings, never the game: the defaults stand in.
     private fun read(): Read {
-        return try {
-            val root = JsonParser.parseString(disk.read(file))
-            if (root.isJsonObject) Read.Found(root.asJsonObject) else Read.Broken
+        val text = try {
+            disk.read(file)
         } catch (e: NoSuchFileException) {
-            Read.Missing
+            return Read.Missing
+        } catch (e: CharacterCodingException) {
+            // Read in full, but not text: that is the content's fault, not the disk's.
+            LnbPhone.LOGGER.warn("The phone settings in {} aren't UTF-8 text; using the defaults", file, e)
+            return Read.Broken
+        } catch (e: IOException) {
+            LnbPhone.LOGGER.warn("Couldn't read the phone settings in {} just now; leaving the file as it is", file, e)
+            return Read.Unavailable
+        }
+        return try {
+            val root = JsonParser.parseString(text)
+            if (root.isJsonObject) Read.Found(root.asJsonObject) else Read.Broken
         } catch (e: Exception) {
-            LnbPhone.LOGGER.warn("Couldn't read the phone settings in {}; using the defaults", file, e)
+            LnbPhone.LOGGER.warn("Couldn't understand the phone settings in {}; using the defaults", file, e)
             Read.Broken
         }
     }
