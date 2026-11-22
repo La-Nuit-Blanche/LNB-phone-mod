@@ -19,9 +19,14 @@ internal object SmoothTextures : ResourceManagerReloadListener {
     fun find(namespace: String, path: String, guiScale: Int): ResourceLocation =
         cache.getOrPut(Key(namespace, path, guiScale)) {
             val resources = Minecraft.getInstance().resourceManager
-            val candidates = candidates(guiScale).map { location(namespace, it, path) }
-            candidates.firstOrNull { resources.getResource(it).isPresent } ?: candidates.first()
+            location(namespace, choose(guiScale) { resources.getResource(location(namespace, it, path)).isPresent }, path)
         }
+
+    /** The density folder to load for [guiScale]: the best one that [exists], or the ideal one when none does. */
+    fun choose(guiScale: Int, exists: (folder: String) -> Boolean): String {
+        val candidates = candidates(guiScale)
+        return candidates.firstOrNull(exists) ?: candidates.first()
+    }
 
     /** Density folders to try for [guiScale], best first. Plain logic, for tests. */
     fun candidates(guiScale: Int): List<String> {
