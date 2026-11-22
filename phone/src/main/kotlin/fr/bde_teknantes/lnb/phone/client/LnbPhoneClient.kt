@@ -4,6 +4,7 @@ import fr.bde_teknantes.lnb.phone.client.apps.AppRegistration
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
+import fr.bde_teknantes.lnb.phone.client.ui.SmoothTextures
 import net.minecraft.client.Minecraft
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
@@ -23,7 +24,11 @@ object LnbPhoneClient {
     fun init(modBus: IEventBus) {
         modBus.addListener(::onClientSetup)
         // The smooth layer's fonts and atlas come from resources: drop them when resource packs change.
-        modBus.addListener(RegisterClientReloadListenersEvent::class.java) { it.registerReloadListener(SmoothResources) }
+        modBus.addListener(RegisterClientReloadListenersEvent::class.java) {
+            it.registerReloadListener(SmoothResources)
+            // Which densities of the kit's icons exist may change with resource packs.
+            it.registerReloadListener(SmoothTextures)
+        }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
     }
 

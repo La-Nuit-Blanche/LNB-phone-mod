@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.client.apps
 
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
+import fr.bde_teknantes.lnb.phone.api.client.FakeCanvas
 import fr.bde_teknantes.lnb.phone.api.client.AppIcon
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.api.client.AppTargetScreens
@@ -23,10 +24,7 @@ internal fun testApp(
     targets?.let { create -> AppTargetScreens { create(it) } },
 ) { root() }
 
-internal object TestCanvas : AppCanvas {
-    override val width = AppCanvas.WIDTH
-    override val height = AppCanvas.HEIGHT
-}
+internal object TestCanvas : FakeCanvas()
 
 /** Writes each lifecycle call to [log] as `name:event`; [onEvent] lets a test act from inside a callback. */
 internal open class RecordingScreen(
