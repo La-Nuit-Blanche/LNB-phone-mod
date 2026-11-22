@@ -244,4 +244,51 @@ class NotificationServiceTest {
         for (id in ids.take(10)) service.clientDismissed(host, alice, id)
         assertEquals(1, store.of(alice).size)
     }
+
+    // ---- The backstop against an app that loops ----
+
+    @Test
+    fun `one mod may send one player 20 at once, then one every 3 seconds`() {
+        repeat(NotificationService.APP_BURST) { assertEquals(1, service.send(host, listOf(alice), feed, title, text, null)) }
+        assertEquals(0, service.send(host, listOf(alice), feed, title, text, null))
+        assertEquals(NotificationService.APP_BURST, store.of(alice).size)
+        clock += 2_999
+        assertEquals(0, service.send(host, listOf(alice), feed, title, text, null))
+        clock += 1
+        assertEquals(1, service.send(host, listOf(alice), feed, title, text, null))
+    }
+
+    @Test
+    fun `the backstop is per player and per mod, so a flood stops nobody else`() {
+        val quests = ResourceLocation.fromNamespaceAndPath("quests", "quests")
+        repeat(30) { service.send(host, listOf(alice), feed, title, text, null) }
+        // The same mod under another path shares the allowance.
+        assertEquals(0, service.send(host, listOf(alice), mail, title, text, null))
+        // Another mod for the same player, and the same mod for another player, are untouched.
+        assertEquals(1, service.send(host, listOf(alice), quests, title, text, null))
+        assertEquals(2, service.send(host, listOf(alice, bob), quests, title, text, null))
+        assertEquals(1, store.of(bob).size)
+        // A broadcast skips only the players over the limit.
+        assertEquals(1, service.send(host, listOf(alice, carol), feed, title, text, null))
+        assertEquals(1, store.of(carol).size)
+    }
+
+    @Test
+    fun `an announcement and a reply in the same second both arrive`() {
+        host.online += alice
+        service.sendToEveryone(host, feed, Component.literal("New announcement"), text, null)
+        service.send(host, listOf(alice), feed, Component.literal("New reply"), text, "thread:1")
+        assertEquals(listOf("New announcement", "New reply"), store.of(alice).map { it.title.string })
+        assertEquals(2, host.sentTo(alice).size)
+    }
+
+    @Test
+    fun `allowances that filled up again are forgotten`() {
+        repeat(NotificationService.APP_BURST) { service.send(host, listOf(alice), feed, title, text, null) }
+        clock += 60_000
+        service.resync(host)
+        // A fresh allowance: a burst of 20 again, not 20 plus what built up.
+        repeat(NotificationService.APP_BURST) { assertEquals(1, service.send(host, listOf(alice), feed, title, text, null)) }
+        assertEquals(0, service.send(host, listOf(alice), feed, title, text, null))
+    }
 }

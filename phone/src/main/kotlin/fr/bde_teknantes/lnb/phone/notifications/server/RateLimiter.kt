@@ -24,13 +24,24 @@ class RateLimiter<K>(
         val elapsed = (now - bucket.at).coerceAtLeast(0L)
         bucket.tokens = minOf(burst.toDouble(), bucket.tokens + elapsed * perSecond / 1000.0)
         bucket.at = now
-        if (bucket.tokens < 1.0) return false
-        bucket.tokens -= 1.0
+        // A rate like 1/3 a second can't be written exactly: 3000 ms of it make 0.999...; a hair of slack counts it whole.
+        if (bucket.tokens < 1.0 - EPSILON) return false
+        bucket.tokens = (bucket.tokens - 1.0).coerceAtLeast(0.0)
         return true
+    }
+
+    /** Forgets the keys whose bucket has filled up again: they act as a new key would, and take no memory. */
+    fun forgetIdle() {
+        val now = clock()
+        buckets.values.removeIf { it.tokens + (now - it.at).coerceAtLeast(0L) * perSecond / 1000.0 >= burst - EPSILON }
     }
 
     /** Forgets [key] (the player left). */
     fun forget(key: K) {
         buckets.remove(key)
+    }
+
+    private companion object {
+        const val EPSILON = 1e-9
     }
 }
