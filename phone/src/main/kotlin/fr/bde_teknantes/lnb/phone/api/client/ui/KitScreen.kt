@@ -462,19 +462,24 @@ abstract class KitScreen : AppScreen() {
     private fun saveSnackbar() {
         val session = host?.session ?: return
         val s = snackbar?.takeIf { it.isShowing(now) }
-        if (s == null) handedOver.remove(session) else handedOver[session] = s.saved(now)
+        if (s == null) handedOver.remove(session) else handedOver[session] = Handover(s.saved(now), System.nanoTime())
         dismissSnackbar()
     }
 
     private fun restoreSnackbar() {
         val session = host?.session ?: return
-        val saved = handedOver.remove(session) ?: return
+        val handover = handedOver.remove(session) ?: return
+        // Handed to the next screen at once (a pop, a push); not brought back long after, when the phone reopens.
+        if (System.nanoTime() - handover.at > HANDOVER_NANOS) return
         dismissSnackbar()
-        snackbar = overlays.add(0, Snackbar.restore(saved, now))
+        snackbar = overlays.add(0, Snackbar.restore(handover.snackbar, now))
     }
 
+    private class Handover(val snackbar: Snackbar.Saved, val at: Long)
+
     private companion object {
-        val handedOver = WeakHashMap<Any, Snackbar.Saved>()
+        const val HANDOVER_NANOS = 1_000_000_000L
+        val handedOver = WeakHashMap<Any, Handover>()
     }
 }
 
