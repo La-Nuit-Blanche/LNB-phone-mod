@@ -36,6 +36,7 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
     /** Every screen shown, in order (null: back to the game). */
     val screensShown = ArrayList<Screen?>()
     val sounds = ArrayList<ShellSound>()
+    var prewarms = 0
     val deferred = ArrayList<() -> Unit>()
     var phoneKey = GLFW.GLFW_KEY_UP
     var phoneMouseButton: Int? = null
@@ -83,6 +84,10 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
     override fun isPhoneMouseButton(button: Int) = button == phoneMouseButton
 
     override fun isPhoneKeyDown() = phoneKey in keysDown
+
+    override fun prewarm() {
+        prewarms++
+    }
 
     override fun play(sound: ShellSound) {
         sounds += sound

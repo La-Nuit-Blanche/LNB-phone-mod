@@ -59,6 +59,25 @@ internal class QuadBatch : AutoCloseable {
         b.addVertex(matrix, x1, y0, 0f).setUv(u1, v0).setColor(argb)
     }
 
+    /**
+     * Queues a quad with free corners, for turned images: [corners] holds the pixel positions of the texture's
+     * top-left, bottom-left, bottom-right and top-right corners, as x, y pairs.
+     */
+    fun quad(tex: AbstractTexture, linearFilter: Boolean, corners: FloatArray, u0: Float, v0: Float, u1: Float, v1: Float, argb: Int) {
+        require(corners.size == 8) { "Four corners, as x, y pairs" }
+        if (tex !== texture || linearFilter != linear) {
+            flush()
+            texture = tex
+            linear = linearFilter
+            beforeDraw = null
+        }
+        val b = builder ?: BufferBuilder(memory, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR).also { builder = it }
+        b.addVertex(matrix, corners[0], corners[1], 0f).setUv(u0, v0).setColor(argb)
+        b.addVertex(matrix, corners[2], corners[3], 0f).setUv(u0, v1).setColor(argb)
+        b.addVertex(matrix, corners[4], corners[5], 0f).setUv(u1, v1).setColor(argb)
+        b.addVertex(matrix, corners[6], corners[7], 0f).setUv(u1, v0).setColor(argb)
+    }
+
     fun flush() {
         val b = builder ?: return
         builder = null

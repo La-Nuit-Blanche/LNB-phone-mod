@@ -14,9 +14,11 @@ import fr.bde_teknantes.lnb.phone.client.shell.PhoneInventoryButton
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
-import fr.bde_teknantes.lnb.phone.client.shell.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.PlayerSkins
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
+import fr.bde_teknantes.lnb.phone.client.ui.SmoothTextures
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothShader
 import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
@@ -60,6 +62,8 @@ object LnbPhoneClient {
             // resource packs change.
             it.registerReloadListener(SmoothResources)
             it.registerReloadListener(AppIconTextures)
+            // Which densities of the kit's icons exist may change with resource packs.
+            it.registerReloadListener(SmoothTextures)
         }
         modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
         modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->
@@ -112,6 +116,7 @@ object LnbPhoneClient {
             navigator.reset()
             notifications.reset()
             PhoneShell.reset()
+            PlayerSkins.clear()
         }
     }
 }
