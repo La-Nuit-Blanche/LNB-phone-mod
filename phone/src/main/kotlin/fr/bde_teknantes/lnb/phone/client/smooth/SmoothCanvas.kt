@@ -290,7 +290,11 @@ class SmoothCanvas {
     fun icon(texture: ResourceLocation, x: Float, y: Float, size: Float, color: Int) =
         image(texture, x, y, size, size, 0f, 0f, 1f, 1f, color, linear = true)
 
-    /** Part [u0]..[u1] x [v0]..[v1] (0..1) of a texture, stretched over a rectangle in dp and tinted with [color]. */
+    /**
+     * Part [u0]..[u1] x [v0]..[v1] (0..1) of a texture, stretched over a rectangle in dp and tinted with [color],
+     * filtered linearly or not ([linear]) for this draw only: the texture keeps its own filter for everyone else.
+     * Any texture size works; nothing here assumes a set of densities.
+     */
     fun image(texture: ResourceLocation, x: Float, y: Float, w: Float, h: Float, u0: Float, v0: Float, u1: Float, v1: Float, color: Int, linear: Boolean) {
         val tex = Minecraft.getInstance().textureManager.getTexture(texture)
         batch.quad(
@@ -346,7 +350,7 @@ class SmoothCanvas {
         val page = region.page
         val texel = 1f / page.size
         batch.quad(
-            page.texture, false,
+            page.texture, null,
             l.toFloat(), t.toFloat(), r.toFloat(), b.toFloat(),
             (region.x + u0) * texel, (region.y + v0) * texel, (region.x + u1) * texel, (region.y + v1) * texel,
             color, page.uploader,

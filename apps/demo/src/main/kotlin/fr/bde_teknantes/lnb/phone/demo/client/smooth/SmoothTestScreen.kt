@@ -44,7 +44,7 @@ class SmoothTestScreen(
         RenderSystem.setShaderColor(1f, 1f, 1f, 0.999f)
         graphics.pose().pushPose()
         graphics.pose().translate(-offsetX / 2f, -offsetY / 2f, 0f)
-        val before = GlStateSnapshot.take(graphics)
+        val before = GlStateSnapshot.take(graphics, BORROWED_TEXTURES)
         // The whole 640 x 480 dp sheet, even where it runs off the window.
         canvas.begin(graphics, 0, 0, maxOf(width, 320), maxOf(height, 240))
         canvas.fillRect(0f, 0f, 256f, 480f, BG)
@@ -54,7 +54,7 @@ class SmoothTestScreen(
         textVariants()
         shapes()
         canvas.end()
-        val after = GlStateSnapshot.take(graphics)
+        val after = GlStateSnapshot.take(graphics, BORROWED_TEXTURES)
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
         minecraftTtfRow(graphics)
         graphics.pose().popPose()
@@ -356,6 +356,9 @@ class SmoothTestScreen(
 
         val HEART_2X = spike("heart_2x")
         val BACK_2X = spike("back_2x")
+
+        /** Textures the sheet draws with a filter of its choosing; each must keep its own filter afterwards. */
+        val BORROWED_TEXTURES = listOf(HEART_2X, BACK_2X, spike("shape_pill"), spike("shape_r10"), spike("heart_1_5x"))
 
         // Art direction 8.3, as ARGB.
         val BG = 0xFF12151B.toInt()
