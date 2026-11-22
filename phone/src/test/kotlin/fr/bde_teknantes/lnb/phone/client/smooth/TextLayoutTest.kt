@@ -57,4 +57,20 @@ class TextLayoutTest {
         // Content 10 dp in an 18 dp box: 4 dp of leading above, then the 8 dp ascender.
         assertEquals(12f, TextLayout.baseline(TextStyle(FontWeight.REGULAR, 10f, 18f), mono))
     }
+
+    @Test
+    fun `wrapped lines know where they come from`() {
+        val text = "aa bb cccc\ndd"
+        val lines = TextLayout.lines(text, mono, 10f, 30f)
+        assertEquals(listOf(TextLayout.Line(0, 5, 6, 25f), TextLayout.Line(6, 10, 11, 20f), TextLayout.Line(11, 13, 13, 10f)), lines)
+        assertEquals(0, TextLayout.lineOf(lines, 5))
+        assertEquals(1, TextLayout.lineOf(lines, 6))
+        assertEquals(8, TextLayout.indexAt(text, lines[1], 11f, mono, 10f))
+    }
+
+    @Test
+    fun `a limited wrap ends with an ellipsis`() {
+        assertEquals(listOf("aa bb", "cccc…"), TextLayout.wrap("aa bb cccc dd ee", mono, 10f, 30f, 2))
+        assertEquals(listOf("aa"), TextLayout.wrap("aa", mono, 10f, 30f, 2))
+    }
 }

@@ -9,6 +9,7 @@ object TextLayout {
     const val ELLIPSIS = "…"
     private const val ELLIPSIS_CP = 0x2026
     private const val EPSILON = 1e-3f
+    private const val LINE_FEED = '\u000A'
 
     // A regular space before these, or after «, is French typography's (non-breaking) space: never break there, so a
     // line never starts with "!" or ends with "«".
@@ -71,70 +72,126 @@ object TextLayout {
     }
 
     /**
-     * Breaks [text] into lines no wider than [maxWidth]: at spaces, at line feeds, and inside a word only when the
-     * word alone is wider than a line. The space a line breaks at is dropped.
+     * One line of wrapped text: `text[start, end)` is drawn, [width] dp wide; [next] is where the following line
+     * starts, past the space or line feed this one broke at (equal to [end] for a word cut in two). Offsets are UTF-16
+     * indexes into the wrapped text, for placing a caret, a selection or marks on characters.
      */
-    fun wrap(text: String, font: FontMetrics, size: Float, maxWidth: Float): List<String> {
-        val lines = ArrayList<String>()
-        for (paragraph in text.split('\n')) wrapParagraph(paragraph, font, size, maxWidth, lines)
-        return lines
+    data class Line(val start: Int, val end: Int, val next: Int, val width: Float)
+
+    /**
+     * Breaks [text] into lines no wider than [maxWidth]: at spaces, at line feeds, and inside a word only when the
+     * word alone is wider than a line. The space a line breaks at is dropped. An empty text is one empty line.
+     */
+    fun wrap(text: String, font: FontMetrics, size: Float, maxWidth: Float): List<String> =
+        lines(text, font, size, maxWidth).map { text.substring(it.start, it.end) }
+
+    /**
+     * [wrap], but at most [maxLines] lines; when text is left out, the last line kept ends with an ellipsis (cut to
+     * fit). No lines when [maxLines] is below 1.
+     */
+    fun wrap(text: String, font: FontMetrics, size: Float, maxWidth: Float, maxLines: Int): List<String> {
+        if (maxLines < 1) return emptyList()
+        val lines = lines(text, font, size, maxWidth)
+        if (lines.size <= maxLines) return lines.map { text.substring(it.start, it.end) }
+        val kept = lines.subList(0, maxLines).map { text.substring(it.start, it.end) }.toMutableList()
+        // The ellipsis says there is more, so it goes on even when the last kept line would fit whole.
+        kept[kept.size - 1] = truncate(kept.last().trimEnd() + ELLIPSIS, font, size, maxWidth)
+        return kept
     }
 
-    private fun wrapParagraph(paragraph: String, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<String>) {
-        var line = ""
-        for (word in words(paragraph)) {
-            if (line.isNotEmpty()) {
-                val candidate = "$line $word"
-                if (width(candidate, font, size) <= maxWidth + EPSILON) {
-                    line = candidate
-                    continue
+    /** The lines of [wrap], with where each comes from in [text] and its width. */
+    fun lines(text: String, font: FontMetrics, size: Float, maxWidth: Float): List<Line> {
+        val out = ArrayList<Line>()
+        var paragraphStart = 0
+        while (true) {
+            val feed = text.indexOf(LINE_FEED, paragraphStart)
+            val paragraphEnd = if (feed < 0) text.length else feed
+            wrapParagraph(text, paragraphStart, paragraphEnd, font, size, maxWidth, out)
+            if (feed < 0) break
+            // The line feed belongs to the paragraph's last line, like a break space.
+            out[out.size - 1] = out.last().copy(next = feed + 1)
+            paragraphStart = feed + 1
+        }
+        return out
+    }
+
+    private fun wrapParagraph(text: String, from: Int, to: Int, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<Line>) {
+        fun width(a: Int, b: Int) = width(text.substring(a, b), font, size)
+        fun fits(a: Int, b: Int) = width(a, b) <= maxWidth + EPSILON
+        var lineStart = from
+        var lineEnd = from
+        var hasContent = false
+        var wordStart = from
+        var i = from
+        while (i <= to) {
+            if (i < to && !(text[i] == ' ' && breakable(text, i))) {
+                i++
+                continue
+            }
+            // A word runs from wordStart to i: on the current line if it fits there, else on a new one.
+            if (hasContent) {
+                if (fits(lineStart, i)) {
+                    lineEnd = i
+                } else {
+                    out.add(Line(lineStart, lineEnd, wordStart, width(lineStart, lineEnd)))
+                    hasContent = false
                 }
-                out.add(line)
-                line = ""
             }
-            if (word.isEmpty()) continue
-            if (width(word, font, size) <= maxWidth + EPSILON) {
-                line = word
-            } else {
-                val pieces = breakWord(word, font, size, maxWidth)
-                out.addAll(pieces.subList(0, pieces.size - 1))
-                line = pieces.last()
+            if (!hasContent) {
+                var pieceStart = wordStart
+                if (!fits(wordStart, i)) {
+                    // Wider than a line alone: cut into pieces that fit, at least one code point each.
+                    var j = wordStart
+                    while (j < i) {
+                        val next = j + Character.charCount(text.codePointAt(j))
+                        if (j > pieceStart && !fits(pieceStart, next)) {
+                            out.add(Line(pieceStart, j, j, width(pieceStart, j)))
+                            pieceStart = j
+                        }
+                        j = next
+                    }
+                }
+                lineStart = pieceStart
+                lineEnd = i
+                hasContent = true
             }
+            if (i == to) break
+            wordStart = i + 1
+            i++
         }
-        out.add(line)
+        out.add(Line(lineStart, lineEnd, to, width(lineStart, lineEnd)))
     }
 
-    /** Splits at the spaces a line may break at. */
-    internal fun words(paragraph: String): List<String> {
-        val words = ArrayList<String>()
-        var start = 0
-        for (i in paragraph.indices) {
-            if (paragraph[i] != ' ') continue
-            val next = paragraph.getOrNull(i + 1)
-            val previous = paragraph.getOrNull(i - 1)
-            val glued = (next != null && next in NO_BREAK_BEFORE) || (previous != null && previous in NO_BREAK_AFTER)
-            if (glued) continue
-            words.add(paragraph.substring(start, i))
-            start = i + 1
-        }
-        words.add(paragraph.substring(start))
-        return words
+    /** Whether a line may break at the space at [i]: not before high punctuation, not after an opening guillemet. */
+    private fun breakable(text: String, i: Int): Boolean {
+        val next = text.getOrNull(i + 1)
+        val previous = text.getOrNull(i - 1)
+        return !((next != null && next in NO_BREAK_BEFORE) || (previous != null && previous in NO_BREAK_AFTER))
     }
 
-    /** Cuts a word wider than a line into pieces that fit, at least one code point each. */
-    private fun breakWord(word: String, font: FontMetrics, size: Float, maxWidth: Float): List<String> {
-        val pieces = ArrayList<String>()
-        var start = 0
-        var end = 0
-        while (end < word.length) {
-            val next = end + Character.charCount(word.codePointAt(end))
-            if (end > start && width(word.substring(start, next), font, size) > maxWidth + EPSILON) {
-                pieces.add(word.substring(start, end))
-                start = end
-            }
-            end = next
+    /** The line of [lines] a caret at [index] is drawn on: the last one starting at or before it. */
+    fun lineOf(lines: List<Line>, index: Int): Int {
+        var result = 0
+        for ((n, line) in lines.withIndex()) {
+            if (line.start <= index) result = n else break
         }
-        pieces.add(word.substring(start))
-        return pieces
+        return result
+    }
+
+    /** The caret position on [line] nearest to [x] dp from the line's start (a click, or moving up and down). */
+    fun indexAt(text: String, line: Line, x: Float, font: FontMetrics, size: Float): Int {
+        var best = line.start
+        var bestDistance = Float.MAX_VALUE
+        var i = line.start
+        while (true) {
+            val d = kotlin.math.abs(width(text.substring(line.start, i), font, size) - x)
+            if (d < bestDistance) {
+                bestDistance = d
+                best = i
+            }
+            if (i >= line.end) break
+            i += Character.charCount(text.codePointAt(i))
+        }
+        return best
     }
 }
