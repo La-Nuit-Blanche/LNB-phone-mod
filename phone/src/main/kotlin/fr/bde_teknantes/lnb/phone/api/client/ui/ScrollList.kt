@@ -16,7 +16,7 @@ import org.lwjgl.glfw.GLFW
  * ```kotlin
  * val list = add(ScrollList(FeedState.scroll).at(0f, 44f, 256f, 326f))
  * posts.forEach { list.add(PostCard(it)) }
- * list.add(MessageRow(tr("feed.end")))
+ * list.add(MessageRow(I18n.get("feed.end")))
  * list.add(Spacer(72f))   // so the floating button never covers the last row
  * ```
  *

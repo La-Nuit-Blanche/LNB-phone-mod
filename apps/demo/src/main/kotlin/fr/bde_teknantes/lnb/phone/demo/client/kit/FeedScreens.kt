@@ -12,6 +12,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Header
 import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
 import fr.bde_teknantes.lnb.phone.api.client.ui.IconButton
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
+import fr.bde_teknantes.lnb.phone.api.client.ui.LabeledToggle
 import fr.bde_teknantes.lnb.phone.api.client.ui.MessageRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
@@ -25,7 +26,6 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Tabs
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextArea
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextState
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
-import fr.bde_teknantes.lnb.phone.api.client.ui.ToggleRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 
@@ -136,7 +136,9 @@ class FeedScreen(
     }
 
     private fun confirmDelete(card: PostCard) {
-        showDialog(Dialog(tr("dialog.delete_post.title"), tr("dialog.cancel"), tr("dialog.delete.confirm")).apply {
+        showDialog(Dialog(tr("dialog.delete_post.title")).apply {
+            cancelLabel = tr("dialog.cancel")
+            confirmLabel = tr("dialog.delete.confirm")
             text = tr("dialog.delete_post.text")
             danger = true
             onConfirm = { dialog ->
@@ -149,7 +151,9 @@ class FeedScreen(
 
     /** For the gallery: the pin-limit dialog, its confirm button loading. */
     fun showPinLimitDialog(loading: Boolean) {
-        val dialog = Dialog(tr("dialog.pin_limit.title"), tr("dialog.cancel"), tr("dialog.pin_limit.confirm")).apply {
+        val dialog = Dialog(tr("dialog.pin_limit.title")).apply {
+            cancelLabel = tr("dialog.cancel")
+            confirmLabel = tr("dialog.pin_limit.confirm")
             text = tr("dialog.pin_limit.text")
             onConfirm = {}
         }
@@ -187,7 +191,7 @@ class ThreadScreen(post: Post) : KitScreen() {
 
 /** What a Compose draft holds: kept by the app, so closing Compose keeps it (9.8). */
 class ComposeDraft {
-    val text = TextState()
+    val text = TextState.multiline()
     var anonymous = false
     var destination = 1
 }
@@ -205,7 +209,7 @@ class ComposeScreen(
         placeholder = tr("compose.placeholder")
         limit = LIMIT
     }
-    private val anonymous = ToggleRow(tr("compose.anonymous")).apply {
+    private val anonymous = LabeledToggle(tr("compose.anonymous")).apply {
         helper = tr("compose.anonymous.help")
         toggle.checked = draft.anonymous
         toggle.onChange = { draft.anonymous = it }

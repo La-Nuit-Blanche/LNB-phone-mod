@@ -107,10 +107,10 @@ class SettingsScreenSessionTest {
         // The toggles end at x 244, centred in their rows: P-13's and P-14's cursor (226, 169) and (226, 218) is on them.
         assertEquals(listOf(208f, 159f, 36f, 20f), box(s.sounds))
         assertEquals(listOf(208f, 208f, 36f, 20f), box(s.preview))
-        val section = s.canvas.texts.single { it.style == TextStyle.CAPTION_STRONG }
+        val section = s.texts.single { it.style == TextStyle.CAPTION_STRONG }
         assertEquals(12f to 56f, section.x to section.y)
         assertEquals(Colors.TEXT_2, section.color)
-        val label = s.canvas.texts.single { it.text == "settings.lnbphone.position" }
+        val label = s.texts.single { it.text == "settings.lnbphone.position" }
         assertEquals(Triple(12f, 76f, TextStyle.BODY_STRONG), Triple(label.x, label.y, label.style))
     }
 
@@ -145,20 +145,20 @@ class SettingsScreenSessionTest {
         assertEquals(PILL_CENTRE, s.pillX(s.position))
         s.tick(10)
         assertEquals(PILL_CENTRE, s.pillX(s.position))
-
+        // Another visit opens on Centre, from the same store or from the file. (One phone, one tester at a time.)
         val second = open(store)
         assertEquals(1, second.position.selected)
         assertEquals(PILL_CENTRE, second.pillX(second.position))
-        val fresh = open(store())
-        assertEquals(1, fresh.position.selected)
+        assertEquals(1, open(store()).position.selected)
 
         // Centre again: already chosen, nothing written. Corner: back, written.
-        s.click(CENTRE_X, CENTRE_Y)
+        val third = open(store)
+        third.click(CENTRE_X, CENTRE_Y)
         assertEquals(1, heard.size)
-        s.click(CORNER_X, CENTRE_Y)
+        third.click(CORNER_X, CENTRE_Y)
         assertEquals(PhoneSettings(), onDisk())
         assertEquals(2, heard.size)
-        assertEquals(0, s.position.selected)
+        assertEquals(0, third.position.selected)
     }
 
     @Test
@@ -283,54 +283,67 @@ class SettingsScreenSessionTest {
     }
 
     @Test
-    fun `the arrow keys don't move the segmented control, which has none, each segment being a Tab stop`() {
+    fun `Left and Right move the focus between the segments, without choosing`() {
         val s = open()
         s.key(GLFW_KEY_TAB)
         assertSame(s.corner, s.screen.focused)
-        for (key in listOf(GLFW_KEY_RIGHT, GLFW_KEY_LEFT, GLFW_KEY_DOWN)) {
-            assertFalse(s.key(key), "key $key is left to the phone and the game")
-        }
-        assertEquals(0, s.position.selected)
+        assertTrue(s.key(GLFW_KEY_RIGHT))
+        assertSame(s.centre, s.screen.focused)
+        assertTrue(s.centre.showsFocusRing)
+        assertTrue(s.key(GLFW_KEY_RIGHT), "at the end, the key is kept and nothing moves")
+        assertSame(s.centre, s.screen.focused)
+        assertTrue(s.key(GLFW_KEY_LEFT))
         assertSame(s.corner, s.screen.focused)
-        assertFalse(Files.exists(file))
+        assertFalse(s.key(GLFW_KEY_DOWN), "Down is left to the phone and the game")
+        assertEquals(0, s.position.selected)
+        assertFalse(Files.exists(file), "moving chooses nothing")
+        s.key(GLFW_KEY_RIGHT)
+        s.key(GLFW_KEY_SPACE)
+        assertEquals(1, s.position.selected)
     }
 
     @Test
-    fun `a click takes the keyboard focus away, so the rings go`() {
+    fun `a click moves the focus without rings`() {
         val s = open()
         s.key(GLFW_KEY_TAB)
         s.key(GLFW_KEY_TAB)
         s.key(GLFW_KEY_TAB)
         assertSame(s.soundsRow, s.screen.focused)
+        assertTrue(s.soundsRow.showsFocusRing)
         s.click(TOGGLE_X, PREVIEW_Y)
-        // A click on a toggle inside a row lands on the toggle, which isn't a Tab stop: no widget keeps the focus.
-        assertNull(s.screen.focused)
-        assertFalse(s.sounds.showsFocusRing)
+        // A click on a row's toggle lands on the row, which owns it: the row takes the focus, from the pointer.
+        assertSame(s.previewRow, s.screen.focused)
+        for (w in listOf(s.soundsRow, s.sounds, s.previewRow, s.preview)) assertFalse(w.showsFocusRing, "$w")
     }
 
     // ---- Strings ----
 
     @Test
     fun `every text on the screen is a key of section 13 present in both language files`() {
-        // No language is loaded in tests, so the screen draws its keys: each must exist in en_us and fr_fr.
+        // No language is loaded in tests, so the screen draws its keys: each must exist in en_us and fr_fr. A key too
+        // long for a segment is cut with an ellipsis, as a long label would be.
         val s = open()
-        val drawn = s.canvas.texts.map { it.text }.toSet()
-        assertEquals(
-            setOf(
-                "app.lnbphone.settings",
-                "settings.lnbphone.section.phone",
-                "settings.lnbphone.position",
-                "settings.lnbphone.position.corner",
-                "settings.lnbphone.position.centre",
-                "settings.lnbphone.sounds",
-                "settings.lnbphone.preview",
-            ),
-            drawn,
+        val expected = setOf(
+            "app.lnbphone.settings",
+            "settings.lnbphone.section.phone",
+            "settings.lnbphone.position",
+            "settings.lnbphone.position.corner",
+            "settings.lnbphone.position.centre",
+            "settings.lnbphone.sounds",
+            "settings.lnbphone.preview",
         )
+        val drawn = s.texts.map { it.text }
+        assertEquals(expected.size, drawn.size, "$drawn")
+        for (text in drawn) {
+            assertTrue(text in expected || (text.endsWith("…") && expected.any { it.startsWith(text.dropLast(1)) }), text)
+        }
+        val shownKeys = expected.filter { key -> drawn.any { it == key || (it.endsWith("…") && key.startsWith(it.dropLast(1))) } }
+        assertEquals(expected.size, shownKeys.size, "every key shows")
+        val keysDrawn = expected
         for (lang in listOf("en_us", "fr_fr")) {
             val keys = javaClass.getResourceAsStream("/assets/lnbphone/lang/$lang.json")!!.reader(Charsets.UTF_8)
                 .use { JsonParser.parseReader(it).asJsonObject.keySet() }
-            assertTrue(keys.containsAll(drawn), "$lang lacks ${drawn - keys}")
+            assertTrue(keys.containsAll(keysDrawn), "$lang lacks ${keysDrawn - keys}")
         }
     }
 }

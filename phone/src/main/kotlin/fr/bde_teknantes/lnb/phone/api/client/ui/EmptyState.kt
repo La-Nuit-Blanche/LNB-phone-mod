@@ -10,9 +10,9 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * saying so, and a [Button.Kind.SECONDARY] retry button of 104 dp, set [loading][Button.loading] while it retries.
  *
  * ```kotlin
- * add(EmptyState(Icon.INBOX, tr("empty.global.title")).apply {
- *     text = tr("empty.global.text")
- *     button = Button(tr("empty.global.button")) { openCompose() }.apply { fixedWidth = 136f }
+ * add(EmptyState(Icon.INBOX, I18n.get("feed.empty.global.title")).apply {
+ *     text = I18n.get("feed.empty.global.text")
+ *     button = Button(I18n.get("feed.empty.global.button")) { openCompose() }.apply { fixedWidth = 136f }
  * }.at(0f, 44f, 256f, 326f))
  * ```
  *
@@ -25,8 +25,13 @@ class EmptyState(var icon: Icon, var title: String) : Widget() {
 
     /** The button under the text, if any. */
     var button: Button? = null
+        // Forgotten once it is added elsewhere: this widget no longer places, draws around or clicks it.
+        get() {
+            if (field?.parent !== this) field = null
+            return field
+        }
         set(value) {
-            field?.let(::remove)
+            field?.takeIf { it.parent === this }?.let(::remove)
             field = value?.let { add(it) }
         }
 

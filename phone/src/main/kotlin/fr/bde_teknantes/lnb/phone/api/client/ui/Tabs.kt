@@ -22,13 +22,16 @@ class Tabs(labels: List<String>) : Widget() {
         require(labels.isNotEmpty()) { "Tabs need at least one label" }
     }
 
-    /** The active tab, the first one at first. Setting it slides the indicator (without calling [onSelect]). */
+    /**
+     * The active tab, the first one at first. Setting it slides the indicator, without calling [onSelect]; set before
+     * the screen's first frame, the indicator is simply there ([shouldAnimate]).
+     */
     var selected: Int = 0
         set(value) {
             val index = value.coerceIn(0, tabs.size - 1)
             if (index == field) return
             field = index
-            if (width > 0f && screen != null) {
+            if (width > 0f && shouldAnimate) {
                 indicator.animateTo(indicatorX(index), now, Motion.SHORT_MS, Easing.OUT)
             } else {
                 indicator.snapTo(indicatorX(index))

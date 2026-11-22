@@ -29,8 +29,9 @@ Read this part first. Most mistakes made with the phone are mistakes about this 
   draws the slides, shows the back arrow in your header and maps Backspace to "back".
 - **Screens are thrown away.** Each time the player opens the app, from the home screen or from a notification, the
   phone calls your factory and gets new screens. When the player leaves the app (the home button, another app, a
-  notification of another app, disconnecting) every screen is closed and never shown again. Putting the phone away
-  (Esc, the phone key, a click outside) is different: the app keeps its screens and the phone reopens on them.
+  notification of another app, disconnecting, and changing the game's language, which sends the phone home) every
+  screen is closed and never shown again. Putting the phone away (Esc, the phone key, a click outside) is different:
+  the app keeps its screens and the phone reopens on them.
 - Screens draw in **dp**, in a viewport of 256 x 370 dp under the status bar, whatever the window or the GUI scale.
   The kit's widgets already follow the phone's look; the art direction (`design/art-direction.md`, section 8) is what
   the kit implements, and you shouldn't need to read it.
@@ -87,9 +88,9 @@ so an answer that arrives after the player left can't drag them back into your a
 ### What you may extend
 
 - Extend `AppScreen`, `KitScreen`, `Widget` and `Clickable`, and override what their KDoc calls hooks.
-- Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s last two arguments).
-- **Don't implement `Phone`, `AppCanvas` or `TextMeasurer` in your mod.** The phone gives you instances; later
-  versions will add methods to them, which would break a class of yours.
+- Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s `rootScreen` and `targetScreens`).
+- `Phone`, `AppCanvas` and `TextMeasurer` are the phone's: it gives you instances, only it can make them, and later
+  versions add methods to them. To test, use the phone's test support (step 9).
 - Widgets take in their constructor only what they can't exist without; everything else is a property you set with
   `apply { ... }`. New settings arrive as new properties, so your code keeps compiling against a newer phone.
 - Some enums are complete for good (`Interaction`, `Label.Align`, `Avatar.Size`: a `when` may list every value);
@@ -261,7 +262,8 @@ transparent), the main shape inside the 12 x 12 square from (2, 2) to (13, 13), 
 ### 4. The first screen: a list
 
 Ping opens on the players online. A `KitScreen` creates its widgets in its constructor, places them with `at(x, y)`
-(top-left corner, in dp; width and height when the widget has no natural size) and `add`s them:
+(top-left corner, in dp; add width and height when the widget has no natural size) and `add`s them. Settings are
+properties, set in any order, before or after `at` and `add`: a widget placed without a size follows its natural size.
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PlayersScreen.kt -->
 ```kotlin
@@ -319,9 +321,11 @@ What the list screen shows:
 
 - **Layout.** The header is 44 dp at the top; the content takes the rest, 256 x 326 dp from y 44. Screens keep 12 dp
   from the sides (`Spacing.SCREEN_PADDING`). Put edges on even dp values so they stay sharp at every GUI scale.
-- **Text.** Widgets take plain strings, so translate on the client with `I18n.get(key)`
+- **Text.** Widgets take plain strings, shown as given, so translate on the client with `I18n.get(key)`
   (`net.minecraft.client.resources.language.I18n`, a client class). A screen is built when it opens, so it picks up
-  the player's language each time.
+  the player's language each time; and when the player changes the game's language, the phone sends the open app
+  home, so no screen built in the old language is seen again. What you keep outside your screens (drafts, scroll
+  positions) stays.
 - **Hooks.** `KitScreen` keeps `AppScreen`'s drawing and input methods for itself. You override `onScreenShown`,
   `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves
   the phone for good, it is where you stop what the screen started (a listener, a request). Here the rows are rebuilt
@@ -390,12 +394,12 @@ object PingSession {
         private set
 
     /** The unsent text for [player]: the field shows it again when the player comes back. */
-    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState("", multiline = false, maxLength = Ping.MAX_LENGTH) }
+    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState.singleLine(maxLength = Ping.MAX_LENGTH) }
 ```
 
-`TextState("", multiline = false, maxLength = Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what
-goes past is cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its
-`limit`) takes a `TextState` the same way.
+`TextState.singleLine(maxLength = Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what goes past is
+cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its `limit`) takes a
+`TextState.multiline()` the same way.
 
 Everything that keeps coming is bounded. A conversation keeps its newest 50 messages, so a talkative player (or a
 modified client) can't make the screen grow without end:
@@ -659,6 +663,38 @@ plain classes, as `PingTarget` and `PingSession` are, and test it with JUnit und
 `PingTargetTest` and `PingSessionTest`. Tests run with the game loaded, which loads Kotlin twice: use JUnit's
 `assertInstanceOf` and `assertThrows`, not kotlin.test's `assertIs` and `assertFailsWith`.
 
+Your screens can be tested too, with `PhoneTester` (`fr.bde_teknantes.lnb.phone.testing`). It is for apps built in
+this repository: the app plugin puts it on your tests and loads it with the phone's classes, and it is never in your
+jar. It isn't published for mods built elsewhere, and isn't promised to them yet. It is a phone without the game: it
+opens your app, passes your screens frames, ticks, clicks, keys (with the characters they type) and typed text as the
+phone does, navigates as the phone does, and records the sounds instead of playing them. Text is measured as if every
+character were half its size wide, and no language is loaded, so `I18n.get` returns its key.
+
+There is no game under it: `Minecraft.getInstance()` is null, and a screen that reads the game throws there. Ping's
+players screen, which reads the players online from the connection in `onScreenShown`, can't be played by it; its
+conversation screen, which takes everything from `PingSession` and its constructor, can. Keep your screens testable the
+same way: what they show comes from your app's objects or their arguments, and the game is read in your client glue
+(payload handlers, events). Its KDoc has the rest.
+
+<!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreenTest.kt -->
+```kotlin
+    // A phone without the game, open on the conversation with Dev.
+    private val tester = PhoneTester { PingScreen(dev, "Dev") }
+
+    @AfterEach
+    fun tearDown() {
+        tester.close()
+        PingSession.clear()
+    }
+
+    @Test
+    fun `Send waits for something to send`() {
+        // The send button, right-aligned to x 244 at y 168: disabled, a click on it answers with the error sound.
+        tester.click(200f, 184f)
+        assertEquals(listOf(PhoneSound.ERROR), tester.sounds)
+    }
+```
+
 ## Mistakes to avoid
 
 Each of these compiles, and most of them work in single player.
@@ -674,7 +710,7 @@ class ForgetfulNoteScreen : KitScreen() {
 
 // Right: the text lives in an object of the app, which outlives the screens; each new screen hands it to its field.
 object NoteState {
-    val draft = TextState("", false)
+    val draft = TextState.singleLine()
 }
 
 class NoteScreen : KitScreen() {
@@ -774,17 +810,11 @@ class CarelessDeleteScreen(private val post: Long) : KitScreen() {
 }
 ```
 
-**Implementing what the phone implements.** `Phone`, `AppCanvas` and `TextMeasurer` are given to you; a later phone
-adds methods to them, and a class of yours that implements them stops loading. A `when` over an enum that may grow
-needs an `else`:
+**Listing every value of an enum that grows.** A later phone may add values to `TextStyle`, `Button.Kind` or
+`Shadow` (each enum's KDoc says whether it grows); a `when` that lists them all without an `else` then breaks:
 
 <!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
 ```kotlin
-// Wrong: only the phone implements Phone (and AppCanvas). A later phone adds a method to it and this class breaks.
-class FakePhone : Phone {
-    // ...
-}
-
 // Right: TextStyle may get new values in a later phone, so a `when` over it keeps an `else`.
 fun isHeading(style: TextStyle) = when (style) {
     TextStyle.TITLE_L, TextStyle.TITLE_M -> true

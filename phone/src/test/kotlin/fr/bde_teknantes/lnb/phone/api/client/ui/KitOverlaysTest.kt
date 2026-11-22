@@ -132,7 +132,9 @@ class KitOverlaysTest {
         @BeforeEach
         fun open() {
             behind = screen.add(Counter().at(0f, 0f, 256f, 370f))
-            dialog = Dialog("Supprimer ce post ?", "Annuler", "Supprimer").apply {
+            dialog = Dialog("Supprimer ce post ?").apply {
+                cancelLabel = "Annuler"
+                confirmLabel = "Supprimer"
                 text = "C'est définitif."
                 danger = true
                 onCancel = { cancels++ }
@@ -250,7 +252,7 @@ class KitOverlaysTest {
             screen.advance(100f)
             val field = screen.add(TextField().at(0f, 0f))
             screen.focus(field)
-            screen.showDialog(Dialog("T", "Annuler", "OK").apply { onConfirm = {} })
+            screen.showDialog(Dialog("T").apply { onConfirm = {} })
             assertNull(screen.focused)
             assertFalse(screen.hasTextFocus)
             screen.type("x")

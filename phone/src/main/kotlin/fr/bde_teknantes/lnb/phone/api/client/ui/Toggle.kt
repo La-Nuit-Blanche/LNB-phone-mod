@@ -4,7 +4,14 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 
 /**
  * An on/off switch (art direction 8.7), 36 x 20 dp: the knob slides in 100 ms and the track turns blue halfway. Off at
- * first. Put it at the end of a [ListRow], or use a [ToggleRow]: the whole row then switches it and is one Tab stop.
+ * first.
+ *
+ * Usually it sits in something that owns it: the [trailing][ListRow.trailing] end of a [ListRow] without a click
+ * handler of its own, or a [LabeledToggle]. The owner then takes the pointer, the hover, the focus and the click for
+ * the whole row, the toggle included, and the toggle only shows the row's state: hovering anywhere on the row lights
+ * both, a click anywhere switches it, and the row is one Tab stop. Anywhere else (a row with its own [ListRow.onClick],
+ * a toggle placed on its own) it is a target of its own: it is clicked and focused by itself. A disabled toggle
+ * disables the row that owns it: disable the toggle to grey out the whole setting.
  */
 class Toggle : Clickable() {
     private val knob = Tween(OFF_X)
@@ -12,13 +19,16 @@ class Toggle : Clickable() {
     /** Called with the new value when the player switches it (not when [checked] is set by code). */
     var onChange: ((Boolean) -> Unit)? = null
 
-    /** Whether it is on. Setting it slides the knob, without calling [onChange]. */
+    /**
+     * Whether it is on. Setting it slides the knob, without calling [onChange]; set before the screen's first frame, the
+     * knob is simply there ([shouldAnimate]).
+     */
     var checked: Boolean = false
         set(value) {
             if (value == field) return
             field = value
             val x = if (value) ON_X else OFF_X
-            if (screen != null) knob.animateTo(x, now, Motion.QUICK_MS, Easing.OUT) else knob.snapTo(x)
+            if (shouldAnimate) knob.animateTo(x, now, Motion.QUICK_MS, Easing.OUT) else knob.snapTo(x)
         }
 
     init {
@@ -32,14 +42,20 @@ class Toggle : Clickable() {
         onChange?.invoke(checked)
     }
 
-    // Inside a row, the row is the Tab stop and the hover target: the toggle follows it.
-    private val row: Widget? get() = parent?.takeIf { it is ListRow || it is ToggleRow }
+    // The row this toggle belongs to, if it owns it: the row is then the target, and the toggle follows its state.
+    private val owner: Clickable?
+        get() {
+            val p = parent
+            return if (p is ToggleOwner && p is Clickable && p.owns(this)) p else null
+        }
 
-    override val focusable get() = isEnabled && row == null
+    override val catchesPointer get() = owner == null
 
-    override val hoverLook get() = isHovered || row?.isHovered == true
+    override val focusable get() = isEnabled && owner == null
 
-    override val showsFocusRing get() = super.showsFocusRing || row?.showsFocusRing == true
+    override val hoverLook get() = owner?.isHovered ?: isHovered
+
+    override val showsFocusRing get() = super.showsFocusRing || owner?.showsFocusRing == true
 
     override val preferredWidth get() = 36f
     override val preferredHeight get() = 20f
@@ -64,4 +80,9 @@ class Toggle : Clickable() {
         const val OFF_X = 2f
         const val ON_X = 18f
     }
+}
+
+/** A row that may own a [Toggle] inside it: it takes the toggle's pointer, focus and click (see [Toggle]). */
+internal interface ToggleOwner {
+    fun owns(toggle: Toggle): Boolean
 }

@@ -14,5 +14,7 @@
   "gui.lnbphone.inventory": "LNB Phone",
   "gui.lnbphone.inventory.unread.one": "1 nouvelle notification",
   "gui.lnbphone.inventory.unread": "%s nouvelles notifications",
-  "subtitles.lnbphone.notification": "Notification du téléphone"
+  "subtitles.lnbphone.notification": "Notification du téléphone",
+  "gui.lnbphone.dialog.cancel": "Annuler",
+  "gui.lnbphone.dialog.confirm": "OK"
 }

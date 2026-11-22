@@ -7,10 +7,14 @@ import fr.bde_teknantes.lnb.phone.api.TextLimits
  *
  * A field creates its own state unless you give it one. Give it one you keep elsewhere (an object of your app that
  * lives for the session) when the text must survive the screen: a draft kept when the player leaves Compose and comes
- * back. The screen is rebuilt each time; the state you pass in is what carries over.
+ * back. The screen is rebuilt each time; the state you pass in is what carries over. Make one with [singleLine] (for a
+ * [TextField]) or [multiline] (for a [TextArea]):
  *
  * ```kotlin
- * object Drafts { val post = TextState() }
+ * object Drafts {
+ *     val post = TextState.multiline()
+ *     val name = TextState.singleLine(maxLength = 16)
+ * }
  * TextArea(Drafts.post).apply { placeholder = "What's new?"; limit = 280 }
  * ```
  *
@@ -20,20 +24,16 @@ import fr.bde_teknantes.lnb.phone.api.TextLimits
  * Unicode normalisation form C, so a pasted `e` plus combining accent becomes the one character `é`, drawn and counted
  * as such ([TextLimits]). Plain logic: no game classes, usable in tests.
  *
- * @param multiline Whether line feeds are kept (a text area) or turned into spaces (a single-line field).
- * @param maxLength The most characters (code points) the text can hold; what would go past is cut. Separate from a
+ * @property multiline Whether line feeds are kept (a text area) or turned into spaces (a single-line field).
+ * @property maxLength The most characters (code points) the text can hold; what would go past is cut. Separate from a
  * text area's visible limit, which may be exceeded and is then marked.
  */
-class TextState(initial: String, val multiline: Boolean, val maxLength: Int) {
-    /** An empty multi-line text. */
-    constructor() : this("", true, DEFAULT_MAX_LENGTH)
+class TextState internal constructor(initial: String, val multiline: Boolean, val maxLength: Int) {
+    internal constructor() : this("", true, DEFAULT_MAX_LENGTH)
 
-    /** A multi-line text starting as [initial]. */
-    constructor(initial: String) : this(initial, true, DEFAULT_MAX_LENGTH)
+    internal constructor(initial: String) : this(initial, true, DEFAULT_MAX_LENGTH)
 
-    /** A text starting as [initial], on one line unless [multiline]. */
-    constructor(initial: String, multiline: Boolean) : this(initial, multiline, DEFAULT_MAX_LENGTH)
-
+    internal constructor(initial: String, multiline: Boolean) : this(initial, multiline, DEFAULT_MAX_LENGTH)
     private var content = ""
     private val listeners = ArrayList<(TextState) -> Unit>()
 
@@ -263,6 +263,18 @@ class TextState(initial: String, val multiline: Boolean, val maxLength: Int) {
     companion object {
         /** Far beyond any limit a field shows; only there so a huge paste can't stall the game. */
         val DEFAULT_MAX_LENGTH = 4000
+
+        /** An empty single-line text, for a [TextField]: line feeds typed or pasted become spaces. */
+        fun singleLine(): TextState = TextState("", false, DEFAULT_MAX_LENGTH)
+
+        /** An empty single-line text of at most [maxLength] characters: what would go past is cut as it comes. */
+        fun singleLine(maxLength: Int): TextState = TextState("", false, maxLength)
+
+        /** An empty text of several lines, for a [TextArea]. */
+        fun multiline(): TextState = TextState("", true, DEFAULT_MAX_LENGTH)
+
+        /** An empty text of several lines and at most [maxLength] characters: what would go past is cut as it comes. */
+        fun multiline(maxLength: Int): TextState = TextState("", true, maxLength)
 
         /** Whether [codePoint] may be typed: not a control character, not Minecraft's section sign, not half a surrogate pair. */
         fun isAllowed(codePoint: Int): Boolean =

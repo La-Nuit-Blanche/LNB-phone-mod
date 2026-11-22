@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.api.client.ui
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 import fr.bde_teknantes.lnb.phone.api.client.Shadow
 import fr.bde_teknantes.lnb.phone.client.ui.Placement
+import net.minecraft.client.resources.language.I18n
 
 /**
  * A confirmation dialog (art direction 8.7): a card over a darkened viewport with a title, a text, a cancel button and
@@ -13,23 +14,48 @@ import fr.bde_teknantes.lnb.phone.client.ui.Placement
  * that has nothing to wait for (without [onConfirm], confirming just closes). While it loads, the dialog can't be
  * cancelled. Cancel, Esc and a click on the dark area call [onCancel] and close it.
  *
+ * The buttons say "Cancel" and "OK" in the player's language unless told otherwise: give [confirmLabel] the action's
+ * verb ("Delete"). Like every widget, it takes plain, already translated strings.
+ *
  * ```kotlin
- * showDialog(Dialog(tr("dialog.delete_post.title"), tr("dialog.cancel"), tr("dialog.delete.confirm")).apply {
- *     text = tr("dialog.delete_post.text")
+ * showDialog(Dialog(I18n.get("feed.dialog.delete_post.title")).apply {
+ *     text = I18n.get("feed.dialog.delete_post.text")
+ *     confirmLabel = I18n.get("feed.dialog.delete.confirm")
  *     danger = true
- *     onConfirm = { dialog -> server.delete(post) { ok -> dialog.close(); if (!ok) showErrorSnackbar(tr("snackbar.action_failed")) } }
+ *     onConfirm = { dialog ->
+ *         server.delete(post) { ok ->
+ *             dialog.close()
+ *             if (!ok) showErrorSnackbar(I18n.get("feed.snackbar.action_failed"))
+ *         }
+ *     }
  * })
  * ```
  *
  * @param title Up to 2 lines.
  */
-class Dialog(val title: String, cancelLabel: String, confirmLabel: String) : Widget(), Overlay {
+class Dialog(val title: String) : Widget(), Overlay {
     private val card = add(Card())
-    private val cancelButton = card.add(Button(cancelLabel) { cancel() }.apply {
+    private val cancelButton = card.add(Button(I18n.get("gui.lnbphone.dialog.cancel")) { cancel() }.apply {
         kind = Button.Kind.SECONDARY
         fixedWidth = Placement.DIALOG_CANCEL_WIDTH
     })
-    private val confirmButton = card.add(Button(confirmLabel) { confirm() }.apply { fixedWidth = Placement.DIALOG_CONFIRM_WIDTH })
+    private val confirmButton = card.add(Button(I18n.get("gui.lnbphone.dialog.confirm")) { confirm() }.apply {
+        fixedWidth = Placement.DIALOG_CONFIRM_WIDTH
+    })
+
+    /** What the cancel button says: "Cancel" in the player's language unless told otherwise. 88 dp wide. */
+    var cancelLabel: String
+        get() = cancelButton.label
+        set(value) {
+            cancelButton.label = value
+        }
+
+    /** What the confirm button says: the action, such as "Delete"; "OK" in the player's language until set. 104 dp wide. */
+    var confirmLabel: String
+        get() = confirmButton.label
+        set(value) {
+            confirmButton.label = value
+        }
 
     /** Up to 3 lines under the title; empty for none. */
     var text: String = ""

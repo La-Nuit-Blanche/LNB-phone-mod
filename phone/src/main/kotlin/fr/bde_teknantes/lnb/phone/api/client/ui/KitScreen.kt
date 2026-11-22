@@ -64,6 +64,10 @@ abstract class KitScreen : AppScreen() {
     var now = 0f
         private set
 
+    /** How many times the screen was shown: widgets drawn in the current showing animate their changes. */
+    internal var shownCount = 0
+        private set
+
     /** Where the pointer was last seen, in viewport dp. */
     var mouseX = -1f
         private set
@@ -149,7 +153,8 @@ abstract class KitScreen : AppScreen() {
     /** Gives the keyboard focus to [widget] (if it can take it), or takes it away with null. */
     fun focus(widget: Widget?) = focus(widget, visible = false)
 
-    private fun focus(widget: Widget?, visible: Boolean) {
+    /** Gives the focus as [focus] does; [visible] when it comes from the keyboard, so its ring shows. */
+    internal fun focus(widget: Widget?, visible: Boolean) {
         val target = widget?.takeIf { it.focusable && it.isShowing && it.screen === this }
         focusVisible = visible && target != null
         if (target === focused) return
@@ -272,16 +277,23 @@ abstract class KitScreen : AppScreen() {
         this.mouseX = mouseX
         this.mouseY = mouseY
         // Animations and layout first, so that what is hit and what is drawn agree within the frame.
-        content.updateTree()
-        floating.updateTree()
-        overlays.updateTree()
-        focused?.let { if (!it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
+        updateWidgets()
         updateHover()
         canvas.fillRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), background)
         content.draw(canvas)
         floating.draw(canvas)
         overlays.draw(canvas)
         drawTooltip(canvas)
+    }
+
+    /** Sizes, layout and the widgets' own updates, top-down; then a focused widget that can't keep the focus loses it. */
+    private fun updateWidgets() {
+        content.updateTree()
+        floating.updateTree()
+        overlays.updateTree()
+        // A widget that can't take the focus any more loses it: disabled, hidden, gone, or no longer a stop of its own
+        // (a toggle its row now owns).
+        focused?.let { if (!it.focusable || !it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
     }
 
     final override fun tick() {
@@ -302,8 +314,12 @@ abstract class KitScreen : AppScreen() {
     }
 
     final override fun onShown() {
+        shownCount++
         restoreSnackbar()
         onScreenShown()
+        // Brought up to date before the first frame: a key or a click that comes first finds what that frame will
+        // show (a header's back button there or not, rows at their size).
+        updateWidgets()
     }
 
     final override fun onHidden() {
@@ -385,14 +401,15 @@ abstract class KitScreen : AppScreen() {
             revealFocused()
             return true
         }
-        var w: Widget? = focused?.takeIf { it.isEnabled && it.isShowing }
+        var w: Widget? = focused?.takeIf { it.focusable && it.isEnabled && it.isShowing }
         while (w != null && w !is Root) {
             if (w.keyPressed(keyCode, scanCode, modifiers)) return true
             w = w.parent
         }
         if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-            // Under a menu or dialog nothing goes back: the dialog may be waiting for the server on this screen.
-            if (overlayOpen) return true
+            // Under a menu or dialog nothing goes back: the dialog may be waiting for the server on this screen. A
+            // held Backspace goes back once, as the phone does: its repeats are for text fields only.
+            if (overlayOpen || isKeyRepeat) return true
             return onBack()
         }
         if (overlayOpen) return false
@@ -414,7 +431,7 @@ abstract class KitScreen : AppScreen() {
             else -> codePoint.code
         }
         pendingHighSurrogate = null
-        val w = focused?.takeIf { it.isEnabled && it.isShowing } ?: return false
+        val w = focused?.takeIf { it.focusable && it.isEnabled && it.isShowing } ?: return false
         return w.charTyped(code, modifiers)
     }
 

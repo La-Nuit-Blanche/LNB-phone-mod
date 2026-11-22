@@ -296,7 +296,11 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
      * player never sits in a phone screen that draws nothing.
      */
     fun onScreenShown() {
+        // Keys still down were pressed elsewhere (the game, a vanilla dialog): their next event is a repeat, not a press,
+        // and the app ignores them until they come up. Asked of the host, so a key released elsewhere is no longer held.
         keysHeld.clear()
+        keysHeld += host.heldKeys()
+        navigator.keysHeldElsewhere(keysHeld)
         phoneKeyLatched = host.isPhoneKeyDown()
         homeScroll = 0.0
         if (state == State.OPEN) return
@@ -560,12 +564,14 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
             }
             return false
         }
+        // Known to the navigator wherever the key goes, so a screen opened while it is held ignores it.
+        navigator.keyDown(keyCode)
         val phoneKey = host.isPhoneKey(keyCode, scanCode)
         if (phoneKey && phoneKeyLatched) return true
         val app = showsApp()
         // Read before the app sees the key: the key may move the focus.
         val textFocus = app && navigator.hasTextFocus
-        val used = app && navigator.keyPressed(keyCode, scanCode, modifiers)
+        val used = app && navigator.keyPressed(keyCode, scanCode, modifiers, repeat)
         // The phone's own actions answer the first press only: a held key repeats, and the app gets the repeats.
         when {
             // The app closes its menu or dialog on Esc and keeps the key; otherwise Esc puts the phone away (2.3).
@@ -582,6 +588,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
 
     fun keyReleased(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
         keysHeld.remove(keyCode)
+        navigator.keyUp(keyCode)
         // Without its modifier: Ctrl may come up before the key itself.
         if (host.isPhoneKey(keyCode, scanCode, withModifier = false)) phoneKeyLatched = false
         return false

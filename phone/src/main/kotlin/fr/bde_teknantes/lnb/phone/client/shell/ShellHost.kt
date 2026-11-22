@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
+import com.mojang.blaze3d.platform.InputConstants
 import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
@@ -10,6 +11,7 @@ import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
+import org.lwjgl.glfw.GLFW
 
 /**
  * Everything the shell's state machine ([PhoneShellCore]) needs from the game: the window, the screen, the phone key,
@@ -60,6 +62,9 @@ internal interface ShellHost {
     fun isPhoneKey(keyCode: Int, scanCode: Int, withModifier: Boolean = true): Boolean
 
     fun isPhoneMouseButton(button: Int): Boolean
+
+    /** The keys physically held down right now (GLFW key codes). */
+    fun heldKeys(): Set<Int>
 
     /** Whether the phone key is physically held down right now. */
     fun isPhoneKeyDown(): Boolean
@@ -113,6 +118,11 @@ internal object MinecraftShellHost : ShellHost {
     override fun isPhoneMouseButton(button: Int) = PhoneKeys.OPEN.matchesMouse(button) && PhoneKeys.modifierHeld()
 
     override fun isPhoneKeyDown(): Boolean = PhoneKeys.isPhysicallyDown()
+
+    override fun heldKeys(): Set<Int> {
+        val window = mc.window.window
+        return (GLFW.GLFW_KEY_SPACE..GLFW.GLFW_KEY_LAST).filterTo(HashSet()) { InputConstants.isKeyDown(window, it) }
+    }
 
     override fun prewarm() {
         SmoothCanvas.prewarm()

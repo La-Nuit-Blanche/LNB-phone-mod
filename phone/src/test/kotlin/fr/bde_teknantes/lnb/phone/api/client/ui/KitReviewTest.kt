@@ -57,7 +57,7 @@ class KitReviewTest {
         assertTrue(screen.key(GLFW_KEY_BACKSPACE))
         assertEquals(2, screen.backs, "under a menu, Backspace is kept and goes nowhere")
         screen.closeMenu()
-        screen.showDialog(Dialog("T", "Annuler", "OK").apply { onConfirm = {} })
+        screen.showDialog(Dialog("T").apply { onConfirm = {} })
         screen.frame()
         assertTrue(screen.key(GLFW_KEY_BACKSPACE))
         assertEquals(2, screen.backs)
@@ -184,7 +184,7 @@ class KitReviewTest {
 
     @Test
     fun `a toggle row is one stop and switches from anywhere`() {
-        val row = screen.add(ToggleRow("Publier anonymement").apply { helper = "Nom masqué aux joueurs" }.at(12f, 0f))
+        val row = screen.add(LabeledToggle("Publier anonymement").apply { helper = "Nom masqué aux joueurs" }.at(12f, 0f))
         val heard = ArrayList<Boolean>()
         row.toggle.onChange = { heard += it }
         screen.frame()

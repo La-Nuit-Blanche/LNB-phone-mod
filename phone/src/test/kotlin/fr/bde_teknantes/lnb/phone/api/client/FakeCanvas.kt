@@ -8,7 +8,7 @@ import net.minecraft.resources.ResourceLocation
  * An [AppCanvas] that draws nothing and measures text as if every character were half the font size wide, for tests
  * that call `render` without a game window. [calls] counts the drawing calls.
  */
-open class FakeCanvas : AppCanvas {
+open class FakeCanvas : AppCanvas() {
     var calls = 0
         private set
 

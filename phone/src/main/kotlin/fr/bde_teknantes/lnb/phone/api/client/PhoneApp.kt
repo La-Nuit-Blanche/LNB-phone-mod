@@ -29,17 +29,21 @@ import net.minecraft.resources.ResourceLocation
  * translatable component and give the key in both `en_us.json` and `fr_fr.json`. Keep it to 16 characters or fewer
  * in each language: a name too long for the home screen's label line is truncated when drawn.
  * @property icon The app's icon on the home screen and on its notifications.
- * @param targetScreens Only for apps whose notifications point somewhere precise (see [AppTarget]); leave it out
- * otherwise, and notifications open the app on its first screen.
+ * @param targetScreens Only for apps whose notifications point somewhere precise (see [AppTarget]); the constructor
+ * without it suits every other app, whose notifications open it on its first screen.
  * @param rootScreen Creates the first screen of the app, each time the player opens it.
  */
 class PhoneApp(
     val id: ResourceLocation,
     val name: Component,
     val icon: AppIcon,
-    private val targetScreens: AppTargetScreens? = null,
+    private val targetScreens: AppTargetScreens,
     private val rootScreen: AppScreenFactory,
 ) {
+    /** An app whose notifications all open it on its first screen. */
+    constructor(id: ResourceLocation, name: Component, icon: AppIcon, rootScreen: AppScreenFactory) :
+        this(id, name, icon, AppTargetScreens { emptyList() }, rootScreen)
+
     /** A new instance of the app's first screen. Called by the phone each time the app is opened from home. */
     internal fun createRootScreen(): AppScreen = rootScreen.create()
 
@@ -47,7 +51,7 @@ class PhoneApp(
      * The screens to open for [target], root first, or an empty list when the app has none for it (it then opens on
      * its first screen). Called by the phone when the player opens a notification that carries a target.
      */
-    internal fun createTargetScreens(target: String): List<AppScreen> = targetScreens?.create(target).orEmpty()
+    internal fun createTargetScreens(target: String): List<AppScreen> = targetScreens.create(target)
 
     override fun toString() = "PhoneApp($id)"
 }

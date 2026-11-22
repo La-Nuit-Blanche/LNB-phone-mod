@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.client
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistration
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
+import fr.bde_teknantes.lnb.phone.client.apps.LanguageWatch
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
@@ -25,6 +26,7 @@ import fr.bde_teknantes.lnb.phone.client.smooth.SmoothShader
 import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
 import net.neoforged.fml.loading.FMLPaths
@@ -47,6 +49,9 @@ object LnbPhoneClient {
     /** What the phone shows. Lives as long as the game: the phone reopens where it was left, until disconnection. */
     internal val navigator = PhoneNavigator(apps) { Minecraft.getInstance().isSameThread }
 
+    // Sends the open app home when the language changes, so no screen shows the old one.
+    private val languageWatch = LanguageWatch(navigator)
+
     /** The player's notifications, mirrored from the server: badges, LED, inventory button. */
     internal val notifications = ClientNotifications { apps[it] != null }
 
@@ -68,6 +73,8 @@ object LnbPhoneClient {
             it.registerReloadListener(AppIconTextures)
             // Which densities of the kit's icons exist may change with resource packs.
             it.registerReloadListener(SmoothTextures)
+            // A new language is applied by a reload: screens built in the old one go.
+            it.registerReloadListener(ResourceManagerReloadListener { languageWatch.loaded(Minecraft.getInstance().languageManager.selected) })
         }
         modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
         modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->

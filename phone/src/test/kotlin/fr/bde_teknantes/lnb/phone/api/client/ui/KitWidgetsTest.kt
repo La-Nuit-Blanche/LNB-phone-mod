@@ -127,9 +127,43 @@ class KitWidgetsTest {
         assertEquals(14 * 6.5f + 32f, long.preferredWidth)
         val text = Button("Réessayer").apply { kind = Button.Kind.TEXT }
         assertEquals(9 * 6.5f + 16f, text.preferredWidth)
-        // A new label resizes it.
+        // A new label resizes it, by the next frame.
         val b = screen.add(Button("OK").at(0f, 0f))
         b.label = "Se désabonner"
+        screen.frame()
         assertEquals(13 * 6.5f + 32f, b.width)
+    }
+
+    @Test
+    fun `a dialog's buttons say Cancel and OK in the player's language until told otherwise`() {
+        val dialog = Dialog("Supprimer ce post ?")
+        // No language is loaded in tests: the labels are the phone's keys, present in both language files.
+        assertEquals("gui.lnbphone.dialog.cancel", dialog.cancelLabel)
+        assertEquals("gui.lnbphone.dialog.confirm", dialog.confirmLabel)
+        dialog.confirmLabel = "Supprimer"
+        screen.showDialog(dialog)
+        screen.frame()
+        assertTrue(screen.canvas.drew("Supprimer"))
+    }
+
+    @Test
+    fun `text states are made by kind`() {
+        val line = TextState.singleLine(maxLength = 4)
+        line.insert("ab\ncdef")
+        assertEquals("ab c", line.text)
+        val area = TextState.multiline()
+        area.insert("ab\ncd")
+        assertEquals("ab\ncd", area.text)
+        assertEquals(TextState.DEFAULT_MAX_LENGTH, TextState.singleLine().maxLength)
+    }
+
+    @Test
+    fun `a label inset lines up with the rows of a full-width list`() {
+        val list = screen.add(ScrollList().at(0f, 0f, 256f, 200f))
+        list.add(Label("Début").apply { inset = Spacing.SCREEN_PADDING; maxLines = 2 })
+        list.add(Label("Fin").apply { inset = Spacing.SCREEN_PADDING; align = Label.Align.END })
+        screen.frame()
+        assertEquals(12f, screen.canvas.texts.single { it.text == "Début" }.x)
+        assertEquals(256f - 12f - 3 * 6.5f, screen.canvas.texts.single { it.text == "Fin" }.x)
     }
 }

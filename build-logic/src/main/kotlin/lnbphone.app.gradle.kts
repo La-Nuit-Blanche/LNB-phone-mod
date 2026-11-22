@@ -8,15 +8,21 @@ plugins {
 evaluationDependsOn(":phone")
 val phone = project(":phone")
 
+// The phone's test support (PhoneTester), for the app's unit tests; never part of a jar.
+val phoneTesting = phone.the<SourceSetContainer>().getByName("testing")
+
 dependencies {
     implementation(phone)
+    testImplementation(phoneTesting.output)
 }
 
 neoForge {
-    // Runs and unit tests load the phone from its classes next to the app, so a change to either needs no jar.
+    // Runs and unit tests load the phone from its classes next to the app, so a change to either needs no jar. The
+    // test support goes with the phone's classes: it uses the phone's internals and must be loaded with them.
     mods {
         register(phone.property("mod_id").toString()) {
             sourceSet(phone.the<SourceSetContainer>().getByName("main"))
+            sourceSet(phoneTesting)
         }
     }
 

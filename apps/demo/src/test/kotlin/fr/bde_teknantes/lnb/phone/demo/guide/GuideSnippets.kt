@@ -1,7 +1,5 @@
 package fr.bde_teknantes.lnb.phone.demo.guide
 
-import fr.bde_teknantes.lnb.phone.api.client.AppScreen
-import fr.bde_teknantes.lnb.phone.api.client.Phone
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
 import fr.bde_teknantes.lnb.phone.api.client.ui.Label
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextField
@@ -36,7 +34,7 @@ class ForgetfulNoteScreen : KitScreen() {
 
 // Right: the text lives in an object of the app, which outlives the screens; each new screen hands it to its field.
 object NoteState {
-    val draft = TextState("", false)
+    val draft = TextState.singleLine()
 }
 
 class NoteScreen : KitScreen() {
@@ -122,17 +120,7 @@ class CarelessDeleteScreen(private val post: Long) : KitScreen() {
 // Wrong: STRING_UTF8 reads up to 32767 characters, whatever the app allows, and the handler takes it as it comes.
 val CARELESS_TEXT_CODEC: StreamCodec<ByteBuf, String> = ByteBufCodecs.STRING_UTF8
 
-// ---- Interfaces the phone implements ----
-
-// Wrong: only the phone implements Phone (and AppCanvas). A later phone adds a method to it and this class breaks.
-class FakePhone : Phone {
-    override val canGoBack = false
-    override fun push(screen: AppScreen) {}
-    override fun pop() {}
-    override fun replace(screen: AppScreen) {}
-    override fun home() {}
-    override fun close() {}
-}
+// ---- Enums that grow ----
 
 // Right: TextStyle may get new values in a later phone, so a `when` over it keeps an `else`.
 fun isHeading(style: TextStyle) = when (style) {

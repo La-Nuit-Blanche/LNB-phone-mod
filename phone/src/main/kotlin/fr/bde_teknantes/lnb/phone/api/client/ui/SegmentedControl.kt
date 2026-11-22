@@ -1,11 +1,13 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
+import org.lwjgl.glfw.GLFW
 
 /**
  * A choice between a few options shown side by side (art direction 8.7): a 32 dp pill track split into equal segments,
  * the selected one a lighter pill inset 3 dp that slides in 150 ms. 232 dp wide in the phone's layouts.
  *
+ * Each segment is a Tab stop; Left and Right move the focus between them, and Space or Enter picks the focused one.
  */
 class SegmentedControl(labels: List<String>) : Widget() {
     /** Called with the new index when the player picks another segment (not when [selected] is set by code). */
@@ -18,13 +20,16 @@ class SegmentedControl(labels: List<String>) : Widget() {
         require(labels.isNotEmpty()) { "A segmented control needs at least one label" }
     }
 
-    /** The selected segment. Setting it slides the pill, without calling [onSelect]. */
+    /**
+     * The selected segment. Setting it slides the pill, without calling [onSelect]; set before the screen's first
+     * frame, the pill is simply there ([shouldAnimate]).
+     */
     var selected: Int = 0
         set(value) {
             val index = value.coerceIn(0, segments.size - 1)
             if (index == field) return
             field = index
-            if (width > 0f && screen != null) pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT) else pill.snapTo(pillX(index))
+            if (width > 0f && shouldAnimate) pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT) else pill.snapTo(pillX(index))
         }
 
     override val preferredWidth get() = 232f
@@ -54,6 +59,18 @@ class SegmentedControl(labels: List<String>) : Widget() {
                     onSelect?.invoke(index)
                 }
             }
+        }
+
+        // Left and Right move between the segments, as Tab does; Space or Enter picks one.
+        override fun onKey(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+            val step = when (keyCode) {
+                GLFW.GLFW_KEY_LEFT -> -1
+                GLFW.GLFW_KEY_RIGHT -> 1
+                else -> return false
+            }
+            val next = segments.getOrNull(index + step)?.takeIf { it.focusable } ?: return true
+            screen?.focus(next, visible = true)
+            return true
         }
 
         override fun render(canvas: AppCanvas) {

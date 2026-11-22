@@ -23,49 +23,49 @@ import net.minecraft.resources.ResourceLocation
  * **Order**: what is drawn later is drawn on top. A canvas is only valid during the [AppScreen.render] call that
  * received it; don't keep it.
  *
- * The phone provides the canvas; don't implement this interface yourself (for tests, draw through a
- * [fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen] and check the widgets' state instead). Later versions of the
- * phone will add methods to it, which would break a class of yours.
+ * The phone provides the canvas, and only the phone can make one: later versions add drawing methods without breaking
+ * your code. To test a screen, play it with the phone's test support (`fr.bde_teknantes.lnb.phone.testing.PhoneTester`),
+ * which draws on a canvas of its own and tells what was drawn.
  */
-interface AppCanvas : TextMeasurer {
+abstract class AppCanvas internal constructor() : TextMeasurer() {
     /** Width of the viewport in dp: [WIDTH]. */
-    val width: Int
+    abstract val width: Int
 
     /** Height of the viewport in dp: [HEIGHT]. */
-    val height: Int
+    abstract val height: Int
 
     /** Real screen pixels per dp right now: 1, 1.5 or 2 at GUI scale 2, 3 or 4. Rarely needed: everything is in dp. */
-    val pixelsPerDp: Float
+    abstract val pixelsPerDp: Float
 
     // ---- Shapes ----
 
     /** Fills a rectangle whose top-left corner is ([x], [y]), [w] x [h] dp. */
-    fun fillRect(x: Float, y: Float, w: Float, h: Float, color: Int)
+    abstract fun fillRect(x: Float, y: Float, w: Float, h: Float, color: Int)
 
     /** Fills a rectangle with rounded corners of [radius] dp. [Radius.FULL][fr.bde_teknantes.lnb.phone.api.client.ui.Radius.FULL] gives a pill. */
-    fun fillRoundRect(x: Float, y: Float, w: Float, h: Float, radius: Float, color: Int)
+    abstract fun fillRoundRect(x: Float, y: Float, w: Float, h: Float, radius: Float, color: Int)
 
     /**
      * Draws a border [thickness] dp thick along the inside of a rounded rectangle (it doesn't grow the shape). The
      * thickness is rounded to whole pixels and never thinner than one.
      */
-    fun strokeRoundRect(x: Float, y: Float, w: Float, h: Float, radius: Float, thickness: Float, color: Int)
+    abstract fun strokeRoundRect(x: Float, y: Float, w: Float, h: Float, radius: Float, thickness: Float, color: Int)
 
     /** Fills a circle of [diameter] dp whose bounding square's top-left corner is ([x], [y]). */
-    fun fillCircle(x: Float, y: Float, diameter: Float, color: Int)
+    abstract fun fillCircle(x: Float, y: Float, diameter: Float, color: Int)
 
     /**
      * A horizontal divider from [x0] to [x1], occupying the dp row [y]..[y]+1: one pixel at GUI scale 2, two at 3 and
      * 4. It always ends at the bottom of that row, so a line drawn on the last dp of an area (a header's at y 43, a
      * row's at its bottom) never spills onto what follows.
      */
-    fun hairline(x0: Float, x1: Float, y: Float, color: Int)
+    abstract fun hairline(x0: Float, x1: Float, y: Float, color: Int)
 
     /** [hairline] in [Colors.HAIRLINE]. */
     fun hairline(x0: Float, x1: Float, y: Float) = hairline(x0, x1, y, Colors.HAIRLINE)
 
     /** A vertical divider from [y0] to [y1], occupying the dp column [x]..[x]+1 (see [hairline]). */
-    fun verticalHairline(x: Float, y0: Float, y1: Float, color: Int)
+    abstract fun verticalHairline(x: Float, y0: Float, y1: Float, color: Int)
 
     /** [verticalHairline] in [Colors.HAIRLINE]. */
     fun verticalHairline(x: Float, y0: Float, y1: Float) = verticalHairline(x, y0, y1, Colors.HAIRLINE)
@@ -76,7 +76,7 @@ interface AppCanvas : TextMeasurer {
      * Draws one line of [text] in [style], in the line box whose top-left corner is ([x], [y]). Line feeds are not
      * interpreted. Returns the width drawn, in dp.
      */
-    fun drawText(text: String, x: Float, y: Float, style: TextStyle, color: Int): Float
+    abstract fun drawText(text: String, x: Float, y: Float, style: TextStyle, color: Int): Float
 
     /** Draws [text] on one line, cut with an ellipsis (…) so that it fits in [maxWidth] dp. Returns the width drawn. */
     fun drawTextTruncated(text: String, x: Float, y: Float, maxWidth: Float, style: TextStyle, color: Int): Float =
@@ -105,7 +105,7 @@ interface AppCanvas : TextMeasurer {
      * Draws [icon] as a [size] dp square tinted with [color], its top-left corner at ([x], [y]). Use one of the icon's
      * [sizes][Icon.sizes]: the icon is then drawn pixel for pixel.
      */
-    fun drawIcon(icon: Icon, x: Float, y: Float, color: Int, size: Float)
+    abstract fun drawIcon(icon: Icon, x: Float, y: Float, color: Int, size: Float)
 
     /** [drawIcon] at the icon's smallest size. */
     fun drawIcon(icon: Icon, x: Float, y: Float, color: Int) = drawIcon(icon, x, y, color, icon.sizes.first().toFloat())
@@ -115,13 +115,13 @@ interface AppCanvas : TextMeasurer {
      * turned by [turns] (0 to 1, a full turn; the phone's spinner turns once per 800 ms). The
      * [Spinner][fr.bde_teknantes.lnb.phone.api.client.ui.Spinner] widget animates it for you.
      */
-    fun drawSpinner(x: Float, y: Float, size: Float, color: Int, turns: Float)
+    abstract fun drawSpinner(x: Float, y: Float, size: Float, color: Int, turns: Float)
 
     /**
      * Draws part [u0]..[u1] x [v0]..[v1] (0 to 1) of [texture], stretched over a rectangle and multiplied by [color]
      * (white leaves it as it is). [linear] smooths it when stretched; pass false for pixel art.
      */
-    fun drawTexture(
+    abstract fun drawTexture(
         texture: ResourceLocation, x: Float, y: Float, w: Float, h: Float,
         color: Int, u0: Float, v0: Float, u1: Float, v1: Float, linear: Boolean,
     )
@@ -136,14 +136,14 @@ interface AppCanvas : TextMeasurer {
      * grey disc stands in. The [Avatar][fr.bde_teknantes.lnb.phone.api.client.ui.Avatar] widget does this, and
      * the anonymous variant.
      */
-    fun drawPlayerFace(skin: ResourceLocation, x: Float, y: Float, size: Float)
+    abstract fun drawPlayerFace(skin: ResourceLocation, x: Float, y: Float, size: Float)
 
     /**
      * Draws the soft shadow that goes under an element occupying the rectangle ([x], [y], [w], [h]); draw the element
      * itself afterwards. The shadow reaches past the rectangle: see [Shadow]. Only sheets (menus, dialogs, snackbars,
      * banners) and the floating action button have shadows on the phone.
      */
-    fun drawShadow(shadow: Shadow, x: Float, y: Float, w: Float, h: Float)
+    abstract fun drawShadow(shadow: Shadow, x: Float, y: Float, w: Float, h: Float)
 
     // ---- State ----
 
@@ -151,28 +151,28 @@ interface AppCanvas : TextMeasurer {
      * Cuts what follows to a rectangle (also inside the current one) until the matching [popClip]. For scrolling
      * areas and text that must not overflow its box.
      */
-    fun pushClip(x: Float, y: Float, w: Float, h: Float)
+    abstract fun pushClip(x: Float, y: Float, w: Float, h: Float)
 
     /** Ends the clip of the last [pushClip]. */
-    fun popClip()
+    abstract fun popClip()
 
     /**
      * Moves the origin by ([dx], [dy]) dp until the matching [popOffset]: a widget draws at (0, 0) and its parent
      * places it. Offsets add up. Fractions are fine (a list scrolled by 10.5 dp): edges still land on whole pixels.
      */
-    fun pushOffset(dx: Float, dy: Float)
+    abstract fun pushOffset(dx: Float, dy: Float)
 
     /** Ends the offset of the last [pushOffset]. */
-    fun popOffset()
+    abstract fun popOffset()
 
     /**
      * Multiplies the opacity of what follows by [alpha] (0 to 1) until the matching [popAlpha], for fades. Opacities
      * multiply: half inside half is a quarter.
      */
-    fun pushAlpha(alpha: Float)
+    abstract fun pushAlpha(alpha: Float)
 
     /** Ends the opacity of the last [pushAlpha]. */
-    fun popAlpha()
+    abstract fun popAlpha()
 
     companion object {
         /** Width of the app viewport in dp. */

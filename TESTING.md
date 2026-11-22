@@ -127,7 +127,9 @@ Each item says what to do and what should be seen; anything else is a failure to
 Set both clients to French (Options, Language, Français) and redo items 2, 7, 10, 11 and 15 quickly. Every text of
 the phone, Settings, Ping, the banner, the inventory tooltip and the controls screen is in French; no raw key such as
 `settings.lnbphone.sounds` shows anywhere; French typography holds (`Ping envoyé`, a space before `:` in `A : …`).
-Then set "Français (Canada)": the same French.
+Then set "Français (Canada)": the same French. Last, open Settings, put the phone away with Esc, and switch the
+game back to English: the phone opens on the home screen, and Settings, opened again, is in English. A draft typed in
+Ping before the switch is still in its field.
 
 ### Screens, machines and resource packs
 
@@ -181,7 +183,8 @@ Warden and more), with their own client settings. Install the phone on that modp
 launcher), and cover what can be reasoned about without a window: the navigation model, the shell's state machine and
 its handling of every key, notification alerts and the inventory button's logic, the layout maths, text layout and
 editing, the kit's widgets and focus, the notification store, its limits and its sync, the settings file and the
-Settings app. The demo's tests check Ping's session and target, and that every code sample of
+Settings app (played through `PhoneTester`, the test support apps use too, in `phone/src/testing/`). The demo's tests
+check Ping's session, target and conversation screen, and that every code sample of
 `docs/writing-an-app.md` is still found in the file it quotes.
 
 ### Screenshots

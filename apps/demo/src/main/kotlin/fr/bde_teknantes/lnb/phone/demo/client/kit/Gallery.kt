@@ -20,12 +20,14 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Interaction
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitPreview
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
 import fr.bde_teknantes.lnb.phone.api.client.ui.Label
+import fr.bde_teknantes.lnb.phone.api.client.ui.LabeledToggle
 import fr.bde_teknantes.lnb.phone.api.client.ui.ListRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.MessageRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
 import fr.bde_teknantes.lnb.phone.api.client.ui.SegmentedControl
 import fr.bde_teknantes.lnb.phone.api.client.ui.SkeletonPost
 import fr.bde_teknantes.lnb.phone.api.client.ui.Spacer
+import fr.bde_teknantes.lnb.phone.api.client.ui.Spacing
 import fr.bde_teknantes.lnb.phone.api.client.ui.Spinner
 import fr.bde_teknantes.lnb.phone.api.client.ui.SpinnerRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Tabs
@@ -34,7 +36,6 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.TextField
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextState
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
 import fr.bde_teknantes.lnb.phone.api.client.ui.Toggle
-import fr.bde_teknantes.lnb.phone.api.client.ui.ToggleRow
 import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.demo.client.smooth.SampleSkins
@@ -163,7 +164,7 @@ object Gallery {
             val y = 52f + i * 92f
             page.caption(name, y)
             val filled = name.startsWith("Filled") || name.startsWith("Error") || name.startsWith("Disabled")
-            val field = TextField(TextState(if (filled) "Mika Laurent" else "", false)).apply {
+            val field = TextField(TextState.singleLine().apply { text = if (filled) "Mika Laurent" else "" }).apply {
                 placeholder = tr("reply.placeholder", "Alexandre Morel")
             }
             when {
@@ -181,7 +182,7 @@ object Gallery {
     fun textFields2() = Page("Text fields 2") { fieldStates(this, listOf("Filled", "Error: helper 4 dp under", "Disabled")) }
 
     fun textAreas() = Page("Text areas") {
-        fun area(text: String) = TextArea(TextState(text)).apply { limit = 280 }
+        fun area(text: String) = TextArea(TextState.multiline().also { it.text = text }).apply { limit = 280 }
         caption("Empty, focused: placeholder, caret, 0/280", 50f)
         add(area("").apply {
             placeholder = tr("compose.placeholder")
@@ -214,7 +215,7 @@ object Gallery {
             enabled = false
         }.at(12f, 212f))
         caption("Toggle row (Compose 9.8): one Tab stop, all of it clicks", 254f)
-        add(ToggleRow(tr("compose.anonymous")).apply { helper = tr("compose.anonymous.help") }.at(12f, 272f, 232f, 44f))
+        add(LabeledToggle(tr("compose.anonymous")).apply { helper = tr("compose.anonymous.help") }.at(12f, 272f, 232f, 44f))
         caption("Focus ring", 322f)
         add(Toggle().apply { checked = true }.look(null, focus = true).at(12f, 342f))
         add(Button("OK").apply { fixedWidth = 64f }.look(null, focus = true).at(68f, 336f))
@@ -251,7 +252,7 @@ object Gallery {
         }, 12f, 8f, 4f))
         list.add(Divider())
         list.add(Spacer(16f))
-        list.add(Divider().apply { inset = true })
+        list.add(Divider().apply { start = Spacing.CONTENT_X })
     }
 
     /** A label with padding, as a list row. */

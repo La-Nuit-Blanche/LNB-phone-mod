@@ -26,15 +26,23 @@ internal class FakeTextEnvironment : TextEnvironment {
 
 /** Puts the fakes in place of the game for a widget test, and takes them away. */
 internal object KitFakes {
+    /** The sounds played since [install], in order; sounds are on unless a test turns [soundsOn] off. */
+    val sounds = ArrayList<PhoneSounds.Sound>()
+    var soundsOn = true
+
     fun install(): FakeTextEnvironment {
         TextMetrics.fonts = { MonoFont }
-        PhoneSounds.forcedEnabled = false
+        sounds.clear()
+        soundsOn = true
+        PhoneSounds.output = { sounds += it }
+        PhoneSounds.setting = { soundsOn }
         return FakeTextEnvironment().also { TextEnvironment.current = it }
     }
 
     fun uninstall() {
         TextMetrics.fonts = { SmoothResources.font(it) }
-        PhoneSounds.forcedEnabled = null
+        PhoneSounds.output = PhoneSounds.gameOutput
+        PhoneSounds.setting = PhoneSounds.playerSetting
         TextEnvironment.current = TextEnvironment.Game
     }
 }
@@ -127,6 +135,17 @@ internal open class TestScreen : KitScreen() {
     }
 
     fun key(keyCode: Int, modifiers: Int = 0): Boolean = keyPressed(keyCode, 0, modifiers)
+
+    /** The key held down: one press, then [repeats] repeats, as the phone passes them on. */
+    fun hold(keyCode: Int, repeats: Int, modifiers: Int = 0) {
+        keyPressed(keyCode, 0, modifiers)
+        keyRepeat = true
+        try {
+            repeat(repeats) { keyPressed(keyCode, 0, modifiers) }
+        } finally {
+            keyRepeat = false
+        }
+    }
 
     /** Types [text] as Minecraft hands it over: one UTF-16 unit at a time, a pair's halves one after the other. */
     fun type(text: String) {

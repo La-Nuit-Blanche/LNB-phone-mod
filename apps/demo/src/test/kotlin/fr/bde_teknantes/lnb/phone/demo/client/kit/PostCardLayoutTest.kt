@@ -1,20 +1,14 @@
 package fr.bde_teknantes.lnb.phone.demo.client.kit
 
-import fr.bde_teknantes.lnb.phone.api.client.ui.TextMeasurer
-import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
+import fr.bde_teknantes.lnb.phone.testing.TestTextMeasurer
 import net.minecraft.resources.ResourceLocation
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class PostCardLayoutTest {
-    /** Every character 5 dp; a line feed in the text splits lines, nothing else wraps. */
-    private val fake = object : TextMeasurer {
-        override fun measure(text: String, style: TextStyle) = text.length * 5f
-        override fun truncate(text: String, style: TextStyle, maxWidth: Float) = text
-        override fun wrap(text: String, style: TextStyle, maxWidth: Float) = text.split('\n')
-        override fun wrap(text: String, style: TextStyle, maxWidth: Float, maxLines: Int) = wrap(text, style, maxWidth).take(maxLines)
-    }
+    /** Every character half its size wide, as the phone's test support measures: "2 min" is 30 dp in caption. */
+    private val fake = TestTextMeasurer
 
     private val skin = { ResourceLocation.withDefaultNamespace("missing") }
 
@@ -39,8 +33,8 @@ class PostCardLayoutTest {
     @Test
     fun `the name leaves room for the badge and the time`() {
         val l = PostCardLayout(post(Author("Admin_Lune", "Lune Garnier", skin, announcer = true), canDelete = true), fake)
-        // Time "2 min" is 25 dp, right-aligned to 214 with the more button: 214 - 25 - 8 - 20 - 56.
-        assertEquals(105f, l.nameMaxWidth)
+        // Time "2 min" is 30 dp, right-aligned to 214 with the more button: 214 - 30 - 8 - 20 - 56.
+        assertEquals(100f, l.nameMaxWidth)
     }
 
     @Test
