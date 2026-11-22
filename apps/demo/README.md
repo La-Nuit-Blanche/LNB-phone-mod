@@ -12,16 +12,16 @@ kept apart:
 | File | Side | What |
 |---|---|---|
 | `ping/Ping.kt` | both | the app's id and start-up |
-| `ping/PingNetwork.kt` | both | the two payloads |
-| `ping/PingServer.kt` | server | checks a ping, passes it on, sends the notification |
+| `ping/PingNetwork.kt` | both | the three payloads: a ping, the server's answer, a ping received |
+| `ping/PingServer.kt` | server | checks a ping (length, one a second, recipient online), passes it on with a notification, answers the sender |
 | `ping/PingTarget.kt` | both | the notification's target, written and read back |
 | `ping/client/PingClient.kt` | client | registers the app, opens a notification's target |
-| `ping/client/PingSession.kt` | client | drafts, conversations and scroll position, kept until disconnection |
+| `ping/client/PingSession.kt` | client | drafts, conversations (the newest 50 messages each), answers awaited, scroll position; kept until disconnection |
 | `ping/client/PlayersScreen.kt` | client | the first screen: the players online |
 | `ping/client/PingScreen.kt` | client | writing to one player |
 
-Its strings are the `ping` keys of `lang/en_us.json` and `fr_fr.json`, its icon `textures/gui/ping.png`. Its test is
-`src/test/.../ping/PingTargetTest.kt`; `src/test/.../guide/` keeps the guide's samples true.
+Its strings are the `ping` keys of `lang/en_us.json` and `fr_fr.json`, its icon `textures/gui/ping.png`. Its tests are
+`src/test/.../ping/PingTargetTest.kt` and `ping/client/PingSessionTest.kt`; `src/test/.../guide/` keeps the guide's samples true.
 
 ## Development tools
 
@@ -29,7 +29,8 @@ They stay because the screenshot harness and the tasks' checks rely on them. Don
 should be written: some reach into the phone's internals, by reflection, to show or drive what no app can.
 
 - **Apps on the home screen** (`client/DemoAppClient.kt`): "Hello" (`client/HelloScreen.kt`), a bare `AppScreen`
-  drawn without the kit, where every click opens one more screen, to try navigation; "UI kit" (`client/kit/Gallery.kt`,
+  drawn without the kit, where every click opens one more screen, to try navigation, and a right click opens a
+  vanilla dialog over the phone; "UI kit" (`client/kit/Gallery.kt`,
   `KitPages.kt`), every widget of the kit in every state; "Feed (sample)" (`client/kit/FeedScreens.kt`,
   `PostCard.kt`, `FeedSample.kt`), the screens of the planned Feed app rebuilt from the kit with made-up posts.
   `-PdemoApps=<n>` adds n sample icons, to fill the home screen.
@@ -38,5 +39,5 @@ should be written: some reach into the phone's internals, by reflection, to show
 - **Test sheets**: `client/smooth/SmoothTestScreen.kt` (the smooth drawing layer: type, shapes, icons, faces) and
   `client/notifications/BannerTestScreen.kt` (the notification banner), drawn as plain game screens.
 - **The screenshot harness** (`client/capture/`): an unattended client that plays a scenario and quits. See
-  [`TESTING.md`](../../TESTING.md).
+  [`TESTING.md`](../../TESTING.md). `HomeSlots` finds a home icon by its app's id.
 - `scripts/gen_spike_sprites.py` and `textures/gui/spike/`: images the smooth layer's test sheet compares against.
