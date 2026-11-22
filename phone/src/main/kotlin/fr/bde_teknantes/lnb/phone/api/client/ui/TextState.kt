@@ -1,0 +1,234 @@
+package fr.bde_teknantes.lnb.phone.api.client.ui
+
+/**
+ * The content of a [TextField] or [TextArea]: the text, the caret and the selection, with the editing operations.
+ *
+ * A field creates its own state unless you give it one. Give it one you keep elsewhere (an object of your app that
+ * lives for the session) when the text must survive the screen: a draft kept when the player leaves Compose and comes
+ * back. The screen is rebuilt each time; the state you pass in is what carries over.
+ *
+ * ```kotlin
+ * object Drafts { val post = TextState() }
+ * TextArea(Drafts.post, placeholder = "What's new?", limit = 280)
+ * ```
+ *
+ * Positions are indexes into [text] (UTF-16 units, as everywhere in Kotlin), always on a character boundary: an emoji
+ * outside the basic plane is never split. Characters that can't be typed are filtered out of what is inserted (control
+ * characters, the section sign Minecraft uses for formatting; line feeds unless [multiline]). Plain logic: no game
+ * classes, usable in tests.
+ *
+ * @param multiline Whether line feeds are kept (a text area) or turned into spaces (a single-line field).
+ * @param maxLength The most characters (code points) the text can hold; what would go past is cut. Separate from a
+ * text area's visible limit, which may be exceeded and is then marked.
+ */
+class TextState(initial: String = "", val multiline: Boolean = true, val maxLength: Int = DEFAULT_MAX_LENGTH) {
+    private var content = ""
+    private val listeners = ArrayList<(TextState) -> Unit>()
+
+    /** Where the caret is. */
+    var caret: Int = 0
+        private set
+
+    /** The other end of the selection; equal to [caret] when nothing is selected. */
+    var anchor: Int = 0
+        private set
+
+    /** Increases at every change of the text, for caches. */
+    var version: Int = 0
+        private set
+
+    init {
+        require(maxLength > 0) { "maxLength must be positive" }
+        content = clean(initial, replacedLength = 0)
+        caret = content.length
+        anchor = caret
+    }
+
+    /** The text. Setting it puts the caret at the end, with no selection. */
+    var text: String
+        get() = content
+        set(value) {
+            val cleaned = clean(value, replacedLength = length)
+            replaceAll(cleaned, cleaned.length)
+        }
+
+    val selectionStart: Int get() = minOf(caret, anchor)
+    val selectionEnd: Int get() = maxOf(caret, anchor)
+    val hasSelection: Boolean get() = caret != anchor
+    val selectedText: String get() = content.substring(selectionStart, selectionEnd)
+
+    /** Number of characters as a player counts them (code points: `é` is one, an emoji is one). */
+    val length: Int get() = content.codePointCount(0, content.length)
+
+    /** Whether the text is empty once spaces and line feeds are trimmed: nothing to send. */
+    val isBlank: Boolean get() = content.isBlank()
+
+    /** Calls [listener] after each change of the text (not of the caret alone). */
+    fun addListener(listener: (TextState) -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: (TextState) -> Unit) {
+        listeners -= listener
+    }
+
+    /** Empties the text. */
+    fun clear() {
+        text = ""
+    }
+
+    // ---- Editing ----
+
+    /** Replaces the selection (or inserts at the caret) with [typed], filtered; the caret ends after it. */
+    fun insert(typed: String) {
+        val start = selectionStart
+        val end = selectionEnd
+        val cleaned = clean(typed, replacedLength = content.codePointCount(start, end))
+        if (cleaned.isEmpty() && start == end) return
+        replaceAll(content.substring(0, start) + cleaned + content.substring(end), start + cleaned.length)
+    }
+
+    /** Backspace: deletes the selection, or the character (with [word], the word) before the caret. */
+    fun deleteBackward(word: Boolean = false) {
+        if (hasSelection) return insert("")
+        if (caret == 0) return
+        val start = if (word) previousWord(caret) else previous(caret)
+        replaceAll(content.substring(0, start) + content.substring(caret), start)
+    }
+
+    /** Delete: deletes the selection, or the character (with [word], the word) after the caret. */
+    fun deleteForward(word: Boolean = false) {
+        if (hasSelection) return insert("")
+        if (caret == content.length) return
+        val end = if (word) nextWord(caret) else next(caret)
+        replaceAll(content.substring(0, caret) + content.substring(end), caret)
+    }
+
+    // ---- Caret and selection ----
+
+    /** Moves the caret to [index] (snapped to a character boundary); with [select], extends the selection. */
+    fun moveTo(index: Int, select: Boolean = false) {
+        caret = boundary(index.coerceIn(0, content.length))
+        if (!select) anchor = caret
+    }
+
+    /** Left arrow: one character, or one word with [word]. Without [select], a selection collapses to its start. */
+    fun moveLeft(select: Boolean = false, word: Boolean = false) {
+        if (hasSelection && !select) return moveTo(selectionStart)
+        moveTo(if (word) previousWord(caret) else previous(caret), select)
+    }
+
+    /** Right arrow: one character, or one word with [word]. Without [select], a selection collapses to its end. */
+    fun moveRight(select: Boolean = false, word: Boolean = false) {
+        if (hasSelection && !select) return moveTo(selectionEnd)
+        moveTo(if (word) nextWord(caret) else next(caret), select)
+    }
+
+    /** Selects everything. */
+    fun selectAll() {
+        anchor = 0
+        caret = content.length
+    }
+
+    /** Selects the word (or run of spaces, or of punctuation) around [index], as a double click does. */
+    fun selectWordAt(index: Int) {
+        if (content.isEmpty()) return
+        val i = boundary(index.coerceIn(0, content.length))
+        val kind = kindAt(if (i < content.length) i else previous(i))
+        var start = if (i < content.length) i else previous(i)
+        var end = start
+        while (start > 0 && kindAt(previous(start)) == kind) start = previous(start)
+        while (end < content.length && kindAt(end) == kind) end = next(end)
+        anchor = start
+        caret = end
+    }
+
+    // ---- Internals ----
+
+    private fun replaceAll(newText: String, newCaret: Int) {
+        val changed = newText != content
+        content = newText
+        caret = boundary(newCaret.coerceIn(0, newText.length))
+        anchor = caret
+        if (changed) {
+            version++
+            listeners.toList().forEach { it(this) }
+        }
+    }
+
+    /** [typed] without what can't be typed, cut so that the text stays within [maxLength] once [replacedLength] code points go. */
+    private fun clean(typed: String, replacedLength: Int): String {
+        val out = StringBuilder(typed.length)
+        var i = 0
+        while (i < typed.length) {
+            val cp = typed.codePointAt(i)
+            i += Character.charCount(cp)
+            when {
+                // Windows line ends from the clipboard: one line feed.
+                cp == '\r'.code -> if (i < typed.length && typed[i] == '\n') continue else out.append(if (multiline) '\n' else ' ')
+                cp == '\n'.code -> out.append(if (multiline) '\n' else ' ')
+                cp == '\t'.code -> out.append(' ')
+                isAllowed(cp) -> out.appendCodePoint(cp)
+            }
+        }
+        val room = maxLength - (content.codePointCount(0, content.length) - replacedLength)
+        if (room <= 0) return ""
+        val count = out.codePointCount(0, out.length)
+        return if (count <= room) out.toString() else out.substring(0, out.offsetByCodePoints(0, room))
+    }
+
+    private fun previous(index: Int): Int = if (index <= 0) 0 else content.offsetByCodePoints(index, -1)
+
+    private fun next(index: Int): Int = if (index >= content.length) content.length else content.offsetByCodePoints(index, 1)
+
+    /** [index], moved back off the middle of a surrogate pair. */
+    private fun boundary(index: Int): Int =
+        if (index in 1 until content.length && Character.isLowSurrogate(content[index]) && Character.isHighSurrogate(content[index - 1])) {
+            index - 1
+        } else {
+            index
+        }
+
+    /** 0: space, 1: word character, 2: anything else (punctuation). */
+    private fun kindAt(index: Int): Int {
+        val cp = content.codePointAt(index)
+        return when {
+            Character.isWhitespace(cp) -> 0
+            Character.isLetterOrDigit(cp) || cp == '_'.code || cp == '\''.code || cp == '’'.code -> 1
+            else -> 2
+        }
+    }
+
+    /** Ctrl+Left: back over spaces, then over the word (or punctuation run) before them. */
+    private fun previousWord(index: Int): Int {
+        var i = index
+        while (i > 0 && kindAt(previous(i)) == 0) i = previous(i)
+        if (i == 0) return 0
+        val kind = kindAt(previous(i))
+        while (i > 0 && kindAt(previous(i)) == kind) i = previous(i)
+        return i
+    }
+
+    /** Ctrl+Right: over the word (or punctuation run) at the caret, then over the spaces after it. */
+    private fun nextWord(index: Int): Int {
+        var i = index
+        if (i < content.length) {
+            val kind = kindAt(i)
+            if (kind != 0) while (i < content.length && kindAt(i) == kind) i = next(i)
+        }
+        while (i < content.length && kindAt(i) == 0) i = next(i)
+        return i
+    }
+
+    override fun toString() = "TextState(\"$content\", caret $caret, anchor $anchor)"
+
+    companion object {
+        /** Far beyond any limit a field shows; only there so a huge paste can't stall the game. */
+        const val DEFAULT_MAX_LENGTH = 4000
+
+        /** Whether [codePoint] may be typed: not a control character, not Minecraft's section sign, not half a surrogate pair. */
+        fun isAllowed(codePoint: Int): Boolean =
+            codePoint >= 0x20 && codePoint != 0x7F && codePoint !in 0x80..0x9F && codePoint != 0xA7 &&
+                codePoint !in Character.MIN_SURROGATE.code..Character.MAX_SURROGATE.code
+    }
+}

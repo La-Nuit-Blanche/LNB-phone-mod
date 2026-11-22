@@ -1,0 +1,299 @@
+package fr.bde_teknantes.lnb.phone.api.client.ui
+
+import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
+import fr.bde_teknantes.lnb.phone.api.client.offset
+
+/**
+ * A piece of a [KitScreen]: a button, a field, a list, or something of your own. A screen creates its widgets once,
+ * adds them to itself, and they draw themselves and react to the player from then on. Widgets keep their state (what
+ * is typed, where a list is scrolled) for as long as the screen lives; hand them a state object of your own
+ * ([TextState], [ScrollState]) when it must outlive the screen.
+ *
+ * **Place** a widget with [at] (or [atRight]), in dp relative to its parent: the screen for widgets added to it,
+ * the enclosing widget otherwise. Each widget has a natural size ([preferredWidth] and [preferredHeight]), used when
+ * you don't give one.
+ *
+ * ```kotlin
+ * add(Button("Post", fixedWidth = 88f) { send() }.atRight(244f, 6f))
+ * ```
+ *
+ * **Your own widget** extends this class (or [Clickable] for something that reacts to clicks) and overrides [render],
+ * drawing at (0, 0) in its own coordinates; its children are drawn on top. [isHovered], [isFocused] and [now] give
+ * what drawing states and animations need. Input methods receive coordinates in the widget's own dp as well.
+ *
+ * Widgets belong to the client thread, like screens.
+ */
+abstract class Widget {
+    /** Left edge in the parent, dp. */
+    var x = 0f
+        private set
+
+    /** Top edge in the parent, dp. */
+    var y = 0f
+        private set
+
+    var width = 0f
+        private set
+
+    var height = 0f
+        private set
+
+    /** Hidden widgets are neither drawn nor reached by the pointer, and keep their place free. */
+    var visible = true
+
+    /**
+     * Whether the widget reacts. A disabled widget is drawn in its disabled state, ignores clicks and keys (a click
+     * on it plays the "can't" sound), and loses the focus.
+     */
+    open var enabled = true
+        set(value) {
+            field = value
+            if (!value && isFocused) screen?.focus(null)
+        }
+
+    /**
+     * Text shown in a small bubble when the pointer rests on the widget for half a second. Null for none. A widget
+     * with a tooltip catches the pointer, so it can't be clicked through.
+     */
+    open var tooltip: String? = null
+
+    /** The widget this one was added to; null for a widget not added anywhere yet. */
+    var parent: Widget? = null
+        private set
+
+    private val childList = ArrayList<Widget>()
+
+    /** The widgets added to this one, in drawing order (later ones on top). */
+    val children: List<Widget> get() = childList
+
+    /** Width the widget takes when placed without one. */
+    open val preferredWidth: Float get() = width
+
+    /** Height the widget takes when placed without one. */
+    open val preferredHeight: Float get() = height
+
+    /**
+     * Height the widget needs at [width], for widgets whose height follows their content (a post card whose text
+     * wraps). A [ScrollList] stacks its rows with it. Defaults to [preferredHeight].
+     */
+    open fun heightFor(width: Float): Float = preferredHeight
+
+    // ---- Placement ----
+
+    /** Places the widget, its top-left corner at ([x], [y]) in its parent, [width] x [height] dp. */
+    fun setBounds(x: Float, y: Float, width: Float, height: Float) {
+        this.x = x
+        this.y = y
+        val resized = width != this.width || height != this.height
+        this.width = width
+        this.height = height
+        if (resized) layout()
+    }
+
+    /**
+     * Called when the widget's size changes: the place to position children that depend on it. Also call it yourself
+     * after changing what the layout depends on.
+     */
+    open fun layout() {}
+
+    // ---- Tree ----
+
+    /** Adds [child] on top of this widget's other children and returns it. A widget has one parent at a time. */
+    fun <T : Widget> add(child: T): T {
+        require(child !== this) { "A widget can't contain itself" }
+        child.parent?.remove(child)
+        childList.add(child)
+        child.parent = this
+        return child
+    }
+
+    /** Inserts [child] at [index] in the drawing order and returns it. */
+    fun <T : Widget> add(index: Int, child: T): T {
+        child.parent?.remove(child)
+        childList.add(index.coerceIn(0, childList.size), child)
+        child.parent = this
+        return child
+    }
+
+    /** Takes [child] out of this widget. If it held the focus, the focus goes. */
+    fun remove(child: Widget) {
+        if (!childList.remove(child)) return
+        screen?.forget(child)
+        child.parent = null
+    }
+
+    /** Takes every child out. */
+    fun removeAll() {
+        childList.toList().forEach(::remove)
+    }
+
+    /** The screen this widget is on, or null while it isn't on one. */
+    val screen: KitScreen?
+        get() {
+            var w: Widget? = this
+            while (w != null) {
+                if (w is KitScreen.Root) return w.owner
+                w = w.parent
+            }
+            return null
+        }
+
+    // ---- State for drawing ----
+
+    /** The screen's clock in milliseconds, for animations: advances 50 ms per game tick, smoothly between ticks. */
+    val now: Float get() = screen?.now ?: 0f
+
+    /** Whether the pointer is on this widget (and on nothing above it that catches the pointer). */
+    open val isHovered: Boolean get() = screen?.hovered === this
+
+    /** Whether the widget has the keyboard focus. */
+    val isFocused: Boolean get() = screen?.focused === this
+
+    /** Whether to draw a focus ring: focused, and the focus came from the keyboard (Tab), not a click. */
+    open val showsFocusRing: Boolean get() = isFocused && screen?.focusVisible == true
+
+    /** Whether this widget and all its parents are visible. */
+    val isShowing: Boolean
+        get() {
+            var w: Widget? = this
+            while (w != null) {
+                if (!w.visible) return false
+                w = w.parent
+            }
+            return true
+        }
+
+    // ---- Drawing ----
+
+    /** Draws the widget itself, in its own coordinates ((0, 0) is its top-left corner). Children come after, on top. */
+    open fun render(canvas: AppCanvas) {}
+
+    /** Draws above the children, for the rare widget that needs it (an indicator over its tabs). */
+    open fun renderOver(canvas: AppCanvas) {}
+
+    /** Draws the children, each moved to its place. Override to clip or to skip some (a list does). */
+    protected open fun renderChildren(canvas: AppCanvas) {
+        for (child in childList) child.draw(canvas)
+    }
+
+    /** Called once per frame before drawing, top-down: the place to move with an animation (a widget's position). */
+    open fun update() {}
+
+    internal fun draw(canvas: AppCanvas) {
+        if (!visible) return
+        update()
+        canvas.offset(x, y) {
+            render(canvas)
+            renderChildren(canvas)
+            renderOver(canvas)
+        }
+    }
+
+    // ---- Pointer ----
+
+    /** Whether the widget catches the pointer: it can be hovered and clicked, and hides what is under it. */
+    open val catchesPointer: Boolean get() = tooltip != null
+
+    /** Where children are drawn relative to this widget's top-left corner: a scrolled list moves them up. */
+    open val childOffsetY: Float get() = 0f
+
+    /**
+     * The topmost widget catching the pointer at ([localX], [localY]) in this widget's coordinates: a child, or this
+     * one, or null. A point outside the widget reaches none of its children.
+     */
+    open fun hitTest(localX: Float, localY: Float): Widget? {
+        if (!visible || localX < 0f || localY < 0f || localX >= width || localY >= height) return null
+        val cy = localY - childOffsetY
+        for (i in childList.indices.reversed()) {
+            val child = childList[i]
+            child.hitTest(localX - child.x, cy - child.y)?.let { return it }
+        }
+        return if (catchesPointer) this else null
+    }
+
+    /** Converts a point of this widget to viewport dp. */
+    fun toViewportX(localX: Float): Float {
+        var vx = localX + x
+        var p = parent
+        while (p != null) {
+            vx += p.x
+            p = p.parent
+        }
+        return vx
+    }
+
+    fun toViewportY(localY: Float): Float {
+        var vy = localY + y
+        var p = parent
+        while (p != null) {
+            vy += p.y + p.childOffsetY
+            p = p.parent
+        }
+        return vy
+    }
+
+    /** A mouse button went down on the widget. Return true if used. */
+    open fun mousePressed(x: Float, y: Float, button: Int): Boolean = false
+
+    /** The button pressed on this widget was released, wherever the pointer is now. */
+    open fun mouseReleased(x: Float, y: Float, button: Int): Boolean = false
+
+    /** The pointer moved with the button held, after a press on this widget. */
+    open fun mouseDragged(x: Float, y: Float, button: Int, dragX: Float, dragY: Float): Boolean = false
+
+    /**
+     * The wheel turned over the widget ([notches] positive towards the top). Unused, it goes to the parent: a text
+     * area that can't scroll further lets its list scroll.
+     */
+    open fun mouseScrolled(x: Float, y: Float, notches: Float): Boolean = false
+
+    // ---- Keyboard ----
+
+    /**
+     * Whether the widget can take the keyboard focus (Tab moves through such widgets in the order they were added;
+     * a click gives the focus to what it lands on).
+     */
+    open val focusable: Boolean get() = false
+
+    /** Whether the widget, focused, takes typed text: the phone then leaves Backspace and its own key to it. */
+    open val acceptsText: Boolean get() = false
+
+    /** A key, while the widget has the focus; unused keys go to its parents, then to the screen. */
+    open fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
+
+    /**
+     * A typed character, while the widget has the focus: a whole code point (accents and dead keys arrive composed,
+     * `é` as one; characters outside the basic plane arrive whole, not as two halves).
+     */
+    open fun charTyped(codePoint: Int, modifiers: Int): Boolean = false
+
+    /** The widget gained or lost the focus. */
+    open fun focusChanged(focused: Boolean) {}
+
+    /** Takes the focus, if [focusable] and on a screen. */
+    fun requestFocus() {
+        screen?.focus(this)
+    }
+
+    /** Called 20 times a second while the screen is shown, children included. */
+    open fun tick() {
+        for (child in childList.toList()) child.tick()
+    }
+
+    /** The screen was hidden, or the widget removed: drop a press or drag in progress. Children included. */
+    open fun pointerLost() {
+        for (child in childList) child.pointerLost()
+    }
+}
+
+/** Places the widget at ([x], [y]) in its parent with its natural size, or the one given. Returns it, for chaining. */
+fun <T : Widget> T.at(x: Float, y: Float, width: Float = preferredWidth, height: Float = preferredHeight): T {
+    setBounds(x, y, width, height)
+    return this
+}
+
+/** Places the widget with its right edge at [right] (top at [y]), as headers and dialogs align buttons. */
+fun <T : Widget> T.atRight(right: Float, y: Float, width: Float = preferredWidth, height: Float = preferredHeight): T {
+    setBounds(right - width, y, width, height)
+    return this
+}
