@@ -45,7 +45,7 @@ class PhoneSettingsStoreEdgeTest {
         assertEquals(true, alice.get("sounds").asBoolean)
         assertEquals(true, alice.get("preview").asBoolean)
         // Written whole: no temporary file left behind.
-        assertFalse(Files.exists(dir.resolve("lnbphone-client.json.tmp")))
+        Files.list(dir).use { files -> assertFalse(files.anyMatch { it.fileName.toString().endsWith(".tmp") }) }
     }
 
     @Test
