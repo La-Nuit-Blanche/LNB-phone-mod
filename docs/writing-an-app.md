@@ -319,9 +319,11 @@ What the list screen shows:
 
 - **Layout.** The header is 44 dp at the top; the content takes the rest, 256 x 326 dp from y 44. Screens keep 12 dp
   from the sides (`Spacing.SCREEN_PADDING`). Put edges on even dp values so they stay sharp at every GUI scale.
-- **Text.** Widgets take plain strings, so translate on the client with `I18n.get(key)`
+- **Text.** Widgets take plain strings, shown as given, so translate on the client with `I18n.get(key)`
   (`net.minecraft.client.resources.language.I18n`, a client class). A screen is built when it opens, so it picks up
-  the player's language each time.
+  the player's language each time; and when the player changes the game's language, the phone sends the open app
+  home, so no screen built in the old language is seen again. What you keep outside your screens (drafts, scroll
+  positions) stays.
 - **Hooks.** `KitScreen` keeps `AppScreen`'s drawing and input methods for itself. You override `onScreenShown`,
   `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves
   the phone for good, it is where you stop what the screen started (a listener, a request). Here the rows are rebuilt

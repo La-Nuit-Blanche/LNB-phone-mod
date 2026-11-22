@@ -24,6 +24,10 @@ import fr.bde_teknantes.lnb.phone.api.client.offset
  * order doesn't matter: set them before or after placing and adding the widget, or in [KitScreen.onScreenShown]; a
  * value set before the screen's first frame simply appears, where a later change animates ([shouldAnimate]).
  *
+ * **Text** is given as plain strings, shown as they are: translate it first (`I18n.get(key)` on the client). When the
+ * player changes the game's language, the phone sends the open app home, so text translated when a screen was built
+ * is never seen in the old language.
+ *
  * **Your own widget** extends this class (or [Clickable] for something that reacts to clicks) and overrides [render],
  * drawing at (0, 0) in its own coordinates; its children are drawn on top. [isHovered], [isFocused] and [now] give
  * what drawing states and animations need; [KitDrawing] has the kit's focus ring and tints. Input methods receive

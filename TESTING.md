@@ -127,7 +127,9 @@ Each item says what to do and what should be seen; anything else is a failure to
 Set both clients to French (Options, Language, Français) and redo items 2, 7, 10, 11 and 15 quickly. Every text of
 the phone, Settings, Ping, the banner, the inventory tooltip and the controls screen is in French; no raw key such as
 `settings.lnbphone.sounds` shows anywhere; French typography holds (`Ping envoyé`, a space before `:` in `A : …`).
-Then set "Français (Canada)": the same French.
+Then set "Français (Canada)": the same French. Last, open Settings, put the phone away with Esc, and switch the
+game back to English: the phone opens on the home screen, and Settings, opened again, is in English. A draft typed in
+Ping before the switch is still in its field.
 
 ### Screens, machines and resource packs
 
