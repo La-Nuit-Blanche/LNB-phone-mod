@@ -16,6 +16,7 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Read in place.** A notification whose target is already on screen gives no banner, the chime plays, and it counts as read. Reopening the phone onto an app left open keeps that app's badge, except for notifications the shown screen reports as visible, which are read in place. Notifications received while offline show as badges at login, with no peek and no chime (10.2, 10.3, 6.1).
 - **Banner text.** Emoji are dropped and each run of other characters the font lacks becomes one `?`; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
 - **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
+- **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
 
 ## History
 
@@ -1298,17 +1299,19 @@ The game ticks every 50 ms. Durations are whole ticks. Animations interpolate wi
 
 ## 15. Sound
 
-Vanilla sound events, client-side. All muted when the Settings `Sons` toggle is off.
+The phone's sounds are the mod's own sound events (`sounds.json`, client-side), each reusing the vanilla sound the table names at the same volume and pitch. They are the phone's own so that subtitles can say what they are: **only the notification chime has a subtitle** (`Phone notification` / `Notification du téléphone`); the interface sounds have none, as vanilla's button click has none. All are muted when the Settings `Sons` toggle is off, and follow the Master volume slider.
 
-| Event | Sound event | Volume | Pitch |
-|---|---|---|---|
-| Open | `minecraft:item.spyglass.use` | 0.6 | 1.4 |
-| Close | `minecraft:item.spyglass.stop_using` | 0.6 | 1.4 |
-| Tap (icon, button, row, toggle, tab, pin, menu item) | `minecraft:block.note_block.hat` | 0.35 | 2.0 |
-| Like | `minecraft:block.note_block.chime` | 0.3 | 2.0 |
-| Post or reply sent | `minecraft:entity.experience_orb.pickup` | 0.4 | 1.2 |
-| Notification | `minecraft:block.note_block.chime`, twice, 100 ms apart | 0.6 | 1.26, then 1.68 |
-| Error snackbar / disabled tap | `minecraft:block.note_block.bass` | 0.3 | 0.7 |
+| Event | Phone sound event | Vanilla sound played | Volume | Pitch |
+|---|---|---|---|---|
+| Open | `lnbphone:phone.open` | `minecraft:item.spyglass.use` | 0.6 | 1.4 |
+| Close | `lnbphone:phone.close` | `minecraft:item.spyglass.stop_using` | 0.6 | 1.4 |
+| Tap (icon, button, row, toggle, tab, pin, menu item) | `lnbphone:ui.tap` | `minecraft:block.note_block.hat` | 0.35 | 2.0 |
+| Like | `lnbphone:ui.like` | `minecraft:block.note_block.chime` | 0.3 | 2.0 |
+| Post or reply sent | `lnbphone:ui.sent` | `minecraft:entity.experience_orb.pickup` | 0.4 | 1.2 |
+| Notification | `lnbphone:notification` | `minecraft:block.note_block.chime`, twice, 100 ms apart | 0.6 | 1.26, then 1.68 |
+| Error snackbar / disabled tap | `lnbphone:ui.error` | `minecraft:block.note_block.bass` | 0.3 | 0.7 |
+
+Notifications that arrive in the same tick chime once (10.3).
 
 ---
 
