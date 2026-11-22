@@ -18,13 +18,16 @@ class Toggle : Clickable() {
     /** Called with the new value when the player switches it (not when [checked] is set by code). */
     var onChange: ((Boolean) -> Unit)? = null
 
-    /** Whether it is on. Setting it slides the knob, without calling [onChange]. */
+    /**
+     * Whether it is on. Setting it slides the knob, without calling [onChange]; set before the screen's first frame, the
+     * knob is simply there ([shouldAnimate]).
+     */
     var checked: Boolean = false
         set(value) {
             if (value == field) return
             field = value
             val x = if (value) ON_X else OFF_X
-            if (screen != null) knob.animateTo(x, now, Motion.QUICK_MS, Easing.OUT) else knob.snapTo(x)
+            if (shouldAnimate) knob.animateTo(x, now, Motion.QUICK_MS, Easing.OUT) else knob.snapTo(x)
         }
 
     init {

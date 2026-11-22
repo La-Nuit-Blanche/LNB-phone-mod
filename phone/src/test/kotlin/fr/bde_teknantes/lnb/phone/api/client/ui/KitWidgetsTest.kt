@@ -127,9 +127,10 @@ class KitWidgetsTest {
         assertEquals(14 * 6.5f + 32f, long.preferredWidth)
         val text = Button("Réessayer").apply { kind = Button.Kind.TEXT }
         assertEquals(9 * 6.5f + 16f, text.preferredWidth)
-        // A new label resizes it.
+        // A new label resizes it, by the next frame.
         val b = screen.add(Button("OK").at(0f, 0f))
         b.label = "Se désabonner"
+        screen.frame()
         assertEquals(13 * 6.5f + 32f, b.width)
     }
 }

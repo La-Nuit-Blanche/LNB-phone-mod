@@ -8,8 +8,8 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * Give buttons that sit in a fixed layout a [fixedWidth] wide enough for the longer of the English and French labels
  * (art direction 13.3); without one, the button is as wide as its label plus padding (at least 64 dp, except
  * [Kind.TEXT]). [loading] swaps the label for a spinner and makes the button unclickable while keeping its width.
- * A button whose width follows its label keeps its left edge when the label changes; a [Header] places its trailing
- * button again by its right edge.
+ * Placed without a width ([at], [atRight]), a button follows its label when it changes, keeping its left edge (its
+ * right edge with [atRight]).
  *
  * ```kotlin
  * val publish = Button(tr("compose.post")) { send() }.apply { fixedWidth = 88f }
@@ -41,23 +41,11 @@ class Button(label: String) : Clickable() {
 
     /** The look. */
     var kind: Kind = Kind.PRIMARY
-        set(value) {
-            field = value
-            resize()
-        }
 
     var label: String = label
-        set(value) {
-            field = value
-            resize()
-        }
 
     /** A width that doesn't follow the label, in dp; null to follow it. */
     var fixedWidth: Float? = null
-        set(value) {
-            field = value
-            resize()
-        }
 
     /**
      * Shows a spinner instead of the label and ignores clicks, until set back to false: while the action the button
@@ -66,10 +54,6 @@ class Button(label: String) : Clickable() {
     var loading = false
 
     private val spinner = Spinner().apply { size = 16f }
-
-    private fun resize() {
-        if (width > 0f) setBounds(x, y, preferredWidth, height)
-    }
 
     override val preferredWidth: Float
         get() = fixedWidth ?: run {

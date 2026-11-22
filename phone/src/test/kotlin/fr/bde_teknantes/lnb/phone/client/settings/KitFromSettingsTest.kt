@@ -27,8 +27,7 @@ import org.lwjgl.glfw.GLFW.GLFW_KEY_TAB
 import java.nio.file.Path
 
 /**
- * What the kit does today, seen from its first real app. These pin behaviour the Settings screen depends on or works
- * around; they are observations, not wishes: where the kit's documentation says otherwise, the test says so.
+ * The kit seen from its first real app: what the Settings screen relied on or once had to work around.
  */
 class KitFromSettingsTest {
     @TempDir
@@ -102,32 +101,44 @@ class KitFromSettingsTest {
     }
 
     @Test
-    fun `a toggle set after it is on a screen slides on the first frames, set before it stands still`() {
-        val screen = Plain()
+    fun `a toggle set after it is on a screen, or when the screen shows, stands still, and slides after the first frame`() {
+        val toggles = ArrayList<Toggle>()
+        val screen = object : KitScreen() {
+            override fun onScreenShown() {
+                toggles[2].checked = true
+            }
+        }
         val late = screen.add(Toggle().at(0f, 0f))
         late.checked = true
         val early = screen.add(Toggle().apply { checked = true }.at(0f, 40f))
+        val shown = screen.add(Toggle().at(0f, 80f))
+        toggles += listOf(late, early, shown)
+        screen.onShown()
         val p = ScreenPlayer(screen).apply { frame() }
+        for (t in toggles) assertEquals(KNOB_ON, p.knobX(t))
 
-        assertEquals(KNOB_OFF, p.knobX(late))
-        assertEquals(KNOB_ON, p.knobX(early))
+        // Once the player has seen it, a change slides.
+        late.checked = false
+        p.frame()
+        assertTrue(p.knobX(late) > KNOB_OFF)
         p.tick(2)
-        assertEquals(KNOB_ON, p.knobX(late))
-        assertEquals(KNOB_ON, p.knobX(early))
+        assertEquals(KNOB_OFF, p.knobX(late))
     }
 
     @Test
-    fun `a segmented control set after it is on a screen slides on the first frames, set before it stands still`() {
+    fun `a segmented control set after it is on a screen stands still`() {
         val screen = Plain()
         val late = screen.add(SegmentedControl(listOf("a", "b")).at(12f, 0f))
         late.selected = 1
         val early = screen.add(SegmentedControl(listOf("a", "b")).apply { selected = 1 }.at(12f, 50f))
         val p = ScreenPlayer(screen).apply { frame() }
 
-        assertEquals(PILL_CORNER, p.pillX(late))
-        assertEquals(PILL_CENTRE, p.pillX(early))
-        p.tick(3)
         assertEquals(PILL_CENTRE, p.pillX(late))
         assertEquals(PILL_CENTRE, p.pillX(early))
+        late.selected = 0
+        p.frame()
+        assertTrue(p.pillX(late) > PILL_CORNER, "after the first frame, a change slides")
+        p.tick(3)
+        assertEquals(PILL_CORNER, p.pillX(late))
     }
 }

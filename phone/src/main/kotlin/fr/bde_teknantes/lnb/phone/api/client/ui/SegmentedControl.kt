@@ -18,13 +18,16 @@ class SegmentedControl(labels: List<String>) : Widget() {
         require(labels.isNotEmpty()) { "A segmented control needs at least one label" }
     }
 
-    /** The selected segment. Setting it slides the pill, without calling [onSelect]. */
+    /**
+     * The selected segment. Setting it slides the pill, without calling [onSelect]; set before the screen's first
+     * frame, the pill is simply there ([shouldAnimate]).
+     */
     var selected: Int = 0
         set(value) {
             val index = value.coerceIn(0, segments.size - 1)
             if (index == field) return
             field = index
-            if (width > 0f && screen != null) pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT) else pill.snapTo(pillX(index))
+            if (width > 0f && shouldAnimate) pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT) else pill.snapTo(pillX(index))
         }
 
     override val preferredWidth get() = 232f

@@ -78,10 +78,6 @@ class Avatar : Widget() {
  */
 class CountBadge : Widget() {
     var count: Int = 0
-        set(value) {
-            field = value
-            if (width > 0f) setBounds(x, y, preferredWidth, preferredHeight)
-        }
 
     private val text get() = if (count > 99) "99+" else count.toString()
 

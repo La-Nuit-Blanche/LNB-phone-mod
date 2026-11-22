@@ -64,6 +64,10 @@ abstract class KitScreen : AppScreen() {
     var now = 0f
         private set
 
+    /** Whether a frame was drawn since the screen was last shown: until then, values set by code don't animate. */
+    internal var drawnSinceShown = false
+        private set
+
     /** Where the pointer was last seen, in viewport dp. */
     var mouseX = -1f
         private set
@@ -272,16 +276,22 @@ abstract class KitScreen : AppScreen() {
         this.mouseX = mouseX
         this.mouseY = mouseY
         // Animations and layout first, so that what is hit and what is drawn agree within the frame.
-        content.updateTree()
-        floating.updateTree()
-        overlays.updateTree()
-        focused?.let { if (!it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
+        updateWidgets()
         updateHover()
         canvas.fillRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), background)
         content.draw(canvas)
         floating.draw(canvas)
         overlays.draw(canvas)
         drawTooltip(canvas)
+        drawnSinceShown = true
+    }
+
+    /** Sizes, layout and the widgets' own updates, top-down; then a focused widget that can't keep the focus loses it. */
+    private fun updateWidgets() {
+        content.updateTree()
+        floating.updateTree()
+        overlays.updateTree()
+        focused?.let { if (!it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
     }
 
     final override fun tick() {
@@ -302,8 +312,12 @@ abstract class KitScreen : AppScreen() {
     }
 
     final override fun onShown() {
+        drawnSinceShown = false
         restoreSnackbar()
         onScreenShown()
+        // Brought up to date before the first frame: a key or a click that comes first finds what that frame will
+        // show (a header's back button there or not, rows at their size).
+        updateWidgets()
     }
 
     final override fun onHidden() {

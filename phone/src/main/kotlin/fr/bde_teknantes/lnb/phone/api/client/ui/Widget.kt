@@ -10,15 +10,19 @@ import fr.bde_teknantes.lnb.phone.api.client.offset
  * ([TextState], [ScrollState]) when it must outlive the screen.
  *
  * **Place** a widget with [at] (or [atRight]), in dp relative to its parent: the screen for widgets added to it,
- * the enclosing widget otherwise. Each widget has a natural size ([preferredWidth] and [preferredHeight]), used when
- * you don't give one.
+ * the enclosing widget otherwise. Each widget has a natural size ([preferredWidth] and [preferredHeight]). Placed
+ * without a size, a widget takes its natural size and keeps following it: a row given a subtitle later grows to 56 dp,
+ * a button whose label changes keeps its left edge (its right edge with [atRight]). Placed with a size, it keeps that
+ * size.
  *
  * ```kotlin
  * add(Button("Post") { send() }.apply { fixedWidth = 88f }.atRight(244f, 6f))
  * ```
  *
  * **Settings** are properties, set after construction (`apply { ... }`); constructors only take what a widget can't
- * exist without. New settings can then be added in later versions of the phone without breaking compiled apps.
+ * exist without. New settings can then be added in later versions of the phone without breaking compiled apps. The
+ * order doesn't matter: set them before or after placing and adding the widget, or in [KitScreen.onScreenShown]; a
+ * value set before the screen's first frame simply appears, where a later change animates ([shouldAnimate]).
  *
  * **Your own widget** extends this class (or [Clickable] for something that reacts to clicks) and overrides [render],
  * drawing at (0, 0) in its own coordinates; its children are drawn on top. [isHovered], [isFocused] and [now] give
@@ -109,8 +113,34 @@ abstract class Widget {
 
     // ---- Placement ----
 
-    /** Places the widget, its top-left corner at ([x], [y]) in its parent, [width] x [height] dp. */
+    // Placed without a size (at, atRight): the widget follows its preferred size, keeping its left edge, or its right
+    // edge when rightEdge is a number.
+    private var followsPreferredSize = false
+    private var rightEdge = Float.NaN
+
+    /** Places the widget, its top-left corner at ([x], [y]) in its parent, [width] x [height] dp, and keeps that size. */
     fun setBounds(x: Float, y: Float, width: Float, height: Float) {
+        followsPreferredSize = false
+        place(x, y, width, height)
+    }
+
+    /** Places the widget at its preferred size, which it then follows: from its left edge, or from [right] if given. */
+    internal fun placeNatural(x: Float, y: Float, right: Float) {
+        val w = preferredWidth
+        place(if (right.isNaN()) x else right - w, y, w, preferredHeight)
+        followsPreferredSize = true
+        rightEdge = right
+    }
+
+    /** A widget placed without a size takes its preferred size again, if it changed. Once per frame, before update. */
+    private fun followPreferredSize() {
+        if (!followsPreferredSize) return
+        val w = preferredWidth
+        val h = preferredHeight
+        if (w != width || h != height) place(if (rightEdge.isNaN()) x else rightEdge - w, y, w, h)
+    }
+
+    private fun place(x: Float, y: Float, width: Float, height: Float) {
         this.x = x
         this.y = y
         val resized = width != this.width || height != this.height
@@ -186,6 +216,14 @@ abstract class Widget {
     /** The screen's clock in milliseconds, for animations: advances 50 ms per game tick, smoothly between ticks. */
     val now: Float get() = screen?.now ?: 0f
 
+    /**
+     * Whether a change of what the widget shows should animate now: it is on a screen that has drawn a frame since it
+     * was last shown. A value set while the screen is built or shown (its constructor, [KitScreen.onScreenShown])
+     * should simply be there when the player first sees it. The kit's animated values ([Toggle.checked],
+     * [SegmentedControl.selected], [Tabs.selected]) follow this; so should a widget of yours.
+     */
+    val shouldAnimate: Boolean get() = screen?.drawnSinceShown == true
+
     /** Whether the pointer is on this widget (and on nothing above it that catches the pointer). */
     open val isHovered: Boolean get() = screen?.hovered === this
 
@@ -237,6 +275,7 @@ abstract class Widget {
 
     internal fun updateTree() {
         if (!visible) return
+        followPreferredSize()
         update()
         for (child in childList.toTypedArray()) child.updateTree()
     }
@@ -368,14 +407,32 @@ abstract class Widget {
     }
 }
 
-/** Places the widget at ([x], [y]) in its parent with its natural size, or the one given. Returns it, for chaining. */
-fun <T : Widget> T.at(x: Float, y: Float, width: Float = preferredWidth, height: Float = preferredHeight): T {
+/**
+ * Places the widget at ([x], [y]) in its parent at its natural size, which it keeps following: a row given a subtitle
+ * later grows, a button whose label changes keeps its left edge. Returns it, for chaining.
+ */
+fun <T : Widget> T.at(x: Float, y: Float): T {
+    placeNatural(x, y, Float.NaN)
+    return this
+}
+
+/** Places the widget at ([x], [y]) in its parent, [width] x [height] dp, a size it keeps. Returns it, for chaining. */
+fun <T : Widget> T.at(x: Float, y: Float, width: Float, height: Float): T {
     setBounds(x, y, width, height)
     return this
 }
 
-/** Places the widget with its right edge at [right] (top at [y]), as headers and dialogs align buttons. */
-fun <T : Widget> T.atRight(right: Float, y: Float, width: Float = preferredWidth, height: Float = preferredHeight): T {
+/**
+ * Places the widget with its right edge at [right] and its top at [y], at its natural size, which it keeps following
+ * from that right edge: as headers and dialogs align buttons, whose labels change with the language.
+ */
+fun <T : Widget> T.atRight(right: Float, y: Float): T {
+    placeNatural(right, y, right)
+    return this
+}
+
+/** Places the widget with its right edge at [right] and its top at [y], [width] x [height] dp, a size it keeps. */
+fun <T : Widget> T.atRight(right: Float, y: Float, width: Float, height: Float): T {
     setBounds(right - width, y, width, height)
     return this
 }

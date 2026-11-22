@@ -18,7 +18,7 @@ import net.minecraft.client.resources.language.I18n
  * Built from the public UI kit only, like any app's screen.
  */
 internal class SettingsScreen(private val choices: SettingsChoices) : KitScreen() {
-    // Each widget starts on the stored value before it is added, so nothing slides while the app opens.
+    // Each widget starts on the stored value: set before the first frame, it stands there without sliding.
     private val position = SegmentedControl(listOf(tr("position.corner"), tr("position.centre"))).apply {
         selected = choices.position
         onSelect = choices::choosePosition
