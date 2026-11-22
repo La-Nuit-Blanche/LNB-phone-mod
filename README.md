@@ -12,8 +12,11 @@ sizes and strings of the phone and its apps are set in [`design/art-direction.md
 - `apps/<name>/`: apps, each a mod of its own that depends on `lnbphone`.
 - `apps/demo/`: an app for development, loaded with the phone in the runs below. Never shipped.
 - `build-logic/`: the build shared by every mod. `lnbphone.mod` builds a mod; `lnbphone.app` adds the dependency on
-  the phone and the runs. Versions are in the root `gradle.properties`, and each mod's id, name and description in
-  its own `gradle.properties`.
+  the phone and the runs. Each mod's id, name and description are in its own `gradle.properties`.
+
+Versions are in the root `gradle.properties`, except those of the ModDevGradle and Kotlin plugins, in
+`build-logic/build.gradle.kts`. Kotlin must be the version Kotlin for Forge bundles, so a change to `kff_version`
+means checking both files.
 
 ## Building
 
