@@ -172,6 +172,15 @@ class TextInputTest {
         }
 
         @Test
+        fun `a double click on the right half of a word's last letter selects that word`() {
+            // Column 9.8 is on the right half of "j", the last letter of the first word: the nearest boundary is
+            // the one before the space.
+            screen.clickAt(0, 9.8f)
+            screen.clickAt(0, 9.8f)
+            assertEquals("abcdefghij", area.state.selectedText)
+        }
+
+        @Test
         fun `two quick clicks at different places are two clicks`() {
             screen.clickAt(0, 2f)
             screen.clickAt(0, 14f)

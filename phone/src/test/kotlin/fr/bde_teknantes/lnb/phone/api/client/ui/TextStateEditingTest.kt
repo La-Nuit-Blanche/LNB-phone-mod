@@ -538,6 +538,27 @@ class TextStateEditingTest {
             s.selectWordAt(0)
             assertFalse(s.hasSelection)
         }
+
+        @Test
+        fun `at the end of a word selects the word, not what follows it`() {
+            val s = TextState("le loup, bleu")
+            s.selectWordAt(2)
+            assertEquals("le", s.selectedText)
+            s.selectWordAt(7)
+            assertEquals("loup", s.selectedText)
+            // At the start of a word, still the word; between two spaces, the spaces.
+            s.selectWordAt(3)
+            assertEquals("loup", s.selectedText)
+            // Between a word and a hyphen: the word.
+            val hyphen = TextState("est-ce")
+            hyphen.selectWordAt(3)
+            assertEquals("est", hyphen.selectedText)
+            val spaces = TextState("a   b")
+            spaces.selectWordAt(1)
+            assertEquals("a", spaces.selectedText)
+            spaces.selectWordAt(3)
+            assertEquals("   ", spaces.selectedText)
+        }
     }
 
     @Nested

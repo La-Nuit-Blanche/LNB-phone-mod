@@ -130,12 +130,18 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
         caret = content.length
     }
 
-    /** Selects the word (or run of spaces, or of punctuation) around [index], as a double click does. */
+    /**
+     * Selects the word (or run of spaces, or of punctuation) around [index], as a double click does. At the boundary
+     * between a word and what follows it, the word wins: a click on the right half of a word's last letter lands
+     * there, and the player meant the word.
+     */
     fun selectWordAt(index: Int) {
         if (content.isEmpty()) return
         val i = boundary(index.coerceIn(0, content.length))
-        val kind = kindAt(if (i < content.length) i else previous(i))
-        var start = if (i < content.length) i else previous(i)
+        val wordBefore = i > 0 && kindAt(previous(i)) == 1
+        val from = if (i == content.length || (wordBefore && kindAt(i) != 1)) previous(i) else i
+        val kind = kindAt(from)
+        var start = from
         var end = start
         while (start > 0 && kindAt(previous(start)) == kind) start = previous(start)
         while (end < content.length && kindAt(end) == kind) end = next(end)
