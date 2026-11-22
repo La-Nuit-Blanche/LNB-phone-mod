@@ -11,7 +11,11 @@ neoForge {
             client()
             systemProperty("lnbphone.capture", providers.gradleProperty("capture").getOrElse("smooth"))
             providers.gradleProperty("captureDir").orNull?.let { systemProperty("lnbphone.capture.dir", it) }
-            programArguments.addAll("--width", "1280", "--height", "960")
+            // -PcaptureWidth=1600 -PcaptureHeight=1200 makes room for GUI scale 5.
+            programArguments.addAll(
+                "--width", providers.gradleProperty("captureWidth").getOrElse("1280"),
+                "--height", providers.gradleProperty("captureHeight").getOrElse("960"),
+            )
         }
     }
 }

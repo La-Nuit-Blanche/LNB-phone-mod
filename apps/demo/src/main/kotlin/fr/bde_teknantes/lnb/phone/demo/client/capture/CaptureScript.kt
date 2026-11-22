@@ -65,6 +65,21 @@ class CaptureScript {
         }
     }
 
+    /** Switches the game's language to [code] (`fr_fr`, `en_us`) and waits for the resource reload to finish. */
+    fun language(code: String) = apply {
+        var reload: CompletableFuture<Void>? = null
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            if (reload == null) {
+                mc.options.languageCode = code
+                mc.languageManager.setSelected(code)
+                reload = mc.reloadResourcePacks()
+            }
+            val future = reload!!
+            future.isDone && mc.overlay == null
+        }
+    }
+
     /**
      * Creates a fresh flat, peaceful world named [name] (deleting any previous one of that name) and waits until the
      * player stands in it with the loading screen gone. Survival by default, so the HUD shows health and hunger.

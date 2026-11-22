@@ -5,6 +5,7 @@ import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
 import fr.bde_teknantes.lnb.phone.api.client.TileColor
 import fr.bde_teknantes.lnb.phone.demo.DemoApp
+import fr.bde_teknantes.lnb.phone.demo.client.kit.KitIndexScreen
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.IEventBus
@@ -22,6 +23,14 @@ object DemoAppClient {
                 name = Component.translatable("app.lnbphone_demo.hello"),
                 icon = AppIcon.Glyph(TileColor.TEAL, ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "textures/gui/hello.png")),
             ) { HelloScreen(depth = 1) },
+        )
+        // The UI kit's gallery and the composed Feed screens (task 5).
+        event.register(
+            PhoneApp(
+                id = ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "kit"),
+                name = Component.translatable("app.lnbphone_demo.kit"),
+                icon = AppIcon.Glyph(TileColor.AZURE, ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "textures/gui/hello.png")),
+            ) { KitIndexScreen() },
         )
     }
 }
