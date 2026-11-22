@@ -8,6 +8,8 @@ import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
@@ -15,6 +17,7 @@ import fr.bde_teknantes.lnb.phone.client.shell.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothShader
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.IEventBus
@@ -63,6 +66,10 @@ object LnbPhoneClient {
             event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "phone")) { graphics, _ ->
                 if (Minecraft.getInstance().screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
             }
+            // The peek of the closed phone, under the hotbar, hearts and food (art direction 10.2).
+            event.registerBelow(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek")) { graphics, _ ->
+                PhoneShell.renderPeek(graphics)
+            }
         }
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {
             PhoneSounds.tick()
@@ -81,6 +88,12 @@ object LnbPhoneClient {
         }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
         navigator.addListener(ClientNotificationHandler)
+        // The notifications drive the home badges, the LED and the inventory button, and what arrives while the player
+        // plays shows as a banner or a peek.
+        PhoneBadges.source = BadgeSource(notifications::unreadCount)
+        notifications.addListener(object : ClientNotifications.Listener {
+            override fun onArrived(notification: PhoneNotification) = PhoneShell.notificationArrived(notification)
+        })
         PhoneShell.init()
     }
 

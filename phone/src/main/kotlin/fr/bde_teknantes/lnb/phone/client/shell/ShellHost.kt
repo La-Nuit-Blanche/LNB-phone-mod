@@ -3,7 +3,9 @@ package fr.bde_teknantes.lnb.phone.client.shell
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
@@ -52,9 +54,12 @@ internal interface ShellHost {
     fun isPhoneKeyDown(): Boolean
 
     fun play(sound: ShellSound)
+
+    /** [notification] was read in place, its target on screen: removed here and on the server. */
+    fun dismissNotification(notification: PhoneNotification)
 }
 
-internal enum class ShellSound { OPEN, CLOSE, TAP }
+internal enum class ShellSound { OPEN, CLOSE, TAP, NOTIFICATION }
 
 /** The shell's host in the game. Client only. */
 internal object MinecraftShellHost : ShellHost {
@@ -90,5 +95,8 @@ internal object MinecraftShellHost : ShellHost {
         ShellSound.OPEN -> PhoneSounds.open()
         ShellSound.CLOSE -> PhoneSounds.close()
         ShellSound.TAP -> PhoneSounds.tap()
+        ShellSound.NOTIFICATION -> PhoneSounds.notification()
     }
+
+    override fun dismissNotification(notification: PhoneNotification) = ClientNotificationHandler.dismiss(notification)
 }

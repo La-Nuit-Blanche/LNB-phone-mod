@@ -36,6 +36,26 @@ internal object PhoneLayout {
         )
     }
 
+    /**
+     * How far the closed phone rises when it peeks (art direction 10.2): 72 px, which shows the top bezel and the
+     * screen's first 60 rows; 112 px in a window narrower than 476 px, where the hotbar and the food row reach under
+     * the device and the banner must clear them.
+     */
+    fun peekRise(width: Int): Int = if (width < NARROW_PEEK_WIDTH) PEEK_RISE_NARROW else PEEK_RISE
+
+    /**
+     * The peeking device's top-left corner when it is [progress] of the way up (0: hidden under the window's bottom
+     * edge, 1: fully risen), whole GUI px. Always in the corner, whatever the placement (2.4): `x = W - 146`.
+     */
+    fun peekPosition(width: Int, height: Int, progress: Float): Point = Point(
+        devicePosition(Placement.CORNER, width, height).x,
+        Motion.snap(height - peekRise(width) * progress.coerceIn(0f, 1f)),
+    )
+
+    const val PEEK_RISE = 72
+    const val PEEK_RISE_NARROW = 112
+    const val NARROW_PEEK_WIDTH = 476
+
     /** How dark the scrim is when the phone stands open in [placement]: full in the centre, none in the corner. */
     fun scrimAmount(placement: Placement): Float = if (placement == Placement.CENTRE) 1f else 0f
 

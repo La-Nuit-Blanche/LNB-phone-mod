@@ -4,6 +4,11 @@ import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
+import fr.bde_teknantes.lnb.phone.client.notifications.BannerContent
+import fr.bde_teknantes.lnb.phone.client.notifications.BannerLayout
+import fr.bde_teknantes.lnb.phone.client.notifications.BannerLook
+import fr.bde_teknantes.lnb.phone.client.notifications.NotificationBanner
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphics
@@ -11,9 +16,10 @@ import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
 
 /**
- * Draws the device (art direction 2 to 6): frame, screen content (home screen, app screens and their slides), status
- * bar, LED, home button and the screen's corner pixels, in that order, so the corners notch whatever the app drew
- * (8.1). The pixel parts are GUI atlas sprites (16.1) and plain fills, on whole GUI px.
+ * Draws the device (art direction 2 to 6): frame, screen content (home screen, app screens and their slides), the
+ * notification banner (10.3), status bar, LED, home button and the screen's corner pixels, in that order, so the
+ * corners notch whatever the app drew (8.1); and the peek of the closed phone (10.2). The pixel parts are GUI atlas
+ * sprites (16.1) and plain fills, on whole GUI px.
  *
  * Render thread only.
  */
@@ -35,6 +41,7 @@ internal object ShellRenderer {
     // layer over the home screen it slides across, and the shell's last parts over everything.
     private const val Z_BADGE = 200f
     private const val Z_APP = 300f
+    private const val Z_BANNER = 350f
     private const val Z_TOP = 400f
 
     // Where the pointer is said to be when nobody points at the phone (it is sliding, the mouse belongs to the game).
@@ -46,8 +53,10 @@ internal object ShellRenderer {
     /** For the screenshot harness: keeps a blinking LED lit, so a capture catches it on. */
     internal var ledHeldOn = false
 
-    fun render(graphics: GuiGraphics, pose: DevicePose, now: Float, pointer: Pointer?) {
+    fun render(graphics: GuiGraphics, pose: DevicePose, now: Float, devicePointer: Pointer?) {
         val mc = Minecraft.getInstance()
+        // What lies under the notification banner doesn't hear the pointer: no hover ring or app hover through it.
+        val pointer = devicePointer?.takeUnless { overBanner(it, pose, now) }
         if (pose.scrim > 0f) graphics.fill(0, 0, PhoneShell.guiWidth(), PhoneShell.guiHeight(), PhoneLayout.scrimColor(pose.scrim))
         val x = pose.x
         val y = pose.y
@@ -82,6 +91,9 @@ internal object ShellRenderer {
         }
         graphics.pose().popPose()
 
+        // The notification banner over whatever the viewport shows, under the status bar (10.3).
+        PhoneShell.alerts.banner?.let { drawBanner(graphics, it.notification, x, y, now, devicePointer) }
+
         graphics.pose().pushPose()
         graphics.pose().translate(0f, 0f, Z_TOP)
         // The status bar is translucent over the wallpaper at home, the app's background inside apps; while an app
@@ -92,9 +104,83 @@ internal object ShellRenderer {
             else -> 0
         }
         drawStatusBar(graphics, mc, x + Device.SCREEN_X, y + Device.SCREEN_Y, homeWidth)
-        drawLed(graphics, x, y)
+        drawLed(graphics, x, y, lit = PhoneShell.counts.values.any { it > 0 } && (ledHeldOn || Motion.ledLit(PhoneShell.ticks)))
         drawHomeButton(graphics, x, y, now, pointer)
         drawScreenCorners(graphics, x, y)
+        graphics.pose().popPose()
+    }
+
+    /**
+     * The closed phone peeking from the bottom-right corner (10.2): the device with the wallpaper, the home status bar
+     * and the banner on its screen, no icons, the LED lit. Drawn on the HUD, under the hotbar.
+     */
+    fun renderPeek(graphics: GuiGraphics, pose: DevicePose, now: Float, notification: PhoneNotification) {
+        val mc = Minecraft.getInstance()
+        val x = pose.x
+        val y = pose.y
+        graphics.blitSprite(FRAME, x, y, Device.WIDTH, Device.HEIGHT)
+        val sx = x + Device.SCREEN_X
+        val sy = y + Device.SCREEN_Y
+        graphics.blitSprite(WALLPAPER, sx, sy, Device.SCREEN_WIDTH, Device.SCREEN_HEIGHT)
+        contentOf(notification)?.let {
+            // Clipped below the status bar, as over the open phone: at screen-local (4, 14) GUI px.
+            val vy = y + Device.VIEWPORT_Y
+            banner.render(
+                graphics, x + Device.VIEWPORT_X, vy, Device.VIEWPORT_WIDTH, Device.VIEWPORT_HEIGHT,
+                BannerLayout.PEEK_SCREEN_X_GUI * 2f, (BannerLayout.PEEK_SCREEN_Y_GUI - Device.STATUS_HEIGHT) * 2f, it, BannerLook.NORMAL,
+            )
+        }
+        drawStatusBar(graphics, mc, sx, sy, Device.SCREEN_WIDTH)
+        drawLed(graphics, x, y, lit = true)
+        drawHomeButton(graphics, x, y, now, null)
+        drawScreenCorners(graphics, x, y)
+    }
+
+    // ---- Notification banner (10.1, 10.3) ----
+
+    private val banner = NotificationBanner()
+
+    // The last banner's content, made drawable once: its text is laid out with the fonts on its first frame.
+    private var content: BannerContent? = null
+    private var contentNotification: PhoneNotification? = null
+
+    /** [notification] as a banner shows it, or null if its app is gone. */
+    private fun contentOf(notification: PhoneNotification): BannerContent? {
+        if (contentNotification !== notification) {
+            val app = LnbPhoneClient.apps[notification.appId] ?: return null
+            content = BannerContent.of(app, notification)
+            contentNotification = notification
+        }
+        return content
+    }
+
+    private fun overBanner(pointer: Pointer, pose: DevicePose, now: Float): Boolean {
+        val alerts = PhoneShell.alerts
+        if (alerts.banner == null || !Device.inViewport(pointer.x - pose.x, pointer.y - pose.y)) return false
+        val dpX = (pointer.x - pose.x - Device.VIEWPORT_X) * 2
+        val dpY = (pointer.y - pose.y - Device.VIEWPORT_Y) * 2
+        return alerts.bannerContains(dpX.toFloat(), dpY.toFloat(), now)
+    }
+
+    private fun drawBanner(graphics: GuiGraphics, notification: PhoneNotification, x: Int, y: Int, now: Float, pointer: Pointer?) {
+        val alerts = PhoneShell.alerts
+        val progress = alerts.bannerProgress(now)
+        if (progress <= 0f || !PhoneShell.appsSupported()) return
+        val content = contentOf(notification) ?: return
+        val vx = x + Device.VIEWPORT_X
+        val vy = y + Device.VIEWPORT_Y
+        val hovered = pointer != null && overBanner(pointer, DevicePose(x, y, 0f), now)
+        val look = when {
+            alerts.bannerPressed -> BannerLook.PRESSED
+            hovered -> BannerLook.HOVER
+            else -> BannerLook.NORMAL
+        }
+        graphics.pose().pushPose()
+        graphics.pose().translate(0f, 0f, Z_BANNER)
+        banner.render(
+            graphics, vx, vy, Device.VIEWPORT_WIDTH, Device.VIEWPORT_HEIGHT,
+            BannerLayout.IN_PHONE_X, BannerLayout.inPhoneY(progress), content, look, progress,
+        )
         graphics.pose().popPose()
     }
 
@@ -226,9 +312,8 @@ internal object ShellRenderer {
 
     // ---- Bezel (2.1, 2.3) ----
 
-    private fun drawLed(graphics: GuiGraphics, x: Int, y: Int) {
-        val unread = PhoneShell.counts.values.any { it > 0 }
-        val lit = unread && (ledHeldOn || Motion.ledLit(PhoneShell.ticks))
+    /** The LED (2.1): blinking while any app has a badge, lit during a peek. */
+    private fun drawLed(graphics: GuiGraphics, x: Int, y: Int, lit: Boolean) {
         val lx = x + Device.LED_X
         val ly = y + Device.LED_Y
         graphics.fill(lx, ly, lx + Device.LED_SIZE, ly + Device.LED_SIZE, if (lit) ShellColors.ACCENT else ShellColors.BODY_LO)

@@ -27,7 +27,7 @@ object CaptureHooks {
     // The badge source in place before the first fake, put back when the fake is lifted.
     private var realBadges: BadgeSource? = null
 
-    /** Holds every shell animation at this eased progress (0 to 1) until called with null. */
+    /** Holds every shell animation (the banner and the peek too) at this eased progress (0 to 1) until called with null. */
     fun holdAnimations(progress: Float?) {
         if (!enabled) return
         PhoneShell.heldProgress = progress
@@ -62,6 +62,27 @@ object CaptureHooks {
         if (!enabled) return
         LnbPhoneClient.settings.update { it.copy(placement = if (centred) Placement.CENTRE else Placement.CORNER) }
     }
+
+    /** Switches the notification preview setting (saved like a player's choice). */
+    fun setPreview(on: Boolean) {
+        if (!enabled) return
+        LnbPhoneClient.settings.update { it.copy(preview = on) }
+    }
+
+    /** How many unread notifications the client's store holds for [app]. */
+    fun unreadCount(app: ResourceLocation): Int = LnbPhoneClient.notifications.unreadCount(app)
+
+    /** Unread notifications of every installed app together. */
+    val totalUnread: Int get() = LnbPhoneClient.notifications.totalUnread
+
+    /** Whether the closed phone peeks with a notification (rising, holding or sinking). */
+    val isPeeking: Boolean get() = PhoneShell.alerts.peek != null
+
+    /** Whether a notification banner is over the open phone. */
+    val bannerShown: Boolean get() = PhoneShell.alerts.banner != null
+
+    /** The peeking device's top-left corner in window GUI px as `[x, y]`, or null while it doesn't peek. */
+    fun peekPosition(): IntArray? = PhoneShell.alerts.peekPose()?.let { intArrayOf(it.x, it.y) }
 
     /** Whether the phone stands open with its screen (the slide up is over). */
     val isOpen: Boolean get() = PhoneShell.state == PhoneShellCore.State.OPEN

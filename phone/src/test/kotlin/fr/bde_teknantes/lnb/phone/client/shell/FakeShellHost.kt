@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.client.shell
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import org.lwjgl.glfw.GLFW
@@ -85,6 +86,13 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
 
     override fun play(sound: ShellSound) {
         sounds += sound
+    }
+
+    /** Notifications read in place, in order. */
+    val dismissed = ArrayList<PhoneNotification>()
+
+    override fun dismissNotification(notification: PhoneNotification) {
+        dismissed += notification
     }
 
     /** Runs the tasks queued with [later], as the client does between frames. */
