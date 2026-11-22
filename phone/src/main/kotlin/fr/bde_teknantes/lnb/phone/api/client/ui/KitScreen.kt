@@ -153,7 +153,8 @@ abstract class KitScreen : AppScreen() {
     /** Gives the keyboard focus to [widget] (if it can take it), or takes it away with null. */
     fun focus(widget: Widget?) = focus(widget, visible = false)
 
-    private fun focus(widget: Widget?, visible: Boolean) {
+    /** Gives the focus as [focus] does; [visible] when it comes from the keyboard, so its ring shows. */
+    internal fun focus(widget: Widget?, visible: Boolean) {
         val target = widget?.takeIf { it.focusable && it.isShowing && it.screen === this }
         focusVisible = visible && target != null
         if (target === focused) return

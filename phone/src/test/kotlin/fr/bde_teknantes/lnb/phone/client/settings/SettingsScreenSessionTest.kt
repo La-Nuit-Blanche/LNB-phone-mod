@@ -283,16 +283,23 @@ class SettingsScreenSessionTest {
     }
 
     @Test
-    fun `the arrow keys don't move the segmented control, which has none, each segment being a Tab stop`() {
+    fun `Left and Right move the focus between the segments, without choosing`() {
         val s = open()
         s.key(GLFW_KEY_TAB)
         assertSame(s.corner, s.screen.focused)
-        for (key in listOf(GLFW_KEY_RIGHT, GLFW_KEY_LEFT, GLFW_KEY_DOWN)) {
-            assertFalse(s.key(key), "key $key is left to the phone and the game")
-        }
-        assertEquals(0, s.position.selected)
+        assertTrue(s.key(GLFW_KEY_RIGHT))
+        assertSame(s.centre, s.screen.focused)
+        assertTrue(s.centre.showsFocusRing)
+        assertTrue(s.key(GLFW_KEY_RIGHT), "at the end, the key is kept and nothing moves")
+        assertSame(s.centre, s.screen.focused)
+        assertTrue(s.key(GLFW_KEY_LEFT))
         assertSame(s.corner, s.screen.focused)
-        assertFalse(Files.exists(file))
+        assertFalse(s.key(GLFW_KEY_DOWN), "Down is left to the phone and the game")
+        assertEquals(0, s.position.selected)
+        assertFalse(Files.exists(file), "moving chooses nothing")
+        s.key(GLFW_KEY_RIGHT)
+        s.key(GLFW_KEY_SPACE)
+        assertEquals(1, s.position.selected)
     }
 
     @Test
