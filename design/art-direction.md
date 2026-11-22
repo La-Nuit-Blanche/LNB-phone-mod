@@ -17,6 +17,8 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Banner text.** Emoji are dropped and each run of other characters the font lacks becomes one `?`; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
 - **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
 - **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
+- **Settings.** Section 12 places the rows 49 dp apart with separate dividers at `y 193` and `y 242`, and 8.7 says where a row's own divider sits. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer (2.4, 8.7, 12).
+- **Language.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch`; everything else gets English (13.1).
 
 ## History
 
@@ -173,7 +175,7 @@ While it is put away the phone keeps its screen, scroll positions and drafts unt
 
 ### 2.4 Placements
 
-Same device, same size, same sprites in both. **Default: bottom-right.** Each player can switch to centred in the built-in Settings app (section 12). The choice is per player and stored client-side.
+Same device, same size, same sprites in both. **Default: bottom-right.** Each player can switch to centred in the built-in Settings app (section 12). The choice is per Minecraft account and stored on the player's computer (section 12).
 
 | Placement | Device top-left | Backdrop |
 |---|---|---|
@@ -701,7 +703,7 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Two-line, 56 dp | leading 32 dp avatar or 20 dp icon centred in a 32 dp box at `(12, 12)`; title `body-strong` at `x 56`, line box `y 10`; subtitle `caption` `text-2` at `x 56`, line box `y 30` |
 | Trailing | toggle, chevron, or `caption` `text-2` meta, right-aligned at `x 244`, vertically centred |
 | Hover / pressed | `overlay-hover` / `overlay-pressed` over the whole row |
-| Divider | hairline at the row bottom, from `x 56` (with leading) or `x 12` (without) to `x 256` |
+| Divider | hairline at the row bottom, inside its height (the last dp of the 48 or 56), from `x 56` (with leading) or `x 12` (without) to `x 256`. A screen that wants its hairline between rows 49 dp apart turns this one off and places a separate divider, as Settings does (12) |
 
 **Divider**: 1 dp `hairline`. Full width between sections; inset to `x 56` between rows with a leading avatar or icon.
 
@@ -1123,7 +1125,7 @@ With the recipe book open, vanilla moves the inventory right and draws the book 
 
 ## 12. Settings app and placement
 
-Built-in app, always last on the home grid, graphite gear icon (7.4). It holds the per-player placement switch. Settings are client-side, per player, applied at once.
+Built-in app, always last on the home grid, graphite gear icon (7.4). It holds the placement switch and two toggles. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer, never on the server, so two accounts on one computer each keep their own; they apply at once.
 
 | Element | Value (app-local, dp) |
 |---|---|
@@ -1132,8 +1134,11 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | Position label | `Position à l'écran` (`settings.position`) in `body-strong` at `x 12`, line box `y 76` |
 | Position control | segmented control 232 x 32 at `(12, 100)`: `Coin` / `Centre` (`settings.position.corner` / `.centre`); **default Coin** (bottom-right) |
 | Divider | full width at `y 144` |
-| Sounds row | one-line 48 dp row at `y 145`: `Sons` (`settings.sounds`), toggle (default on) |
-| Preview row | one-line 48 dp row at `y 194`: `Aperçu des notifications` (`settings.preview`), toggle (default on); off disables the peek only; banners inside the open phone, badges, LED and chime still work |
+| Sounds row | one-line 48 dp row at `y 145..192`: `Sons` (`settings.sounds`), toggle (default on) |
+| Divider | 1 dp `hairline` at `y 193`, from `x 12` to the right edge |
+| Preview row | one-line 48 dp row at `y 194..241`: `Aperçu des notifications` (`settings.preview`), toggle (default on); off disables the peek only; banners inside the open phone, badges, LED and chime still work |
+| Divider | 1 dp `hairline` at `y 242`, from `x 12` to the right edge |
+| Row spacing | the two rows are **49 dp apart**: each is 48 dp and the hairline between them is a separate divider, not the row's own (which 8.7 puts inside its 48 dp) |
 | Change of position | the device glides from the old position to the new one in 250 ms, ease-out; the centred scrim fades in or out over the same 250 ms |
 
 ---
@@ -1142,9 +1147,9 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 
 ### 13.1 Language rule
 
-- **English is the default.** Players whose game language is French (any `fr_*` locale) get French. Every other locale gets English.
+- **English is the default.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch` (the French locales of Minecraft 1.21.1); every other language gets English.
 - French remains the language the strings were written in and the language of the mockups, since most players are French.
-- Strings live in the mod's language files (`en_us.json` as the fallback, `fr_fr.json` for French locales). Third-party apps provide both languages too.
+- Strings live in the mod's language files (`en_us.json` as the fallback, `fr_fr.json` for French). Minecraft itself falls back to `en_us` only, so the build of this repository's mods copies `fr_fr.json` to `fr_ca.json` and `fr_ch.json` unless a mod ships its own. Third-party apps provide both languages too.
 - French typography: a no-break space (U+00A0) before `:` `?` `!` and inside `1,2 k`; the ellipsis character `…` in placeholders.
 - Player content (real names, usernames, post text) is never translated.
 
