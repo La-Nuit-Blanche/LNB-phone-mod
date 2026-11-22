@@ -272,17 +272,40 @@ class SmoothCanvas {
     }
 
     /**
+     * A white-on-transparent texture drawn as a [size] dp square centred on ([centerX], [centerY]) and turned by
+     * [radians] clockwise, tinted with [color] and filtered linearly (a turned image never lines up with pixels). For
+     * the spinner. The centre is not snapped: the image turns about the exact point.
+     */
+    fun imageRotated(texture: ResourceLocation, centerX: Float, centerY: Float, size: Float, radians: Float, color: Int) {
+        val tex = Minecraft.getInstance().textureManager.getTexture(texture)
+        val cx = originX + grid.toPx(centerX)
+        val cy = originY + grid.toPx(centerY)
+        val half = grid.toPx(size) / 2f
+        val cos = kotlin.math.cos(radians) * half
+        val sin = kotlin.math.sin(radians) * half
+        // Corners of the texture (top-left, bottom-left, bottom-right, top-right) turned about the centre; y points down,
+        // so a positive angle turns clockwise on screen.
+        val corners = floatArrayOf(
+            cx - cos + sin, cy - sin - cos,
+            cx - cos - sin, cy - sin + cos,
+            cx + cos - sin, cy + sin + cos,
+            cx + cos + sin, cy + sin - cos,
+        )
+        batch.quad(tex, true, corners, 0f, 0f, 1f, 1f, color)
+    }
+
+    /**
      * A player's face (8 x 8 skin face plus hat, nearest-neighbour) in an anti-aliased circle of [size] dp. Use 16, 32
      * or 48 dp, which scale the face by a whole number at every GUI scale. While the skin is still loading, an
-     * [placeholder] disc stands in.
+     * [placeholder] disc stands in. [tint] multiplies the face's colours; its alpha fades the face.
      */
-    fun playerFace(skin: ResourceLocation, x: Float, y: Float, size: Float, placeholder: Int = 0xFF3A4250.toInt()) {
+    fun playerFace(skin: ResourceLocation, x: Float, y: Float, size: Float, placeholder: Int = 0xFF3A4250.toInt(), tint: Int = -1) {
         val l = originX + grid.snap(x)
         val t = originY + grid.snap(y)
         val s = grid.snap(x + size) - grid.snap(x)
         if (s <= 0) return
         val region = SmoothResources.avatar(skin, s) ?: return fillCircle(x, y, size, placeholder)
-        regionQuad(region, l, t, l + s, t + s, 0, 0, s, s, -1)
+        regionQuad(region, l, t, l + s, t + s, 0, 0, s, s, tint)
     }
 
     // ---- Clipping ----
