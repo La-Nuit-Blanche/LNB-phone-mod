@@ -11,6 +11,8 @@
   "lnbphone_demo.ping.conversation.empty": "No pings yet",
   "notif.lnbphone_demo.ping.title": "New ping",
   "notif.lnbphone_demo.ping.text": "%s: %s",
+  "lnbphone_demo.hello.dialog.title": "A vanilla dialog",
+  "lnbphone_demo.hello.dialog.text": "Either button brings the phone back as it was.",
   "app.lnbphone_demo.hello": "Hello",
   "app.lnbphone_demo.kit": "UI kit",
   "lnbphone_demo.feed.tab.announcements": "Announcements",
