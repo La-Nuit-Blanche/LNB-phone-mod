@@ -156,6 +156,15 @@ class TextLayoutTest {
     }
 
     @Test
+    fun `a space the line breaks at never becomes an empty line`() {
+        // "aaaaa" fills 25 dp; the trailing space has nowhere to go but must not add a blank line.
+        assertEquals(listOf("aaaaa"), wrap("aaaaa ", 25f))
+        assertEquals(listOf("aaaaa"), wrap("aaaaa   ", 25f))
+        assertEquals(listOf("aaaaa", "bb"), wrap("aaaaa \nbb", 25f))
+        assertEquals(listOf("aaaaa", "bb"), wrap("aaaaa  bb", 25f))
+    }
+
+    @Test
     fun `never breaks before French high punctuation`() {
         // "servi !" stays together even though "servi" alone would end the line.
         assertEquals(listOf("ab", "servi !"), wrap("ab servi !", 35f))

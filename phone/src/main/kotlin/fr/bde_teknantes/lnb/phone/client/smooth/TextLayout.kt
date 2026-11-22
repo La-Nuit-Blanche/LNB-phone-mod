@@ -81,6 +81,7 @@ object TextLayout {
     }
 
     private fun wrapParagraph(paragraph: String, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<String>) {
+        val first = out.size
         var line = ""
         for (word in words(paragraph)) {
             if (line.isNotEmpty()) {
@@ -101,7 +102,8 @@ object TextLayout {
                 line = pieces.last()
             }
         }
-        out.add(line)
+        // Empty here after earlier lines means the paragraph ended in spaces it broke at: they make no line of their own.
+        if (line.isNotEmpty() || out.size == first) out.add(line)
     }
 
     /** Splits at the spaces a line may break at. */
