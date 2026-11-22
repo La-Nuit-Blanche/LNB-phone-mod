@@ -160,18 +160,13 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     }
 
     /**
-     * The phone key pressed in game (2.3 "Up arrow during a peek", P-9): if a peek shows, the phone opens on its
-     * notification's target, rising from where the peek is, and true is returned. False when there is no peek.
+     * The notification of the peek showing now, or null: the phone key opens it (2.3 "Up arrow during a peek", P-9).
+     * The shell does the opening; [onOpening] then hands it where the device rises from.
      */
-    fun phoneKeyDuringPeek(): Boolean {
-        val shown = peek ?: return false
-        if (shell.state != PhoneShellCore.State.CLOSED || peekPose() == null) return false
-        val notification = shown.notification
-        // The app first, while the phone is put away, so its screens don't slide in: the device rises onto them. An
-        // app that fails to start leaves the phone where it was, and it opens there all the same.
-        host.navigator.openApp(notification.appId, notification.target)
-        shell.open()
-        return true
+    fun peekedNotification(): PhoneNotification? {
+        val shown = peek ?: return null
+        if (shell.state != PhoneShellCore.State.CLOSED || peekPose() == null) return null
+        return shown.notification
     }
 
     /**

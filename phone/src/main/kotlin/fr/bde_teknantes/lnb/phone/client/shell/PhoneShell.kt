@@ -159,7 +159,13 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
      * the phone on the notification's target (2.3, P-9).
      */
     fun phoneKeyPressedInGame() {
-        if (host.screen == null && host.inWorld && !alerts.phoneKeyDuringPeek()) toggle()
+        if (host.screen != null || !host.inWorld) return
+        val peeked = alerts.peekedNotification()
+        if (peeked == null) return toggle()
+        // The app first, while the phone is put away, so its screens don't slide in: the device rises onto them, from
+        // where the peek is. An app that fails to start leaves the phone where it was, and it opens there all the same.
+        navigator.openApp(peeked.appId, peeked.target)
+        open()
     }
 
     /**
