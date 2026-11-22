@@ -67,13 +67,19 @@ object LnbPhoneClient {
         }
         modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
         modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->
+            // NeoForge hides only vanilla's layers with the HUD (F1): the phone's own check hideGui themselves.
             // The phone while it slides, over the whole HUD; once it stands open, its screen draws it.
             event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "phone")) { graphics, _ ->
-                if (Minecraft.getInstance().screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
+                val mc = Minecraft.getInstance()
+                if (!mc.options.hideGui && mc.screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
             }
-            // The peek of the closed phone, under the hotbar, hearts and food (art direction 10.2).
+            // The peek of the closed phone, under the hotbar, hearts and food (art direction 10.2)...
             event.registerBelow(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek")) { graphics, _ ->
-                PhoneShell.renderPeek(graphics)
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekDevice(graphics)
+            }
+            // ...and its banner above the chat, which would cover it; it never reaches the hotbar or the food row.
+            event.registerAbove(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek_banner")) { graphics, _ ->
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekBanner(graphics)
             }
         }
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {

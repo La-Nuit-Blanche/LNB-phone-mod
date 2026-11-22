@@ -112,9 +112,10 @@ internal object ShellRenderer {
 
     /**
      * The closed phone peeking from the bottom-right corner (10.2): the device with the wallpaper, the home status bar
-     * and the banner on its screen, no icons, the LED lit. Drawn on the HUD, under the hotbar.
+     * and the LED lit, no icons. Drawn on the HUD, under the hotbar; its banner is [renderPeekBanner], on a layer of its
+     * own above the chat.
      */
-    fun renderPeek(graphics: GuiGraphics, pose: DevicePose, now: Float, notification: PhoneNotification) {
+    fun renderPeekDevice(graphics: GuiGraphics, pose: DevicePose, now: Float) {
         val mc = Minecraft.getInstance()
         val x = pose.x
         val y = pose.y
@@ -122,18 +123,19 @@ internal object ShellRenderer {
         val sx = x + Device.SCREEN_X
         val sy = y + Device.SCREEN_Y
         graphics.blitSprite(WALLPAPER, sx, sy, Device.SCREEN_WIDTH, Device.SCREEN_HEIGHT)
-        contentOf(notification)?.let {
-            // Clipped below the status bar, as over the open phone: at screen-local (4, 14) GUI px.
-            val vy = y + Device.VIEWPORT_Y
-            banner.render(
-                graphics, x + Device.VIEWPORT_X, vy, Device.VIEWPORT_WIDTH, Device.VIEWPORT_HEIGHT,
-                BannerLayout.PEEK_SCREEN_X_GUI * 2f, (BannerLayout.PEEK_SCREEN_Y_GUI - Device.STATUS_HEIGHT) * 2f, it, BannerLook.NORMAL,
-            )
-        }
         drawStatusBar(graphics, mc, sx, sy, Device.SCREEN_WIDTH)
         drawLed(graphics, x, y, lit = true)
         drawHomeButton(graphics, x, y, now, null)
         drawScreenCorners(graphics, x, y)
+    }
+
+    /** The peeking phone's banner, at screen-local (4, 14) GUI px, clipped below the status bar as over the open phone. */
+    fun renderPeekBanner(graphics: GuiGraphics, pose: DevicePose, notification: PhoneNotification) {
+        val content = contentOf(notification) ?: return
+        banner.render(
+            graphics, pose.x + Device.VIEWPORT_X, pose.y + Device.VIEWPORT_Y, Device.VIEWPORT_WIDTH, Device.VIEWPORT_HEIGHT,
+            BannerLayout.PEEK_SCREEN_X_GUI * 2f, (BannerLayout.PEEK_SCREEN_Y_GUI - Device.STATUS_HEIGHT) * 2f, content, BannerLook.NORMAL,
+        )
     }
 
     // ---- Notification banner (10.1, 10.3) ----

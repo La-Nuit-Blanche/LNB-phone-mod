@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
+import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.client.apps.NavigationListener
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
@@ -25,12 +26,33 @@ internal object PhoneShell : PhoneShellCore(MinecraftShellHost) {
         ShellRenderer.render(graphics, pose, now, if (interactive && state == PhoneShellCore.State.OPEN) Pointer(mouseX, mouseY) else null)
     }
 
-    /** Draws the peek of the closed phone (art direction 10.2), if one shows. */
-    fun renderPeek(graphics: GuiGraphics) {
+    /** Draws the peeking device (art direction 10.2), if a peek shows: the HUD layer under the hotbar. */
+    fun renderPeekDevice(graphics: GuiGraphics) {
         val now = now()
         val pose = alerts.peekPose(now) ?: return
+        guardPeek { ShellRenderer.renderPeekDevice(graphics, pose, now) }
+    }
+
+    /** Draws the peek's banner, if a peek shows: its own HUD layer, above the chat, which would cover it. */
+    fun renderPeekBanner(graphics: GuiGraphics) {
+        val pose = alerts.peekPose() ?: return
         val notification = alerts.peek?.notification ?: return
-        ShellRenderer.renderPeek(graphics, pose, now, notification)
+        guardPeek { ShellRenderer.renderPeekBanner(graphics, pose, notification) }
+    }
+
+    private var peekFailed = false
+
+    // The peek draws in the middle of play: an error in it costs the peek, never the game. Logged once.
+    private inline fun guardPeek(draw: () -> Unit) {
+        try {
+            draw()
+        } catch (e: Exception) {
+            alerts.dropPeek()
+            if (!peekFailed) {
+                peekFailed = true
+                LnbPhone.LOGGER.error("The phone's notification peek failed to draw; it is dropped", e)
+            }
+        }
     }
 }
 

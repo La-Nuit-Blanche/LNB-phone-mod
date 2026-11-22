@@ -218,6 +218,11 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
         NotificationAlerts.open(host.navigator, shown.notification)
     }
 
+    /** The peek is gone at once, without sinking (its drawing failed). */
+    fun dropPeek() {
+        peek = null
+    }
+
     /** The phone is put away: the banner belongs to the open phone and goes with it. */
     fun onPutAway() {
         banner = null
