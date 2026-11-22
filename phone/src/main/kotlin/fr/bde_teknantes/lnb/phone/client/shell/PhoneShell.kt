@@ -18,6 +18,7 @@ internal object PhoneShell : PhoneShellCore(MinecraftShellHost) {
      * ([mouseX], [mouseY]), window GUI px.
      */
     fun render(graphics: GuiGraphics, interactive: Boolean, mouseX: Double, mouseY: Double) {
+        if (state == PhoneShellCore.State.CLOSED) return
         val now = now()
         val pose = currentPose(now) ?: return
         ShellRenderer.render(graphics, pose, now, if (interactive && state == PhoneShellCore.State.OPEN) Pointer(mouseX, mouseY) else null)
@@ -82,6 +83,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     // The phone key, still held from the press that brought the phone out when its screen opened: its repeats (and
     // the characters they type) are for neither the phone nor the app, until it is released.
     private var phoneKeyLatched = false
+
+    // Mouse wheel turned on the home screen and not yet turned into a page: a trackpad sends fractions of a notch.
+    private var homeScroll = 0.0
 
     /** Unseen counts by app, read once a tick, and when each badge last started to pulse. */
     internal val counts = HashMap<ResourceLocation, Int>()
@@ -202,6 +206,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     fun onScreenShown() {
         keysHeld.clear()
         phoneKeyLatched = host.isPhoneKeyDown()
+        homeScroll = 0.0
         if (state == State.OPEN) return
         state = State.OPEN
         slide = null
@@ -274,15 +279,17 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
      * The device's pose at [now], or null while it is away. Rising or gliding, it moves towards where [placement] puts
      * it: the current setting, except while that setting is being changed.
      */
-    fun currentPose(now: Float = now(), placement: Placement = host.settings.current.placement): DevicePose? {
+    fun currentPose(now: Float = now(), placement: Placement? = null): DevicePose? {
+        // Away, nothing to place: the settings aren't read (the HUD asks every frame).
         if (state == State.CLOSED) return null
-        val moving = slide ?: return restingPose(placement)
+        val target = placement ?: host.settings.current.placement
+        val moving = slide ?: return restingPose(target)
         val progress = heldProgress ?: moving.progress(now)
         return if (state == State.CLOSING) {
             moving.pose(progress, Motion.snap(moving.fromX), guiHeight(), 0f)
         } else {
-            val target = restingPose(placement)
-            moving.pose(progress, target.x, target.y, target.scrim)
+            val resting = restingPose(target)
+            moving.pose(progress, resting.x, resting.y, resting.scrim)
         }
     }
 
@@ -410,7 +417,17 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         val pose = currentPose() ?: return false
         if (!Device.inViewport(x - pose.x, y - pose.y)) return true
         if (navigator.isHome) {
-            page = HomeGrid.pageAfterScroll(page(), scrollY, appCount())
+            // One page per whole notch, however finely the wheel or trackpad reports it; turning back starts over.
+            homeScroll = if (homeScroll != 0.0 && Math.signum(scrollY) != Math.signum(homeScroll)) scrollY else homeScroll + scrollY
+            // A hair under a notch counts: ten tenths don't add up to exactly 1 in floating point.
+            while (homeScroll >= 1.0 - NOTCH_SLACK) {
+                page = HomeGrid.pageAfterScroll(page(), 1.0, appCount())
+                homeScroll -= 1.0
+            }
+            while (homeScroll <= -1.0 + NOTCH_SLACK) {
+                page = HomeGrid.pageAfterScroll(page(), -1.0, appCount())
+                homeScroll += 1.0
+            }
         } else if (showsApp()) {
             navigator.mouseScrolled(dpX(x, pose), dpY(y, pose), scrollX.toFloat(), scrollY.toFloat())
         }
@@ -440,7 +457,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
             keyCode == GLFW.GLFW_KEY_ESCAPE -> if (!used && !repeat) close()
             // While a text field has the focus, the phone key and Backspace belong to it.
             phoneKey -> if (!used && !textFocus && !repeat) close()
-            keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus && !repeat) navigator.back()
+            keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus && !repeat) back()
             else -> return used
         }
         // Always true for the phone's own keys, so the game doesn't act on them as well (pause on Esc, the key mapping).
@@ -454,6 +471,11 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         return false
     }
 
+    /** Backspace: back one screen; at GUI scale 1, where app screens can't be seen, the only back there is: home. */
+    private fun back() {
+        if (appsSupported()) navigator.back() else navigator.home()
+    }
+
     fun charTyped(codePoint: Char, modifiers: Int): Boolean =
         state == State.OPEN && !phoneKeyLatched && showsApp() && navigator.charTyped(codePoint, modifiers)
 
@@ -463,6 +485,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         homeButtonHeld = false
         homeButtonShown = false
         viewportButtons.clear()
+        homeScroll = 0.0
     }
 
     // Viewport dp from window GUI px: 2 dp per GUI px, from the viewport's top-left.
@@ -484,6 +507,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         return homeButtonShown
     }
 }
+
+private const val NOTCH_SLACK = 1e-6
 
 /** The mouse pointer over the open phone, window GUI px. */
 internal data class Pointer(val x: Double, val y: Double)

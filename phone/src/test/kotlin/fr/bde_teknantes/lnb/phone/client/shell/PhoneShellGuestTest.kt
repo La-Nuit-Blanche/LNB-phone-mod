@@ -234,4 +234,38 @@ internal class PhoneShellGuestTest : ShellTestBase() {
         assertFalse(host.navigator.isOpen)
         assertEquals(listOf("root:hidden"), log)
     }
+
+    // ---- Decisions of the review ----
+
+    @Test
+    fun `at GUI scale 1 Backspace goes home and the phone key still closes`() {
+        openOnRoot()
+        root.handle.push(deep)
+        tick(3)
+        host.guiScale = 1.0
+        host.pressKey(BACKSPACE)
+        assertTrue(host.navigator.isHome)
+        host.pressKey(UP)
+        assertEquals(State.CLOSING, shell.state)
+    }
+
+    @Test
+    fun `the home wheel turns one page per whole notch, however finely it is reported`() {
+        registerApps(65)
+        openFully()
+        val (x, y) = device(70.0, 120.0)
+        repeat(3) { shell.mouseScrolled(x, y, 0.0, -0.25) }
+        assertEquals(0, shell.page())
+        shell.mouseScrolled(x, y, 0.0, -0.25)
+        assertEquals(1, shell.page())
+        // A trackpad gesture of many small steps: as many pages as whole notches, not one per step.
+        repeat(10) { shell.mouseScrolled(x, y, 0.0, -0.1) }
+        assertEquals(2, shell.page())
+        // Turning back starts over from that direction.
+        shell.mouseScrolled(x, y, 0.0, -0.5)
+        shell.mouseScrolled(x, y, 0.0, 0.5)
+        assertEquals(2, shell.page())
+        shell.mouseScrolled(x, y, 0.0, 0.5)
+        assertEquals(1, shell.page())
+    }
 }
