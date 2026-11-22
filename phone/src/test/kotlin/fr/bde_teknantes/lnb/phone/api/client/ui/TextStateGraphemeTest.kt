@@ -438,6 +438,31 @@ class TextStateGraphemeTest {
         }
     }
 
+    // ---- Long texts ----
+
+    @Test
+    fun `word moves, word deletion and double click stay quick on the longest text, made of emoji`() {
+        // 4000 characters is the editing limit. A run of emoji has no ASCII to anchor a boundary search on.
+        for (text in listOf("😀".repeat(2000), "😀 ".repeat(1300), FR.repeat(1000), "a😀".repeat(1500), FAMILY.repeat(800))) {
+            val s = TextState(text)
+            assertTimeoutPreemptively(Duration.ofSeconds(5)) {
+                s.moveTo(s.text.length)
+                repeat(5) { s.moveLeft(select = false, word = true) }
+                s.selectWordAt(s.text.length / 2)
+                s.moveTo(s.text.length)
+                s.deleteBackward(word = true)
+                repeat(200) { s.moveLeft() }
+                s.moveTo(s.text.length / 2)
+                s.insert("x")
+                s.moveTo(0)
+                repeat(200) { s.moveRight(select = true, word = false) }
+                s.selectAll()
+                s.insert("")
+            }
+            check(s)
+        }
+    }
+
     // ---- Fuzz ----
 
     @Test

@@ -71,6 +71,17 @@ class EmojiWrapTest {
     }
 
     @Test
+    fun `wrapping the longest text, emoji and spaces with no ASCII pair anywhere, takes milliseconds`() {
+        // 4000 characters is the editing limit. Looking for a grapheme boundary from the start of the text at every
+        // space made this take seconds.
+        for (text in listOf("😀 ".repeat(2000), "é😀 ".repeat(1300), "$flag ".repeat(1300))) {
+            assertTimeoutPreemptively(Duration.ofSeconds(1)) {
+                assertTrue(TextLayout.lines(text, font, 13f, 208f).size > 50)
+            }
+        }
+    }
+
+    @Test
     fun `a sequence wider than the line is a line of its own, never cut, and the wrap ends`() {
         val line = 5f // far narrower than any emoji
         val text = family.repeat(4)
