@@ -35,6 +35,14 @@ internal class PhoneNavigator(
     private var session: AppSession? = null
     private var shown: AppScreen? = null
     private var syncing = false
+
+    // Keys held down in the phone's screen, and those of them held when the shown screen last changed: a held key
+    // belongs to the screen it was pressed on, so its repeats and characters must not act on the next one (a held
+    // Space that opens a conversation must not type spaces into its field). Swallowing characters: the last key event
+    // was a dead key's, and the characters that follow it are its.
+    private val heldKeys = HashSet<Int>()
+    private val deadKeys = HashSet<Int>()
+    private var swallowChars = false
     // Copy on write: a listener may add another from inside a callback.
     private val listeners = CopyOnWriteArrayList<NavigationListener>()
 
@@ -232,9 +240,20 @@ internal class PhoneNavigator(
 
     fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = keyPressed(keyCode, scanCode, modifiers, repeat = false)
 
-    /** A key press, or with [repeat] the key repeating as it is held: the screen reads it as [AppScreen.isKeyRepeat]. */
-    fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int, repeat: Boolean): Boolean =
-        dispatch("keyPressed") {
+    /**
+     * A key press, or with [repeat] the key repeating as it is held: the screen reads it as [AppScreen.isKeyRepeat].
+     * A key held since before the shown screen changed is dead: its repeats, and the characters they type, reach no
+     * screen until it is released. Returns true for a dead key, which nothing else should act on either.
+     */
+    fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int, repeat: Boolean): Boolean {
+        keyDown(keyCode)
+        if (keyCode in deadKeys) {
+            swallowChars = true
+            return true
+        }
+        swallowChars = false
+        val before = shown
+        val used = dispatch("keyPressed") {
             it.keyRepeat = repeat
             try {
                 it.keyPressed(keyCode, scanCode, modifiers)
@@ -242,9 +261,39 @@ internal class PhoneNavigator(
                 it.keyRepeat = false
             }
         }
+        // The press opened another screen (a row pushed one): the character it types next is not for that screen.
+        if (shown !== before) swallowChars = true
+        return used
+    }
 
-    fun charTyped(codePoint: Char, modifiers: Int): Boolean =
-        dispatch("charTyped") { it.charTyped(codePoint, modifiers) }
+    /** A character typed; dropped when it comes from a dead key (see [keyPressed]). */
+    fun charTyped(codePoint: Char, modifiers: Int): Boolean {
+        if (swallowChars) return true
+        return dispatch("charTyped") { it.charTyped(codePoint, modifiers) }
+    }
+
+    /** [keyCode] went down in the phone's screen, wherever it goes next (home, an app, the phone's own keys). */
+    fun keyDown(keyCode: Int) {
+        heldKeys += keyCode
+    }
+
+    /** [keyCode] came up: pressed again, it is a new press, for whichever screen is shown. */
+    fun keyUp(keyCode: Int) {
+        heldKeys -= keyCode
+        deadKeys -= keyCode
+    }
+
+    /**
+     * The phone's screen came (back) while [keys] were held down, pressed elsewhere (in the game, in a vanilla dialog
+     * an app opened): they are dead for the app until released, as keys held through a change of screen are.
+     */
+    fun keysHeldElsewhere(keys: Set<Int>) {
+        heldKeys.clear()
+        heldKeys += keys
+        deadKeys.clear()
+        deadKeys += keys
+        swallowChars = false
+    }
 
     /**
      * Whether the shown screen has a text field with the focus ([AppScreen.hasTextFocus]): then the phone key and
@@ -344,6 +393,8 @@ internal class PhoneNavigator(
                     guard(current, "onHidden", Unit) { current.onHidden() }
                 } else if (wanted != null) {
                     shown = wanted
+                    // What is held now was pressed for another screen.
+                    deadKeys += heldKeys
                     guard(wanted, "onShown", Unit) { wanted.onShown() }
                 }
             }

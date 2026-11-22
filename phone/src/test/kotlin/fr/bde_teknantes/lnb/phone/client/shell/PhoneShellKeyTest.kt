@@ -164,18 +164,23 @@ internal class PhoneShellKeyTest : ShellTestBase() {
     }
 
     @Test
-    fun `the app learns which presses are repeats, also on a screen pushed while the key is held`() {
+    fun `a key held while a screen opens is dead for it until released, characters included`() {
         val heard = ArrayList<String>()
         val deeper = object : ScriptedScreen("deeper", log) {
             override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
                 heard += "deeper repeat=$isKeyRepeat"
                 return true
             }
+
+            override fun charTyped(codePoint: Char, modifiers: Int): Boolean {
+                heard += "deeper char"
+                return true
+            }
         }
         val first = object : ScriptedScreen("first", log) {
             override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
                 heard += "first repeat=$isKeyRepeat"
-                // Enter opens the next screen, as a row does.
+                // Space opens the next screen, as a row does.
                 if (!isKeyRepeat) handle.push(deeper)
                 return true
             }
@@ -184,12 +189,41 @@ internal class PhoneShellKeyTest : ShellTestBase() {
         openFully()
         clickIcon(0)
         tick(3)
-        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
-        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
-        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
-        shell.keyReleased(GLFW.GLFW_KEY_ENTER, 0, 0)
-        shell.keyPressed(GLFW.GLFW_KEY_ENTER, 0, 0)
-        assertEquals(listOf("first repeat=false", "deeper repeat=true", "deeper repeat=true", "deeper repeat=false"), heard)
+        val space = GLFW.GLFW_KEY_SPACE
+        host.keyDown(space)
+        shell.charTyped(' ', 0)
+        host.repeatKey(space, 2)
+        shell.charTyped(' ', 0)
+        host.releaseKey(space)
+        host.keyDown(space)
+        shell.charTyped(' ', 0)
+        host.repeatKey(space, 1)
+        assertEquals(listOf("first repeat=false", "deeper repeat=false", "deeper char", "deeper repeat=true"), heard)
+    }
+
+    @Test
+    fun `a key still down when a vanilla dialog gives the phone back is no new press`() {
+        val heard = ArrayList<String>()
+        val screen = object : ScriptedScreen("screen", log) {
+            override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+                heard += "repeat=$isKeyRepeat"
+                return true
+            }
+        }
+        register(testApp("app") { screen })
+        openFully()
+        clickIcon(0)
+        tick(3)
+        val phone = host.screen
+        // Enter goes down on a vanilla dialog's button, which closes and shows the phone's screen again at once.
+        host.openOtherScreen("dialog")
+        host.keysDown += GLFW.GLFW_KEY_ENTER
+        host.setScreen(phone)
+        host.repeatKey(GLFW.GLFW_KEY_ENTER, 3)
+        assertEquals(emptyList<String>(), heard, "the dialog's key does nothing on the phone")
+        host.releaseKey(GLFW.GLFW_KEY_ENTER)
+        host.pressKey(GLFW.GLFW_KEY_ENTER)
+        assertEquals(listOf("repeat=false"), heard)
     }
 
     @Test

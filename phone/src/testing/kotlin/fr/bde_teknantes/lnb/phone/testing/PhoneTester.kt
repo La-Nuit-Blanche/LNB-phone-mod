@@ -22,6 +22,10 @@ import org.lwjgl.glfw.GLFW
  * ticks, the mouse, keys and typed text the way the phone does. Navigation is the phone's own (`push`, `pop`,
  * `replace`, `home`, `close` behave as in the game), so a test can click a row and check which screen came.
  *
+ * **For apps built in this repository.** The `lnbphone.app` plugin puts it on an app's tests, and loads it with the
+ * phone's classes, which it needs. It isn't published for mods built elsewhere, and nothing about it is promised to them
+ * yet: that would take an artifact per phone version, loaded with the phone in the game's module layer.
+ *
  * ```kotlin
  * class NotesScreenTest {
  *     private val tester = PhoneTester { NotesScreen() }
@@ -41,21 +45,31 @@ import org.lwjgl.glfw.GLFW
  * ```
  *
  * What stands in for the game while a tester is open (until [close]):
+ * - **There is no game**: `Minecraft.getInstance()` is null, so a screen that reads the game (the connection, the
+ *   player, the world) throws under the tester. Write screens to be testable by taking what they show from your
+ *   app's own objects (a session filled by your payload handlers, as Ping's `PingSession`), or as constructor
+ *   arguments, and reading the game only in your app's client glue. A test then fills those objects itself.
  * - **Text** is measured as if every character were half its size wide (6.5 dp in body text), so layouts are known in
  *   advance. No language is loaded: `I18n.get(key)` returns the key, which is what screens then show.
  * - **Sounds** go to [sounds] instead of the speakers, and follow [soundsOn] as they follow the player's setting.
- * - **The clipboard** is [clipboard]; Shift is held while [shiftHeld].
+ * - **The clipboard** is [clipboard]; Shift is held for the mouse while [shiftHeld].
  * - **Time** moves only with [tick] and [advance] (50 ms per tick), as it moves with the game's ticks.
+ * - **The keyboard** is a US layout: a key that types a character in the game sends it after the key, as the game
+ *   does (letters, digits, space and plain punctuation; none while Ctrl or Alt is held), and a held key repeats both.
+ *   [type] presses those keys; other characters arrive alone, as an input method sends them.
  *
- * Every action draws a frame afterwards, as the phone draws one per frame; [texts] and [shapes] are what it drew. The
- * keys the phone itself acts on behave as in the game, on a first press the screen doesn't use: Esc puts the phone
- * away; with no text field focused, Backspace goes back and the Up arrow (the phone's key by default) puts the phone
- * away.
+ * Every action draws a frame afterwards, as the phone draws one per frame; [texts] and [shapes] are what it drew. A
+ * frame that leaves a clip, an offset or an opacity pushed, or pops one it didn't push, fails the call. The keys the
+ * phone itself acts on behave as in the game, on a first press the screen doesn't use: Esc puts the phone away; with
+ * no text field focused, Backspace goes back and the Up arrow (the phone's key by default) puts the phone away. A key
+ * held while the shown screen changes is dead for the new one until released, as in the game.
  *
  * If your app throws, the phone would close it and go home; the tester throws instead, from the call that made it
  * fail, so the test stops there with the cause.
  *
- * Client classes: use it in your tests only. One tester at a time; close it when the test ends.
+ * Client classes: use it in your tests only. The stand-ins are global, so one tester is open at a time: opening one
+ * closes the one before. [close] it when the test ends: the app's screens are closed, as when the player leaves the
+ * app, and the game's own fonts, sounds and clipboard come back.
  */
 class PhoneTester private constructor(
     private val app: PhoneApp,
@@ -73,7 +87,7 @@ class PhoneTester private constructor(
     constructor(rootScreen: AppScreenFactory) : this(testApp(rootScreen), null, Unit)
 
     private val registry = AppRegistry()
-    private val navigator: PhoneNavigator
+    private val navigator = PhoneNavigator(registry)
     private val canvas = TestCanvas()
     private val heldKeys = HashSet<Int>()
     private val heard = ArrayList<PhoneSound>()
@@ -92,7 +106,7 @@ class PhoneTester private constructor(
     /** The clipboard text fields copy to and paste from. */
     var clipboard = ""
 
-    /** Whether Shift is held, for a click that extends a text selection. */
+    /** Whether Shift is held, for a click that extends a text selection. Keys take Shift in their modifiers. */
     var shiftHeld = false
 
     private val environment = object : TextEnvironment {
@@ -106,21 +120,28 @@ class PhoneTester private constructor(
     }
 
     init {
+        active?.close()
+        active = this
         TextMetrics.fonts = { MonospaceFont }
         PhoneSounds.output = { heard += it.forTests() }
         PhoneSounds.setting = { soundsOn }
         TextEnvironment.current = environment
-        registry.register(app, app.id.namespace)
-        registry.freeze()
-        navigator = PhoneNavigator(registry)
-        navigator.addListener(object : NavigationListener {
-            override fun onAppFailed(app: PhoneApp, error: Throwable) {
-                if (failure == null) failure = error
+        try {
+            registry.register(app, app.id.namespace)
+            registry.freeze()
+            navigator.addListener(object : NavigationListener {
+                override fun onAppFailed(app: PhoneApp, error: Throwable) {
+                    if (failure == null) failure = error
+                }
+            })
+            act {
+                navigator.open()
+                navigator.openApp(app, target)
             }
-        })
-        act {
-            navigator.open()
-            navigator.openApp(app, target)
+        } catch (e: Throwable) {
+            // A tester that couldn't open leaves the game's stand-ins as it found them.
+            close()
+            throw e
         }
     }
 
@@ -228,7 +249,10 @@ class PhoneTester private constructor(
 
     // ---- Keyboard ----
 
-    /** Presses and releases [keyCode] (GLFW's codes, `GLFW.GLFW_KEY_ENTER`). Returns whether the screen used it. */
+    /**
+     * Presses and releases [keyCode] (GLFW's codes, `GLFW.GLFW_KEY_ENTER`), with the character it types if any.
+     * Returns whether the screen used the key.
+     */
     fun key(keyCode: Int): Boolean = key(keyCode, 0)
 
     /** [key] with [modifiers] held (`GLFW.GLFW_MOD_CONTROL`...). */
@@ -238,7 +262,7 @@ class PhoneTester private constructor(
         return used
     }
 
-    /** Holds [keyCode] down: the press, then [repeats] repeats, then the release, as a player holding the key. */
+    /** Holds [keyCode] down: the press, then [repeats] repeats (each with its character), then the release. */
     fun holdKey(keyCode: Int, repeats: Int) {
         repeat(repeats + 1) { pressKey(keyCode, 0) }
         releaseKey(keyCode)
@@ -260,17 +284,30 @@ class PhoneTester private constructor(
                 GLFW.GLFW_KEY_BACKSPACE -> if (!textFocus) navigator.back()
             }
         }
+        // The game sends the character a key types after the key itself.
+        charOf(keyCode, modifiers)?.let { navigator.charTyped(it, modifiers) }
         used
     }
 
     /** Releases [keyCode]. */
     fun releaseKey(keyCode: Int) {
         heldKeys.remove(keyCode)
+        navigator.keyUp(keyCode)
     }
 
-    /** Types [text], one character at a time, as the game hands typed characters over. */
-    fun type(text: String) = act {
-        for (c in text) navigator.charTyped(c, 0)
+    /**
+     * Types [text] as a player would: through the keys that type its characters (with Shift for capitals; Enter for a
+     * line feed, Tab for a tab), and characters no key types alone, as an input method sends them.
+     */
+    fun type(text: String) {
+        for (c in text) {
+            val key = keyOf(c)
+            if (key != null) {
+                key(key.first, if (key.second) GLFW.GLFW_MOD_SHIFT else 0)
+            } else {
+                act { navigator.charTyped(c, 0) }
+            }
+        }
     }
 
     // ---- The phone ----
@@ -278,17 +315,30 @@ class PhoneTester private constructor(
     /** Puts the phone away, as Esc does: the app keeps its screens. */
     fun closePhone() = act { navigator.close() }
 
-    /** Brings the phone out again, on the screen it was put away on. */
-    fun openPhone() = act { navigator.open() }
+    /** Brings the phone out again, on the screen it was put away on; keys still held are dead for it until released. */
+    fun openPhone() = act {
+        navigator.keysHeldElsewhere(heldKeys)
+        navigator.open()
+    }
 
-    /** Puts the game back as it was before the tester: fonts, sounds, clipboard. Call it when the test ends. */
+    /**
+     * Ends the test: the app's screens are closed (`onHidden`, `onClosed`) as when the player leaves the app, and the
+     * game's own fonts, sounds and clipboard come back. Call it when the test ends.
+     */
     override fun close() {
         if (closed) return
         closed = true
-        TextMetrics.fonts = { SmoothResources.font(it) }
-        PhoneSounds.output = PhoneSounds.gameOutput
-        PhoneSounds.setting = PhoneSounds.playerSetting
-        if (TextEnvironment.current === environment) TextEnvironment.current = TextEnvironment.Game
+        try {
+            navigator.reset()
+        } finally {
+            if (active === this) {
+                active = null
+                TextMetrics.fonts = { SmoothResources.font(it) }
+                PhoneSounds.output = PhoneSounds.gameOutput
+                PhoneSounds.setting = PhoneSounds.playerSetting
+                TextEnvironment.current = TextEnvironment.Game
+            }
+        }
     }
 
     // Runs one action, draws the frame that follows it, and throws what the app threw meanwhile.
@@ -303,12 +353,65 @@ class PhoneTester private constructor(
             failure = null
             throw IllegalStateException("${app.id} threw: the phone would have closed it", it)
         }
+        canvas.checkBalanced()
         return result
     }
 
     private companion object {
         /** The phone's key as the game binds it by default. */
         const val PHONE_KEY = GLFW.GLFW_KEY_UP
+
+        /** The tester whose stand-ins are in place. */
+        var active: PhoneTester? = null
+
+        // A US layout: the characters keys type without Shift.
+        val PLAIN: Map<Int, Char> = buildMap {
+            for (k in GLFW.GLFW_KEY_A..GLFW.GLFW_KEY_Z) put(k, 'a' + (k - GLFW.GLFW_KEY_A))
+            for (k in GLFW.GLFW_KEY_0..GLFW.GLFW_KEY_9) put(k, '0' + (k - GLFW.GLFW_KEY_0))
+            put(GLFW.GLFW_KEY_SPACE, ' ')
+            put(GLFW.GLFW_KEY_APOSTROPHE, '\'')
+            put(GLFW.GLFW_KEY_COMMA, ',')
+            put(GLFW.GLFW_KEY_MINUS, '-')
+            put(GLFW.GLFW_KEY_PERIOD, '.')
+            put(GLFW.GLFW_KEY_SLASH, '/')
+            put(GLFW.GLFW_KEY_SEMICOLON, ';')
+            put(GLFW.GLFW_KEY_EQUAL, '=')
+            put(GLFW.GLFW_KEY_LEFT_BRACKET, '[')
+            put(GLFW.GLFW_KEY_BACKSLASH, '\\')
+            put(GLFW.GLFW_KEY_RIGHT_BRACKET, ']')
+            put(GLFW.GLFW_KEY_GRAVE_ACCENT, '`')
+        }
+        // The same keys with Shift.
+        val SHIFTED: Map<Int, Char> = buildMap {
+            for ((k, c) in PLAIN) if (c.isLetter()) put(k, c.uppercaseChar())
+            ")!@#$%^&*(".forEachIndexed { i, c -> put(GLFW.GLFW_KEY_0 + i, c) }
+            put(GLFW.GLFW_KEY_SPACE, ' ')
+            put(GLFW.GLFW_KEY_APOSTROPHE, '"')
+            put(GLFW.GLFW_KEY_COMMA, '<')
+            put(GLFW.GLFW_KEY_MINUS, '_')
+            put(GLFW.GLFW_KEY_PERIOD, '>')
+            put(GLFW.GLFW_KEY_SLASH, '?')
+            put(GLFW.GLFW_KEY_SEMICOLON, ':')
+            put(GLFW.GLFW_KEY_EQUAL, '+')
+            put(GLFW.GLFW_KEY_LEFT_BRACKET, '{')
+            put(GLFW.GLFW_KEY_BACKSLASH, '|')
+            put(GLFW.GLFW_KEY_RIGHT_BRACKET, '}')
+            put(GLFW.GLFW_KEY_GRAVE_ACCENT, '~')
+        }
+
+        // How to type a character: its key, and whether with Shift.
+        val KEYS: Map<Char, Pair<Int, Boolean>> = SHIFTED.entries.associate { (k, c) -> c to (k to true) } +
+            PLAIN.entries.associate { (k, c) -> c to (k to false) } +
+            mapOf('\n' to (GLFW.GLFW_KEY_ENTER to false), '\t' to (GLFW.GLFW_KEY_TAB to false))
+
+        /** The character [keyCode] types with [modifiers], or null: none for keys that don't type, nor with Ctrl or Alt. */
+        fun charOf(keyCode: Int, modifiers: Int): Char? {
+            if (modifiers and (GLFW.GLFW_MOD_CONTROL or GLFW.GLFW_MOD_ALT or GLFW.GLFW_MOD_SUPER) != 0) return null
+            return if (modifiers and GLFW.GLFW_MOD_SHIFT != 0) SHIFTED[keyCode] else PLAIN[keyCode]
+        }
+
+        /** The key that types [c], and whether with Shift; null when no key of the layout types it alone. */
+        fun keyOf(c: Char): Pair<Int, Boolean>? = KEYS[c]
 
         fun testApp(rootScreen: AppScreenFactory) = PhoneApp(
             ResourceLocation.fromNamespaceAndPath("phone_tester", "app"),

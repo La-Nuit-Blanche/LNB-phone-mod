@@ -18,6 +18,8 @@ internal class TestCanvas : AppCanvas() {
     private val offsets = ArrayDeque<Pair<Float, Float>>()
     private var dx = 0f
     private var dy = 0f
+    private var clips = 0
+    private var alphas = 0
 
     fun clear() {
         texts.clear()
@@ -25,6 +27,8 @@ internal class TestCanvas : AppCanvas() {
         offsets.clear()
         dx = 0f
         dy = 0f
+        clips = 0
+        alphas = 0
     }
 
     override val width = AppCanvas.WIDTH
@@ -64,8 +68,13 @@ internal class TestCanvas : AppCanvas() {
     ) {}
     override fun drawPlayerFace(skin: ResourceLocation, x: Float, y: Float, size: Float) {}
     override fun drawShadow(shadow: Shadow, x: Float, y: Float, w: Float, h: Float) {}
-    override fun pushClip(x: Float, y: Float, w: Float, h: Float) {}
-    override fun popClip() {}
+    override fun pushClip(x: Float, y: Float, w: Float, h: Float) {
+        clips++
+    }
+
+    override fun popClip() {
+        check(clips-- > 0) { "popClip without a pushClip" }
+    }
 
     override fun pushOffset(dx: Float, dy: Float) {
         offsets.addLast(this.dx to this.dy)
@@ -74,13 +83,26 @@ internal class TestCanvas : AppCanvas() {
     }
 
     override fun popOffset() {
+        check(offsets.isNotEmpty()) { "popOffset without a pushOffset" }
         val (x, y) = offsets.removeLast()
         dx = x
         dy = y
     }
 
-    override fun pushAlpha(alpha: Float) {}
-    override fun popAlpha() {}
+    override fun pushAlpha(alpha: Float) {
+        alphas++
+    }
+
+    override fun popAlpha() {
+        check(alphas-- > 0) { "popAlpha without a pushAlpha" }
+    }
+
+    /** Throws if the frame left a clip, an offset or an opacity pushed: the game would draw what follows wrongly. */
+    fun checkBalanced() {
+        check(clips == 0 && alphas == 0 && offsets.isEmpty()) {
+            "The frame left pushed: $clips clips, ${offsets.size} offsets, $alphas opacities"
+        }
+    }
 }
 
 /** Every character half an em wide, no kerning: 6.5 dp in body text, whatever the character. */

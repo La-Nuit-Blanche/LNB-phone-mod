@@ -99,6 +99,8 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
 
     override fun isPhoneKeyDown() = phoneKey in keysDown
 
+    override fun heldKeys(): Set<Int> = keysDown.toSet()
+
     override fun prewarm() {
         prewarms++
     }

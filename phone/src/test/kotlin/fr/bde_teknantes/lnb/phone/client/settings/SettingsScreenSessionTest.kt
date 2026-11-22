@@ -145,20 +145,20 @@ class SettingsScreenSessionTest {
         assertEquals(PILL_CENTRE, s.pillX(s.position))
         s.tick(10)
         assertEquals(PILL_CENTRE, s.pillX(s.position))
-
+        // Another visit opens on Centre, from the same store or from the file. (One phone, one tester at a time.)
         val second = open(store)
         assertEquals(1, second.position.selected)
         assertEquals(PILL_CENTRE, second.pillX(second.position))
-        val fresh = open(store())
-        assertEquals(1, fresh.position.selected)
+        assertEquals(1, open(store()).position.selected)
 
         // Centre again: already chosen, nothing written. Corner: back, written.
-        s.click(CENTRE_X, CENTRE_Y)
+        val third = open(store)
+        third.click(CENTRE_X, CENTRE_Y)
         assertEquals(1, heard.size)
-        s.click(CORNER_X, CENTRE_Y)
+        third.click(CORNER_X, CENTRE_Y)
         assertEquals(PhoneSettings(), onDisk())
         assertEquals(2, heard.size)
-        assertEquals(0, s.position.selected)
+        assertEquals(0, third.position.selected)
     }
 
     @Test
