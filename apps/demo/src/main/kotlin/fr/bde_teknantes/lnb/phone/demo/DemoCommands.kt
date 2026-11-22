@@ -61,14 +61,14 @@ object DemoCommands {
         } else {
             Component.translatable("notif.lnbphone_demo.test.text", context.source.textName, number)
         }
-        for (profile in players) PhoneNotifications.send(profile.id, DemoApp.HELLO_ID, title, body, depth?.let { "depth:$it" })
+        PhoneNotifications.send(players.map { it.id }, DemoApp.HELLO_ID, title, body, depth?.let { "depth:$it" })
         context.source.sendSuccess({ Component.translatable("commands.phonedemo.notify.done", players.size) }, true)
         return players.size
     }
 
     private fun clear(context: CommandContext<CommandSourceStack>): Int {
         val players = GameProfileArgument.getGameProfiles(context, "players")
-        for (profile in players) PhoneNotifications.clear(profile.id, DemoApp.HELLO_ID)
+        for (profile in players) PhoneNotifications.clearApp(profile.id, DemoApp.HELLO_ID)
         context.source.sendSuccess({ Component.translatable("commands.phonedemo.clear.done", players.size) }, true)
         return players.size
     }

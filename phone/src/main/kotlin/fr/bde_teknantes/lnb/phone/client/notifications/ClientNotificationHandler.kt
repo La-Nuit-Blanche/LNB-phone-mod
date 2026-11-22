@@ -20,7 +20,7 @@ import net.neoforged.neoforge.network.PacketDistributor
 internal object ClientNotificationHandler : NavigationListener {
     private val store get() = LnbPhoneClient.notifications
 
-    fun handleSync(payload: NotificationsSyncPayload) = store.sync(payload.notifications)
+    fun handleSync(payload: NotificationsSyncPayload) = store.sync(payload.notifications, payload.login)
 
     fun handleAdded(payload: NotificationAddedPayload) = store.arrived(payload.notification)
 

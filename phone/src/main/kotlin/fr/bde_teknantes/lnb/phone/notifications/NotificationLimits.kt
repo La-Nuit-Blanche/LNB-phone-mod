@@ -42,15 +42,30 @@ object NotificationLimits {
     /** Characters of translation keys and keybind names in one title or text, all together; past it they are dropped. */
     const val MAX_KEY_CHARS = 512
 
-    /**
-     * Checks [appId] and [target], whose meaning would change if they were cut: throws [IllegalArgumentException] when
-     * one is too long. An empty target counts as none.
-     */
-    fun checkAddress(appId: ResourceLocation, target: String?): String? {
+    /** Checks [appId], whose meaning would change if it were cut: throws [IllegalArgumentException] when too long. */
+    fun checkAppId(appId: ResourceLocation) {
         require(appId.toString().length <= MAX_APP_ID_LENGTH) {
             "App id $appId is longer than $MAX_APP_ID_LENGTH characters"
         }
+    }
+
+    /**
+     * Checks [appId] and the [target] of a notification being sent: throws [IllegalArgumentException] when one is too
+     * long. An empty target counts as none (the notification opens the app's first screen).
+     */
+    fun checkAddress(appId: ResourceLocation, target: String?): String? {
+        checkAppId(appId)
         if (target.isNullOrEmpty()) return null
+        return checkTarget(target)
+    }
+
+    /**
+     * Checks a [target] to clear: neither empty (clearing the empty target would mean clearing the whole app, which is
+     * another call) nor longer than [AppTarget.MAX_LENGTH], the bound the wire and the saved file share. Throws
+     * [IllegalArgumentException] otherwise.
+     */
+    fun checkTarget(target: String): String {
+        require(target.isNotEmpty()) { "A target to clear can't be empty: to clear all of an app's notifications, use clearApp" }
         require(target.length <= AppTarget.MAX_LENGTH) {
             "A notification target is at most ${AppTarget.MAX_LENGTH} characters; this one has ${target.length}"
         }

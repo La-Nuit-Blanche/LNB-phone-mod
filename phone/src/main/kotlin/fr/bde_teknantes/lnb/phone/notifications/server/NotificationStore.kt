@@ -138,8 +138,11 @@ class NotificationStore(private val capacity: Int = NotificationList.CAPACITY) {
     }
 
     companion object {
-        /** How long a notification is kept: 30 days. */
-        const val MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
+        /** How long a notification is kept, in days. */
+        const val MAX_AGE_DAYS = 30
+
+        /** [MAX_AGE_DAYS] in milliseconds. */
+        const val MAX_AGE_MS = MAX_AGE_DAYS * 24L * 60 * 60 * 1000
 
         private const val NEXT_ID = "next_id"
         private const val PLAYERS = "players"

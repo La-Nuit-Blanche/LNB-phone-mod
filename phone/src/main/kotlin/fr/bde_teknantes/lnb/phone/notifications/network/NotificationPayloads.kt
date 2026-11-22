@@ -16,15 +16,20 @@ private fun <T : CustomPacketPayload> type(name: String) =
 
 // ---- Server to client ----
 
-/** Every notification the player has, sent when they log in. Replaces what the client had. */
-data class NotificationsSyncPayload(val notifications: List<PhoneNotification>) : CustomPacketPayload {
+/**
+ * Every notification the player has, replacing what the client had: sent when they log in ([login] true), and again
+ * when their client fell out of step ([login] false, every notification then already delivered).
+ */
+data class NotificationsSyncPayload(val notifications: List<PhoneNotification>, val login: Boolean = true) : CustomPacketPayload {
     override fun type() = TYPE
 
     companion object {
         val TYPE = type<NotificationsSyncPayload>("notifications_sync")
-        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, NotificationsSyncPayload> =
-            NotificationCodecs.STREAM_CODEC.apply(ByteBufCodecs.list(NotificationList.CAPACITY))
-                .map(::NotificationsSyncPayload, NotificationsSyncPayload::notifications)
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, NotificationsSyncPayload> = StreamCodec.composite(
+            NotificationCodecs.STREAM_CODEC.apply(ByteBufCodecs.list(NotificationList.CAPACITY)), NotificationsSyncPayload::notifications,
+            ByteBufCodecs.BOOL, NotificationsSyncPayload::login,
+            ::NotificationsSyncPayload,
+        )
     }
 }
 

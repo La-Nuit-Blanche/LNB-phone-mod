@@ -130,10 +130,16 @@ class ServerThreadTest {
         val long = "t".repeat(AppTarget.MAX_LENGTH + 1)
         val player = UUID(0, 1)
         assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(player, feed, Component.literal("t"), Component.literal("x"), long) }
-        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clear(player, feed, long) }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearTarget(player, feed, long) }
         val longApp = ResourceLocation.fromNamespaceAndPath("a", "p".repeat(200))
         assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(player, longApp, Component.literal("t"), Component.literal("x")) }
-        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clear(player, longApp) }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearApp(player, longApp) }
+        // Clearing one target and clearing the app are two calls: an empty target is refused, never read as "all".
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearTarget(player, feed, "") }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearTargetForEveryone(feed, "") }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.clearTargetForEveryone(feed, long) }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.sendToEveryone(feed, Component.empty(), Component.empty(), long) }
+        assertThrows(IllegalArgumentException::class.java) { PhoneNotifications.send(listOf(player), longApp, Component.empty(), Component.empty()) }
     }
 
     @Test
@@ -141,7 +147,12 @@ class ServerThreadTest {
         assumeTrue(ServerLifecycleHooks.getCurrentServer() == null)
         val player = UUID(0, 1)
         PhoneNotifications.send(player, feed, Component.literal("t"), Component.literal("x"), "thread:1")
-        PhoneNotifications.clear(player, feed)
+        PhoneNotifications.clearApp(player, feed)
+        PhoneNotifications.clearTarget(player, feed, "thread:1")
+        PhoneNotifications.clearTargetForEveryone(feed, "thread:1")
+        PhoneNotifications.clearAppForEveryone(feed)
+        PhoneNotifications.send(listOf(player, UUID(0, 2)), feed, Component.literal("t"), Component.literal("x"))
+        PhoneNotifications.sendToEveryone(feed, Component.literal("t"), Component.literal("x"))
         fromAnotherThread { PhoneNotifications.send(player, feed, Component.literal("t"), Component.literal("x")) }
     }
 }

@@ -381,4 +381,29 @@ class NotificationLimitsTest {
         assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkAddress(long, null) }
         assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkAddress(long, "ok") }
     }
+
+    @Test
+    fun `the target bound send accepts is the one the wire and the saved file take`() {
+        val longest = NotificationLimits.checkAddress(feed, "é".repeat(AppTarget.MAX_LENGTH))!!
+        val notification = PhoneNotification(1, feed, Component.empty(), Component.empty(), longest, 0, false)
+        val buf = RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY)
+        NotificationCodecs.STREAM_CODEC.encode(buf, notification)
+        assertEquals(longest, NotificationCodecs.STREAM_CODEC.decode(buf).target)
+        val saved = NotificationCodecs.CODEC.encodeStart(ops, notification).getOrThrow()
+        assertEquals(longest, NotificationCodecs.CODEC.parse(ops, saved).getOrThrow().target)
+        // One more is refused by all three.
+        val over = "é".repeat(AppTarget.MAX_LENGTH + 1)
+        assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkAddress(feed, over) }
+        assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkTarget(over) }
+        assertThrows(Exception::class.java) {
+            NotificationCodecs.STREAM_CODEC.encode(RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY), notification.copy(target = over))
+        }
+        assertTrue(NotificationCodecs.CODEC.encodeStart(ops, notification.copy(target = over)).error().isPresent)
+    }
+
+    @Test
+    fun `a target to clear can't be empty`() {
+        assertThrows(IllegalArgumentException::class.java) { NotificationLimits.checkTarget("") }
+        assertEquals("thread:1", NotificationLimits.checkTarget("thread:1"))
+    }
 }

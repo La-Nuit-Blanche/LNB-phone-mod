@@ -64,10 +64,13 @@ internal class ClientNotifications(private val isInstalled: (ResourceLocation) -
         listeners -= listener
     }
 
-    /** The login sync: everything the player has, replacing what was here. */
-    fun sync(notifications: List<PhoneNotification>) {
+    /**
+     * Everything the player has, replacing what was here: at login ([login] true, which also sets [missedWhileAway]),
+     * or to put this client back in step with the server.
+     */
+    fun sync(notifications: List<PhoneNotification>, login: Boolean = true) {
         list.replaceAll(notifications)
-        missedWhileAway = list.all.filter { !it.delivered }
+        if (login) missedWhileAway = list.all.filter { !it.delivered }
         notifyListeners { it.onChanged() }
     }
 
