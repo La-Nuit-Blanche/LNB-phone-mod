@@ -25,15 +25,6 @@ import net.neoforged.neoforge.client.event.ScreenEvent
  * Client thread only.
  */
 internal object PhoneInventoryButton {
-    private const val WIDTH = 27
-    private const val HEIGHT = 28
-
-    // 5 px over the inventory's left edge, 4 px under the quest button's lower bracket (which ends at guiTop + 41).
-    private const val LEFT = -22
-    private const val TOP = 46
-
-    // The badge's top-left, from the button's (11): over the tab and the quest button's bracket.
-    private const val BADGE_OFFSET = -3
     private const val Z_BADGE = 200f
 
     private fun sprite(path: String) = ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, path)
@@ -66,21 +57,22 @@ internal object PhoneInventoryButton {
 
     /** What the tooltip says for [unread] notifications: the phone's name, and how many are new. */
     private fun tooltip(unread: Int): Component {
-        val name = Component.translatable("gui.lnbphone.inventory")
-        if (unread <= 0) return name
-        val key = if (unread == 1) "gui.lnbphone.inventory.unread.one" else "gui.lnbphone.inventory.unread"
+        val name = Component.translatable(InventoryButtonLayout.NAME_KEY)
+        val key = InventoryButtonLayout.unreadKey(unread) ?: return name
         return name.copy().append("\n").append(Component.translatable(key, unread).withColor(UNREAD_TEXT))
     }
 
-    private class PhoneButton(val screen: InventoryScreen) : AbstractButton(0, 0, WIDTH, HEIGHT, Component.translatable("gui.lnbphone.inventory")) {
-        // The count the tooltip says, and the one last drawn: a rise makes the badge pulse.
+    private class PhoneButton(val screen: InventoryScreen) : AbstractButton(
+        0, 0, InventoryButtonLayout.WIDTH, InventoryButtonLayout.HEIGHT, Component.translatable(InventoryButtonLayout.NAME_KEY),
+    ) {
+        // The count the tooltip says.
         private var tooltipCount = -1
-        private var drawnCount = -1
-        private var pulseStart = Long.MIN_VALUE
+        private val pulse = BadgePulse()
 
         fun place() {
-            x = screen.guiLeft + LEFT
-            y = screen.guiTop + TOP
+            val at = InventoryButtonLayout.position(screen.guiLeft, screen.guiTop)
+            x = at.x
+            y = at.y
             val unread = unread()
             if (unread != tooltipCount) {
                 tooltipCount = unread
@@ -98,27 +90,89 @@ internal object PhoneInventoryButton {
 
         override fun renderWidget(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
             val unread = unread()
-            // Not when the inventory opens with news already there: only a rise while it is open.
-            if (drawnCount >= 0 && unread > drawnCount) pulseStart = PhoneShell.ticks
-            drawnCount = unread
-            val sprite = when {
-                unread > 0 && isHoveredOrFocused -> NEW_HOVER
-                unread > 0 -> NEW
-                isHoveredOrFocused -> HOVER
-                else -> NORMAL
+            pulse.update(unread, PhoneShell.ticks)
+            val sprite = when (InventoryButtonLayout.look(unread, isHoveredOrFocused)) {
+                InventoryButtonLayout.Look.NEW_HOVER -> NEW_HOVER
+                InventoryButtonLayout.Look.NEW -> NEW
+                InventoryButtonLayout.Look.HOVER -> HOVER
+                InventoryButtonLayout.Look.NORMAL -> NORMAL
             }
-            graphics.blitSprite(sprite, x, y, WIDTH, HEIGHT)
+            graphics.blitSprite(sprite, x, y, InventoryButtonLayout.WIDTH, InventoryButtonLayout.HEIGHT)
             val text = HomeGrid.badgeText(unread) ?: return
-            val bx = x + BADGE_OFFSET
-            val by = y + BADGE_OFFSET
+            val badgeAt = InventoryButtonLayout.badgePosition(Point(x, y))
             graphics.pose().pushPose()
             graphics.pose().translate(0f, 0f, Z_BADGE)
-            val badge = if (Motion.pulseLit(pulseStart, PhoneShell.ticks)) BADGE_PULSE else BADGE
-            graphics.blitSprite(badge, bx, by, HomeGrid.badgeWidth(text), HomeGrid.BADGE_HEIGHT)
-            graphics.drawString(Minecraft.getInstance().font, text, bx + HomeGrid.BADGE_TEXT_X, by + HomeGrid.BADGE_TEXT_Y, ShellColors.BADGE_TEXT, false)
+            val badge = if (pulse.lit(PhoneShell.ticks)) BADGE_PULSE else BADGE
+            graphics.blitSprite(badge, badgeAt.x, badgeAt.y, HomeGrid.badgeWidth(text), HomeGrid.BADGE_HEIGHT)
+            graphics.drawString(
+                Minecraft.getInstance().font, text, badgeAt.x + HomeGrid.BADGE_TEXT_X, badgeAt.y + HomeGrid.BADGE_TEXT_Y,
+                ShellColors.BADGE_TEXT, false,
+            )
             graphics.pose().popPose()
         }
 
         override fun updateWidgetNarration(output: NarrationElementOutput) = defaultButtonNarrationText(output)
     }
+}
+
+/** The inventory button's place and looks (art direction 11) as plain logic, apart from the widget, for tests. */
+internal object InventoryButtonLayout {
+    const val WIDTH = 27
+    const val HEIGHT = 28
+
+    // 5 px over the inventory's left edge, 4 px under the quest button's lower bracket (which ends at guiTop + 41).
+    private const val LEFT = -22
+    private const val TOP = 46
+
+    // The badge's top-left, from the button's (11): over the tab and the quest button's bracket.
+    private const val BADGE_OFFSET = -3
+
+    const val NAME_KEY = "gui.lnbphone.inventory"
+    const val UNREAD_ONE_KEY = "gui.lnbphone.inventory.unread.one"
+    const val UNREAD_KEY = "gui.lnbphone.inventory.unread"
+
+    enum class Look { NORMAL, HOVER, NEW, NEW_HOVER }
+
+    /** The button's top-left for an inventory whose top-left is ([guiLeft], [guiTop]), window GUI px. */
+    fun position(guiLeft: Int, guiTop: Int) = Point(guiLeft + LEFT, guiTop + TOP)
+
+    /** The unread badge's top-left for a button at [button]. */
+    fun badgePosition(button: Point) = Point(button.x + BADGE_OFFSET, button.y + BADGE_OFFSET)
+
+    /** The sprite for [unread] notifications, under the pointer or not. */
+    fun look(unread: Int, hovered: Boolean): Look = when {
+        unread > 0 && hovered -> Look.NEW_HOVER
+        unread > 0 -> Look.NEW
+        hovered -> Look.HOVER
+        else -> Look.NORMAL
+    }
+
+    /** The translation key of the tooltip's second line for [unread] notifications (`{n}` in it), or null for none. */
+    fun unreadKey(unread: Int): String? = when {
+        unread <= 0 -> null
+        unread == 1 -> UNREAD_ONE_KEY
+        else -> UNREAD_KEY
+    }
+}
+
+/**
+ * When the inventory button's badge pulses (11): when the count rises while the inventory is open, not when the
+ * inventory opens with news already there.
+ */
+internal class BadgePulse {
+    // The count last drawn, -1 before the first frame.
+    private var drawnCount = -1
+
+    /** The tick the last pulse started on. */
+    var start = Long.MIN_VALUE
+        private set
+
+    /** Each frame, with the count drawn and the shell's clock. */
+    fun update(unread: Int, ticks: Long) {
+        if (drawnCount >= 0 && unread > drawnCount) start = ticks
+        drawnCount = unread
+    }
+
+    /** Whether the badge shows its light frame at [ticks]. */
+    fun lit(ticks: Long): Boolean = Motion.pulseLit(start, ticks)
 }
