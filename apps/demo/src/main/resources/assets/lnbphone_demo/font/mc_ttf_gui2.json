@@ -1,0 +1,5 @@
+{
+  "providers": [
+    { "type": "ttf", "file": "lnbphone:inter_regular.ttf", "size": 6.5, "oversample": 2.0 }
+  ]
+}
