@@ -205,14 +205,110 @@ internal class ShellAlertsClickTest : AlertsTestBase() {
     }
 
     @Test
-    fun `a banner that leaves while pressed opens nothing when the button comes up`() {
+    fun `a pressed banner neither leaves nor changes, and opens what was pressed`() {
         openWithBanner()
         pressAt(bannerMiddle)
-        tick(HOLD_TICKS + BANNER_IN_TICKS)
+        tick(HOLD_TICKS * 2)
+        assertNotNull(alerts.banner)
+        assertEquals(1f, alerts.bannerProgress(shell.now()))
+        // A newer one arriving meanwhile doesn't take its place, and stays a badge.
+        val newer = notify(app = "mail", target = null)
+        assertEquals("thread:8", alerts.banner!!.notification.target)
+        releaseAt(bannerMiddle)
+        assertEquals("thread:8", host.navigator.currentScreen.toString())
         assertNull(alerts.banner)
+        assertTrue(newer !in host.dismissed)
+    }
+
+    @Test
+    fun `released off the banner, it resumes where it was, or shows what arrived meanwhile with a fresh hold`() {
+        openWithBanner()
+        tick(HOLD_TICKS - 10)
+        pressAt(bannerMiddle)
+        tick(100)
+        releaseAt(dp(128.0, 300.0))
+        // Resumed: 10 ticks of hold were left.
+        tick(9)
+        assertEquals(1f, alerts.bannerProgress(shell.now()))
+        tick(1 + BANNER_IN_TICKS)
+        assertNull(alerts.banner)
+
+        notify()
+        tick(BANNER_IN_TICKS + HOLD_TICKS - 10)
+        pressAt(bannerMiddle)
+        val newer = notify(app = "mail", target = null)
+        releaseAt(dp(128.0, 300.0))
+        assertEquals(newer, alerts.banner!!.notification)
+        tick(HOLD_TICKS - 1)
+        assertEquals(1f, alerts.bannerProgress(shell.now()))
+    }
+
+    @Test
+    fun `a home icon pressed before the banner came down over it is cancelled by a release on the banner`() {
+        registerAll(extraApps = 6)
+        openFully()
+        // Feed's icon, row 0, all under the resting banner.
+        val icon = viewport(16.0, 18.0)
+        pressAt(icon)
+        notify()
+        tick(BANNER_IN_TICKS)
+        releaseAt(icon)
+        assertTrue(host.navigator.isHome)
+    }
+
+    @Test
+    fun `the mouse wheel over the banner is the banner's`() {
+        registerAll(extraApps = 40)
+        openFully()
+        notify()
+        tick(BANNER_IN_TICKS)
+        shell.mouseScrolled(bannerMiddle.first, bannerMiddle.second, 0.0, -1.0)
+        assertEquals(0, shell.page())
+        val below = dp(128.0, 300.0)
+        shell.mouseScrolled(below.first, below.second, 0.0, -1.0)
+        assertEquals(1, shell.page())
+    }
+
+    @Test
+    fun `a notification cleared while its banner or peek shows sends it away early`() {
+        registerAll()
+        val n = notify()
+        host.unreadList = listOf(n)
+        tick(PEEK_RISE_TICKS)
+        shell.notificationsChanged()
+        assertNotNull(peekAt())
+        host.unreadList = emptyList()
+        shell.notificationsChanged()
+        tick(PEEK_RISE_TICKS)
+        assertNull(peekAt())
+
+        openFully()
+        val m = notify()
+        host.unreadList = listOf(m)
+        tick(BANNER_IN_TICKS)
+        pressAt(bannerMiddle)
+        host.unreadList = emptyList()
+        shell.notificationsChanged()
         assertFalse(alerts.bannerPressed)
+        tick(BANNER_IN_TICKS)
+        assertNull(alerts.banner)
+        // Nothing to open where it was.
         releaseAt(bannerMiddle)
         assertTrue(host.navigator.isHome)
+    }
+
+    @Test
+    fun `reopened onto an app left on a notification's target, that notification is read in place`() {
+        registerAll()
+        openFully()
+        host.navigator.openApp(appId("feed"), "thread:2")
+        shell.close()
+        closeFully()
+        val there = notification(target = "thread:2")
+        val elsewhere = notification(target = "thread:3")
+        host.unreadList = listOf(there, elsewhere)
+        pressPhoneKeyInGame()
+        assertEquals(listOf(there), host.dismissed)
     }
 
     @Test

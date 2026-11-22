@@ -106,6 +106,8 @@ object LnbPhoneClient {
         PhoneBadges.source = BadgeSource(notifications::unreadCount)
         notifications.addListener(object : ClientNotifications.Listener {
             override fun onArrived(notification: PhoneNotification) = PhoneShell.notificationArrived(notification)
+
+            override fun onChanged() = PhoneShell.notificationsChanged()
         })
         PhoneShell.init()
     }

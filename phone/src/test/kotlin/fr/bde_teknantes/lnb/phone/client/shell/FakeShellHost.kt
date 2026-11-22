@@ -80,10 +80,10 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         setScreen(null)
     }
 
-    /** What [newestUnread] answers: the newest unread notification of an installed app. */
-    var newest: PhoneNotification? = null
+    /** The store's unread notifications, oldest first; those dismissed since are left out of [unread]. */
+    var unreadList: List<PhoneNotification> = emptyList()
 
-    override fun newestUnread(): PhoneNotification? = newest
+    override val unread: List<PhoneNotification> get() = unreadList.filter { it !in dismissed }
 
     override fun createPhoneScreen(): Screen = TestScreen(PHONE)
 

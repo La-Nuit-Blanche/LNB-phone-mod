@@ -311,7 +311,7 @@ internal class PhoneInventoryButtonTest : AlertsTestBase() {
         shell.close()
         closeFully()
         val newest = notification("mail", null)
-        host.newest = newest
+        host.unreadList = listOf(notification("feed"), newest)
         badges("mail" to 1)
         shell.openFromInventory(host.openOtherScreen("inventory"))
         assertEquals("compose", host.navigator.currentScreen.toString())

@@ -43,8 +43,8 @@ internal interface ShellHost {
      */
     fun closeScreen()
 
-    /** The newest unread notification of an app this client has, or null. */
-    fun newestUnread(): PhoneNotification?
+    /** The unread notifications of the apps this client has, oldest first. */
+    val unread: List<PhoneNotification>
 
     fun createPhoneScreen(): Screen
 
@@ -97,8 +97,8 @@ internal object MinecraftShellHost : ShellHost {
         if (mc.screen != null) mc.setScreen(null)
     }
 
-    override fun newestUnread(): PhoneNotification? =
-        LnbPhoneClient.notifications.all.lastOrNull { LnbPhoneClient.apps[it.appId] != null }
+    override val unread: List<PhoneNotification>
+        get() = LnbPhoneClient.notifications.all.filter { LnbPhoneClient.apps[it.appId] != null }
 
     override fun createPhoneScreen(): Screen = PhoneScreen()
 

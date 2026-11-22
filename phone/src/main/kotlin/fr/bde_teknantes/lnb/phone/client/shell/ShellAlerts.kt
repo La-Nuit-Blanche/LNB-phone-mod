@@ -34,6 +34,24 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
         /** What it shows; a newer notification takes its place during its life (10.2 "Queue"). */
         var notification: PhoneNotification = notification
             internal set
+
+        // Time spent frozen (the banner held pressed), and when the current freeze began: the timeline runs on the
+        // time it wasn't frozen, so a release resumes it where it stopped.
+        private var frozenMs = 0.0
+        private var frozenAt: Double? = null
+
+        /** The timeline's own clock at [nowMs]. */
+        fun at(nowMs: Double): Double = (frozenAt ?: nowMs) - frozenMs
+
+        internal fun freeze(nowMs: Double) {
+            if (frozenAt == null) frozenAt = nowMs
+        }
+
+        internal fun unfreeze(nowMs: Double) {
+            val since = frozenAt ?: return
+            frozenMs += nowMs - since
+            frozenAt = null
+        }
     }
 
     /** The banner over the open phone (10.3), or null. */
@@ -50,6 +68,10 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     /** Whether the left button went down on the banner and hasn't come up yet: its pressed look. */
     var bannerPressed = false
         private set
+
+    // The newest notification that arrived while the banner was held pressed: a pressed banner doesn't change; this one
+    // shows when the press ends off the banner.
+    private var newerWhilePressed: PhoneNotification? = null
 
     // The tick the chime last played on: notifications of one tick chime once.
     private var lastChime = Long.MIN_VALUE
@@ -87,12 +109,18 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     private fun showBanner(notification: PhoneNotification) {
         val now = nowMs()
         val current = banner
-        if (current != null && !current.timeline.isFinished(now)) {
-            current.notification = notification
-            current.timeline.restart(now)
-        } else {
-            banner = Shown(notification, BannerTimeline(BannerMotion.IN_PHONE, now))
-            bannerPressed = false
+        when {
+            // Held under the player's finger: what they are about to open stays as it is.
+            current != null && bannerPressed -> newerWhilePressed = notification
+            current != null && !current.timeline.isFinished(current.at(now)) -> {
+                current.notification = notification
+                current.timeline.restart(current.at(now))
+            }
+            else -> {
+                banner = Shown(notification, BannerTimeline(BannerMotion.IN_PHONE, now))
+                bannerPressed = false
+                newerWhilePressed = null
+            }
         }
     }
 
@@ -139,10 +167,7 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
             }
         }
         banner?.let {
-            if (!held && it.timeline.isFinished(now)) {
-                banner = null
-                bannerPressed = false
-            }
+            if (!held && it.timeline.isFinished(it.at(now))) forgetBanner()
         }
     }
 
@@ -185,7 +210,7 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     /** How far out the banner is at [now], 0 (hidden) to 1 (resting), or 0 without a banner. */
     fun bannerProgress(now: Float): Float {
         val shown = banner ?: return 0f
-        return shell.heldProgress ?: shown.timeline.progress(now * BannerMotion.TICK_MS)
+        return shell.heldProgress ?: shown.timeline.progress(shown.at(now * BannerMotion.TICK_MS))
     }
 
     /** Whether the app-local point ([x], [y]) dp is on the banner as it is drawn at [now], clipped to the viewport. */
@@ -200,22 +225,58 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     /** A mouse button went down on the viewport at app-local dp. Returns true when the banner took it. */
     fun mousePressed(x: Float, y: Float, button: Int, now: Float): Boolean {
         if (!bannerContains(x, y, now)) return false
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) bannerPressed = true
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && !bannerPressed) {
+            bannerPressed = true
+            // Pressed, the banner neither moves nor changes until the button comes up.
+            banner?.freeze(now * BannerMotion.TICK_MS)
+        }
         return true
     }
 
     /**
-     * A mouse button came up at app-local dp. A left click that went down and comes up on the banner opens its
-     * notification (P-10.5): its app at its target, sliding in, which reads the app's notifications.
+     * A mouse button came up at app-local dp. A left click that went down and comes up on the banner opens what was
+     * pressed (P-10.5): its app at its target, sliding in, which reads the app's notifications; a notification that
+     * arrived meanwhile stays a badge. Released off the banner, the banner resumes, showing that newer one, if any,
+     * with a fresh hold.
      */
     fun mouseReleased(x: Float, y: Float, button: Int, now: Float, onViewport: Boolean) {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT || !bannerPressed) return
+        val shown = banner ?: return forgetBanner()
+        val on = onViewport && bannerContains(x, y, now)
         bannerPressed = false
-        val shown = banner ?: return
-        if (!onViewport || !bannerContains(x, y, now)) return
-        banner = null
-        host.play(ShellSound.TAP)
-        NotificationAlerts.open(host.navigator, shown.notification)
+        shown.unfreeze(now * BannerMotion.TICK_MS)
+        val newer = newerWhilePressed
+        newerWhilePressed = null
+        if (on) {
+            banner = null
+            host.play(ShellSound.TAP)
+            NotificationAlerts.open(host.navigator, shown.notification)
+        } else if (newer != null) {
+            showBanner(newer)
+        }
+    }
+
+    /** Whether the mouse wheel at app-local dp turns over the banner, which takes it from the screen under it. */
+    fun mouseScrolled(x: Float, y: Float, now: Float): Boolean = bannerContains(x, y, now)
+
+    /**
+     * The store changed: a banner or a peek whose notification is gone (the app's server side cleared it, or the app
+     * was opened and read it) goes away early, since a click or the phone key would lead to a target that is gone.
+     */
+    fun notificationsChanged() {
+        val unread = host.unread
+        fun gone(notification: PhoneNotification) = unread.none { it.id == notification.id }
+        val now = nowMs()
+        newerWhilePressed?.let { if (gone(it)) newerWhilePressed = null }
+        banner?.let {
+            if (gone(it.notification)) {
+                bannerPressed = false
+                it.unfreeze(now)
+                it.timeline.dismiss(it.at(now))
+            }
+        }
+        peek?.let { if (gone(it.notification)) it.timeline.dismiss(it.at(now)) }
+        pendingPeek?.let { if (gone(it)) pendingPeek = null }
     }
 
     /** The peek is gone at once, without sinking (its drawing failed). */
@@ -224,9 +285,12 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     }
 
     /** The phone is put away: the banner belongs to the open phone and goes with it. */
-    fun onPutAway() {
+    fun onPutAway() = forgetBanner()
+
+    private fun forgetBanner() {
         banner = null
         bannerPressed = false
+        newerWhilePressed = null
     }
 
     /** Disconnection: everything forgotten. */
@@ -236,10 +300,9 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
     }
 
     private fun forgetShown() {
-        banner = null
+        forgetBanner()
         peek = null
         pendingPeek = null
-        bannerPressed = false
     }
 
     private fun nowMs(): Double = shell.now() * BannerMotion.TICK_MS

@@ -160,7 +160,20 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         slide = DeviceSlide.open(from ?: DevicePose(target.x, guiHeight(), 0f), now)
         state = State.OPENING
         navigator.open()
+        readInPlace()
         host.play(ShellSound.OPEN)
+    }
+
+    /**
+     * The phone reopens onto an app left open: its badge stays (it clears when the app is opened), but notifications
+     * whose target the shown screen reports as on screen are read in place, as one arriving there would be (10.3).
+     */
+    private fun readInPlace() {
+        val app = navigator.currentApp ?: return
+        for (notification in host.unread) {
+            val target = notification.target ?: continue
+            if (notification.appId == app.id && navigator.showsTarget(target)) host.dismissNotification(notification)
+        }
     }
 
     /** Puts the phone away: it slides down, and the next [open] shows the same screen. */
@@ -207,7 +220,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (news && !keepsScreen) navigator.home()
         host.closeScreen()
         open(returnTo = reopen)
-        if (keepsScreen) host.newestUnread()?.let(alerts::showUnread)
+        if (keepsScreen) host.unread.lastOrNull()?.let(alerts::showUnread)
     }
 
     /** Unread notifications of every app, read from the store now rather than from last tick's [counts]. */
@@ -215,6 +228,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
 
     /** A notification arrived while the player is connected (not one of the login sync). */
     fun notificationArrived(notification: PhoneNotification) = alerts.arrived(notification)
+
+    /** The notification store changed in any way: a banner or peek whose notification is gone goes away. */
+    fun notificationsChanged() = alerts.notificationsChanged()
 
     /** Disconnection: everything forgotten at once, with no animation. */
     fun reset() {
@@ -490,7 +506,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
                 null
             }
             val app = host.apps.apps.getOrNull(pressed)
-            if (under == pressed && app != null && navigator.isHome) {
+            // Released on the banner, which came down over the icon since: the press is cancelled.
+            val onBanner = alerts.bannerContains(dpX(x, pose), dpY(y, pose), now())
+            if (under == pressed && app != null && navigator.isHome && !onBanner) {
                 host.play(ShellSound.TAP)
                 navigator.openApp(app)
             }
@@ -511,6 +529,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (state != State.OPEN) return false
         val pose = currentPose() ?: return false
         if (!Device.inViewport(x - pose.x, y - pose.y)) return true
+        // Over the banner the wheel is the banner's: the screen under it doesn't scroll.
+        if (alerts.mouseScrolled(dpX(x, pose), dpY(y, pose), now())) return true
         if (navigator.isHome) {
             // One page per whole notch, however finely the wheel or trackpad reports it; turning back starts over.
             homeScroll = if (homeScroll != 0.0 && Math.signum(scrollY) != Math.signum(homeScroll)) scrollY else homeScroll + scrollY
