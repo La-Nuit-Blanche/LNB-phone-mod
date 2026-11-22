@@ -11,6 +11,9 @@ sizes and strings of the phone and its apps are set in [`design/art-direction.md
 - `phone/`: the phone, mod `lnbphone`. The only jar released.
 - `apps/<name>/`: apps, each a mod of its own that depends on `lnbphone`.
 - `apps/demo/`: an app for development, loaded with the phone in the runs below. Never shipped.
+- `tools/sprites/`: draws every image of the phone from the numbers of the art direction. Nothing is drawn by hand:
+  to change an image, change its number there, run `./gradlew :tools:sprites:generateSprites` and commit the PNGs.
+  `./gradlew :tools:sprites:contactSheet -Psheet=<file.png>` draws the whole set enlarged, for checking by eye.
 - `build-logic/`: the build shared by every mod. `lnbphone.mod` builds a mod; `lnbphone.app` adds the dependency on
   the phone and the runs. Versions are in the root `gradle.properties`, and each mod's id, name and description in
   its own `gradle.properties`.

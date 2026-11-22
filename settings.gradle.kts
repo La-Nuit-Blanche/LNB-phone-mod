@@ -15,3 +15,4 @@ rootProject.name = "lnb-phone"
 
 include(":phone")
 include(":apps:demo")
+include(":tools:sprites")
