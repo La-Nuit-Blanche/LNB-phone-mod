@@ -11,6 +11,7 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Keys.** The phone reacts once per real key press, never to key repeats; inside the phone, Esc, the phone key and Backspace act on the first press only, while a focused text field still receives repeats. While a text field has the focus the phone key and Backspace don't close or go back, and typed keys never leave the phone (2.3).
 - **Opening.** The device slides over the HUD for 250 ms and the screen opens when the slide ends; the player can still move during the slide. Another screen opening during the rise sends the phone back down. The crosshair is hidden while the phone is open, and F1 hides the sliding device (2.3, 14, P-1, P-2).
 - **Home pages.** The mouse wheel turns one page per whole notch (2.3).
+- **Inventory button.** With unread notifications the button opens the home screen only if the phone was put away on home or on an app's root screen; deeper in an app it reopens on that screen and shows the newest unread notification as the in-phone banner. This settles a contradiction with 2.3 (the phone keeps its screens and drafts until disconnect) in favour of drafts. Opening the phone closes the inventory properly (crafting grid and cursor items go back) and a fresh inventory opens when the phone closes. With the recipe book open the book covers most of the button: the covered part neither lights up nor takes a click, and the badge sits under the book. No button on the creative inventory (11, P-4, P-5, 19).
 
 ## History
 
@@ -1057,14 +1058,17 @@ A miniature of the phone face on a side tab, under the quest book button.
 |---|---|
 | Size | 27 x 28 GUI px |
 | Position | `wx = guiLeft - 22` (5 px over the inventory edge), `wy = guiTop + 46` (4 px under the quest button's lower bracket, which ends at `guiTop + 41`) |
-| Recipe book | follows `guiLeft` every frame |
+| Recipe book | the button follows `guiLeft` every frame. With the book open it covers most of the button: the covered part neither lights up nor takes a click, the uncovered part works as usual, and the badge sits under the book (see below) |
 | Tooltip (vanilla) | `LNB Phone` (`inventory.tooltip`); when unread, a second line in `#3A8DF0`: `3 nouvelles notifications` (`inventory.tooltip.unread`) |
-| Click, no unread | the inventory closes and the phone opens on the screen it was closed on |
-| Click, unread | the inventory closes and the phone opens on the **home screen**, so the badges show which apps have news |
-| After closing the phone | the inventory reopens |
+| Click, no unread | the inventory closes, as its own close would (the crafting grid and the item on the cursor go back to the inventory), and the phone opens on the screen it was closed on |
+| Click, unread | the inventory closes as above. If the phone was put away on the home screen or on an app's root screen, it opens on the **home screen**, so the badges show which apps have news. If it was put away deeper in an app (a thread, Compose, a conversation with a draft), it reopens on that same screen, because 2.3 keeps screens and drafts and leaving would lose them: drafts win over the badges. The newest unread notification then shows as the in-phone banner (10.3), with no chime, so the news still shows |
+| After closing the phone | a fresh inventory opens, as the inventory key would open it (the creative inventory for a player now in creative); the old one is not kept |
+| Creative inventory | no button: that side belongs to the creative tabs, and the phone key works there |
 | Pressed | no separate sprite: the hover sprite stays until the phone starts opening |
 
 In a 480 x 270 window the survival inventory (176 x 166) has `guiLeft = 152`, `guiTop = 52`: the quest button is at `(130, 60)` and the phone button at `(130, 98)`.
+
+With the recipe book open, vanilla moves the inventory right and draws the book (147 x 166 at `((W - 147) / 2 - 86, (H - 166) / 2)`; centred over the inventory in a window narrower than 379 px) over the button. In the 480 x 270 window the inventory has `guiLeft = 229` and the button is at `(207, 98)`; the book covers `x 207..226` of the button's `x 207..233`, so only its right 7 px light up and take clicks.
 
 | Part (tab-local) | Pixels | Colour |
 |---|---|---|
@@ -1080,7 +1084,7 @@ In a 480 x 270 window the survival inventory (176 x 166) has `guiLeft = 152`, `g
 |---|---|---|
 | Normal | `screen-off`, glare `(17,5) (18,5) (18,6)` in `glare` | |
 | Normal hover | as normal | outline `accent` |
-| New notifications | `accent`; row `y 4` `accent-hi`; four 3 x 3 `#FFFFFF` dots at `x 9..11` / `x 14..16`, `y 7..9` / `y 12..14` | pixel badge (6.1) with the total unread count at `(x - 3, y - 3)`, above the tab and the quest bracket; pulses when the count rises |
+| New notifications | `accent`; row `y 4` `accent-hi`; four 3 x 3 `#FFFFFF` dots at `x 9..11` / `x 14..16`, `y 7..9` / `y 12..14` | pixel badge (6.1) with the total unread count at `(x - 3, y - 3)`, above the tab and the quest bracket but under the recipe book when it is open; pulses when the count rises |
 | New notifications hover | as above | outline `accent` |
 
 ---
@@ -1385,9 +1389,9 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | survival inventory open; quest button at `(130, 60)`, phone button `inventory/button` at `(130, 98)` | `(240, 200)` | The phone button sits under the quest book button. |
 | 2 | W | phone button `inventory/button_hover`, vanilla tooltip `LNB Phone` | `(143, 112)` | Hover: accent outline and tooltip. |
-| 3 | W | inventory gone, device mid-slide at `(334, 153)` showing the Feed Global screen (last screen) | no cursor | Click: the inventory closes and the phone slides up (250 ms). |
+| 3 | W | inventory gone, device mid-slide at `(334, 153)` showing the Feed Global screen (last screen) | no cursor | Click: the inventory closes (its crafting grid and cursor items go back) and the phone slides up (250 ms). |
 | 4 | P | Feed, Global, as it was left | `(128, 200)` | The phone opens on the screen it was closed on. |
-| 5 | W | inventory open again, phone closed | `(240, 200)` | Closing the phone (Esc) brings the inventory back. |
+| 5 | W | inventory open again, phone closed | `(240, 200)` | Closing the phone (Esc) brings a fresh inventory back. |
 
 **P-5 Open from the inventory button, with news** (3 steps)
 
@@ -1395,7 +1399,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | inventory open, phone button `inventory/button_new` with the pixel badge `3` at `(127, 95)` | `(240, 200)` | Unread notifications: the mini screen lights up and a red count appears. |
 | 2 | W | `inventory/button_new_hover`, tooltip `LNB Phone` / `3 nouvelles notifications` (second line `#3A8DF0`) | `(143, 112)` | Hover shows how many. |
-| 3 | P | home screen, Feed icon badge `3`, LED lit | `(128, 200)` | With news, the phone opens on the home screen so the badges show where it is (250 ms slide). |
+| 3 | P | home screen, Feed icon badge `3`, LED lit | `(128, 200)` | With news, the phone opens on the home screen so the badges show where it is (250 ms slide), when it was put away on home or on an app's root screen. Put away deeper in an app, it reopens there with the newest notification as a banner (11). |
 
 **P-6 Home: hover, press, open an app** (5 steps)
 
@@ -1848,7 +1852,7 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 
 1. The post header is two lines (name, then `@handle`), because a real name, a 16-character handle and the time do not fit on one line in 188 dp. Long real names truncate; the handle never does. Warden caps real names at 64 characters.
 2. Any announcer can pin or unpin any announcement.
-3. Esc closes the phone even inside an app (after closing a menu or dialog); the phone reopens on the same screen. With unread notifications, the inventory button opens the home screen instead.
+3. Esc closes the phone even inside an app (after closing a menu or dialog); the phone reopens on the same screen. With unread notifications, the inventory button opens the home screen instead, but only from home or an app's root screen; from deeper in an app it reopens that screen, since drafts win over badges (11).
 4. A Feed badge clears when Feed is opened. Replies to your own posts stay marked in the feed (blue reply count) until you open the thread.
 
 **Known slips in the Feed sample data** (found while drawing the canvas; to fix before the Feed app is built, they do not affect the phone):
