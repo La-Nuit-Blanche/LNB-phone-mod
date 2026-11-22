@@ -86,6 +86,7 @@ internal class PhoneNavigator(
      * false if there is no such app or it failed to start.
      */
     fun openApp(id: ResourceLocation, target: String? = null): Boolean {
+        checkThread()
         val app = registry[id] ?: run {
             LnbPhone.LOGGER.warn("There is no phone app {} to open", id)
             return false
@@ -127,6 +128,7 @@ internal class PhoneNavigator(
 
     /** Back one screen in the open app. Returns false, doing nothing, on an app's root screen or at home. */
     fun back(): Boolean {
+        checkThread()
         val top = currentScreen ?: return false
         return pop(top.host!!)
     }

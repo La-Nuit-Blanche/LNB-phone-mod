@@ -232,6 +232,8 @@ class PhoneNavigatorDispatchTest {
         onClientThread = false
         assertThrows(IllegalStateException::class.java) { navigator.close() }
         assertThrows(IllegalStateException::class.java) { navigator.home() }
+        assertThrows(IllegalStateException::class.java) { navigator.back() }
+        assertThrows(IllegalStateException::class.java) { navigator.openApp(appId("unknown")) }
         assertFalse(navigator.isOpen)
     }
 }
