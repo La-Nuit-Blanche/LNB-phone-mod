@@ -56,8 +56,9 @@ abstract class Phone internal constructor() {
     abstract fun home()
 
     /**
-     * Puts the phone away. The app keeps its screens: the next time the player opens the phone (until they
-     * disconnect), it reopens on the app's top screen, with its state.
+     * Puts the phone away. The app keeps its screens: the next time the player opens the phone, it reopens on the
+     * app's top screen, with its state; unless meanwhile they disconnected or changed the game's language, which
+     * close the app (the phone then opens on home).
      */
     abstract fun close()
 }

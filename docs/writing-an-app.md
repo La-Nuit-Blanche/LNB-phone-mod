@@ -29,8 +29,9 @@ Read this part first. Most mistakes made with the phone are mistakes about this 
   draws the slides, shows the back arrow in your header and maps Backspace to "back".
 - **Screens are thrown away.** Each time the player opens the app, from the home screen or from a notification, the
   phone calls your factory and gets new screens. When the player leaves the app (the home button, another app, a
-  notification of another app, disconnecting) every screen is closed and never shown again. Putting the phone away
-  (Esc, the phone key, a click outside) is different: the app keeps its screens and the phone reopens on them.
+  notification of another app, disconnecting, and changing the game's language, which sends the phone home) every
+  screen is closed and never shown again. Putting the phone away (Esc, the phone key, a click outside) is different:
+  the app keeps its screens and the phone reopens on them.
 - Screens draw in **dp**, in a viewport of 256 x 370 dp under the status bar, whatever the window or the GUI scale.
   The kit's widgets already follow the phone's look; the art direction (`design/art-direction.md`, section 8) is what
   the kit implements, and you shouldn't need to read it.
@@ -87,7 +88,7 @@ so an answer that arrives after the player left can't drag them back into your a
 ### What you may extend
 
 - Extend `AppScreen`, `KitScreen`, `Widget` and `Clickable`, and override what their KDoc calls hooks.
-- Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s last two arguments).
+- Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s `rootScreen` and `targetScreens`).
 - `Phone`, `AppCanvas` and `TextMeasurer` are the phone's: it gives you instances, only it can make them, and later
   versions add methods to them. To test, use the phone's test support (step 9).
 - Widgets take in their constructor only what they can't exist without; everything else is a property you set with
@@ -662,11 +663,18 @@ plain classes, as `PingTarget` and `PingSession` are, and test it with JUnit und
 `PingTargetTest` and `PingSessionTest`. Tests run with the game loaded, which loads Kotlin twice: use JUnit's
 `assertInstanceOf` and `assertThrows`, not kotlin.test's `assertIs` and `assertFailsWith`.
 
-Your screens can be tested too, with `PhoneTester` (`fr.bde_teknantes.lnb.phone.testing`), which the app plugin puts on
-your tests' classpath and never in your jar. It is a phone without the game: it opens your app, passes your screens
-frames, ticks, clicks, keys and typed text as the phone does, navigates as the phone does, and records the sounds
-instead of playing them. Text is measured as if every character were half its size wide, and no language is loaded,
-so `I18n.get` returns its key. Its KDoc has the rest.
+Your screens can be tested too, with `PhoneTester` (`fr.bde_teknantes.lnb.phone.testing`). It is for apps built in
+this repository: the app plugin puts it on your tests and loads it with the phone's classes, and it is never in your
+jar. It isn't published for mods built elsewhere, and isn't promised to them yet. It is a phone without the game: it
+opens your app, passes your screens frames, ticks, clicks, keys (with the characters they type) and typed text as the
+phone does, navigates as the phone does, and records the sounds instead of playing them. Text is measured as if every
+character were half its size wide, and no language is loaded, so `I18n.get` returns its key.
+
+There is no game under it: `Minecraft.getInstance()` is null, and a screen that reads the game throws there. Ping's
+players screen, which reads the players online from the connection in `onScreenShown`, can't be played by it; its
+conversation screen, which takes everything from `PingSession` and its constructor, can. Keep your screens testable the
+same way: what they show comes from your app's objects or their arguments, and the game is read in your client glue
+(payload handlers, events). Its KDoc has the rest.
 
 <!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreenTest.kt -->
 ```kotlin

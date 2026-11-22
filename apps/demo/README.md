@@ -21,7 +21,8 @@ kept apart:
 | `ping/client/PingScreen.kt` | client | writing to one player |
 
 Its strings are the `ping` keys of `lang/en_us.json` and `fr_fr.json`, its icon `textures/gui/ping.png`. Its tests are
-`src/test/.../ping/PingTargetTest.kt` and `ping/client/PingSessionTest.kt`; `src/test/.../guide/` keeps the guide's samples true.
+`src/test/.../ping/PingTargetTest.kt`, `ping/client/PingSessionTest.kt` and `ping/client/PingScreenTest.kt` (the conversation
+screen played by the phone's `PhoneTester`); `src/test/.../guide/` keeps the guide's samples true.
 
 ## Development tools
 

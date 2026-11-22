@@ -28,7 +28,8 @@ import fr.bde_teknantes.lnb.phone.client.apps.ScreenHost
  *   the phone is opened again on it;
  * - [onHidden] when it stops being seen but stays alive: a screen is pushed above it, or the phone is put away;
  * - [onClosed], once, when it leaves the phone for good: popped or replaced, the player went home or disconnected, the
- *   app was opened again (from home or a notification), or the app failed. A closed screen is never shown again.
+ *   app was opened again (from home or a notification), the player changed the game's language (the phone then goes
+ *   home), or the app failed. A closed screen is never shown again.
  *
  * [onShown] and [onHidden] alternate, starting with [onShown]; a screen that is shown when it closes gets [onHidden]
  * before [onClosed]. A screen may also close without ever being shown: one placed under the top of a stack opened for a
