@@ -76,6 +76,12 @@ class GeneratorTest {
         assertEquals(24, paths.getValue("smooth/1_5x/icon16/heart").image.width)
         assertEquals(32, paths.getValue("smooth/2x/icon16/heart").image.width)
         assertEquals(42, paths.getValue("smooth/1_5x/icon28/person").image.width)
+        assertEquals(72, paths.getValue("smooth/4_5x/icon16/heart").image.width)
+        // One density per GUI scale 2 to 9, each with the same icons.
+        val folders = listOf("1x", "1_5x", "2x", "2_5x", "3x", "3_5x", "4x", "4_5x")
+        assertEquals(folders, SmoothFormat().iconDensities.map { it.folder })
+        val names = folders.map { folder -> paths.keys.filter { it.startsWith("smooth/$folder/") }.map { it.substringAfter("smooth/$folder/") }.toSet() }
+        assertTrue(names.all { it == names.first() && it.size == 24 })
         assertEquals(144, paths.getValue("smooth/shadow/fab").image.width)
         val other = smoothSprites(SmoothFormat(iconDensities = listOf(Density("3x", 3.0)))).map { it.path }
         assertTrue("smooth/3x/spinner" in other && other.none { it.startsWith("smooth/2x/") })
