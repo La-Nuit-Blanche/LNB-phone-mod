@@ -133,6 +133,9 @@ class GsubLigatures(font: ByteBuffer) {
 
             // In lookup-list order, as OpenType applies them.
             val result = ArrayList<Subtable>()
+            // A subtable that several lookups (or one lookup several times) point at is used once: a repeat can never
+            // match what its first use did not, and each use would be scanned again for every ligature asked for.
+            val seen = HashSet<Int>()
             val lookupCount = u16(lookupList)
             for (index in lookups) {
                 if (index >= lookupCount) continue
@@ -147,7 +150,7 @@ class GsubLigatures(font: ByteBuffer) {
                         subType = u16(sub + 2)
                         sub += u32(sub + 4)
                     }
-                    if (subType != 4) continue
+                    if (subType != 4 || !seen.add(sub)) continue
                     body(sub)?.let(result::add)
                 }
             }
@@ -163,6 +166,10 @@ class GsubLigatures(font: ByteBuffer) {
             val setCount = u16(at + 4)
             charge(setCount.toLong())
             val sets = Array(setCount) { ligatureSet(at + u16(at + 6 + 2 * it)) }
+            // Asking for a ligature scans a set, so every reference to a set counts, shared or not: many subtables (or
+            // many entries of one) sharing a big set would otherwise multiply a small table into minutes of scanning
+            // for each emoji drawn. A real font's sets are not shared, so this costs it what its ligatures already did.
+            charge(sets.sumOf { it.size.toLong() })
             return Subtable(coverage, sets)
         }
 
