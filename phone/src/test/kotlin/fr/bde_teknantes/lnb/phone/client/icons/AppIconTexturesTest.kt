@@ -73,10 +73,29 @@ class AppIconTexturesTest {
     }
 
     @Test
-    fun `a glyph image that isn't 16 x 16 is refused, smaller or larger (7_2)`() {
-        for ((w, h) in listOf(15 to 16, 16 to 15, 17 to 16, 16 to 17, 32 to 32, 8 to 8, 0 to 0, 20 to 20)) {
+    fun `a glyph image of no usable size is refused`() {
+        for ((w, h) in listOf(15 to 16, 16 to 15, 17 to 16, 16 to 17, 8 to 8, 0 to 0, 20 to 20, 32 to 16, 32 to 64, 24 to 24, 16 to 24)) {
             assertNull(AppIconTextures.glyphFromImage(w, h) { _, _ -> white }, "$w x $h")
+            assertEquals(AppIconTextures.GlyphFit.REFUSED, AppIconTextures.glyphFit(w, h), "$w x $h")
         }
+    }
+
+    @Test
+    fun `a square multiple of 16 is sampled down with nearest neighbour`() {
+        // 48 x 48: each glyph pixel is the top-left of its 3 x 3 block.
+        val glyph = AppIconTextures.glyphFromImage(48, 48) { x, y -> if (x % 3 == 0 && y % 3 == 0) (0xFF000000.toInt() or x or (y shl 8)) else 0 }!!
+        assertEquals(AppIconTextures.GlyphFit.SAMPLED, AppIconTextures.glyphFit(48, 48))
+        for (gy in 0 until 16) for (gx in 0 until 16) {
+            // ABGR in, ARGB out: x lands in the blue channel's place swapped to red.
+            assertEquals(0xFF000000.toInt() or ((3 * gx) shl 16) or ((3 * gy) shl 8), glyph[gy * 16 + gx], "($gx, $gy)")
+        }
+    }
+
+    @Test
+    fun `an animated strip 16 wide shows its first frame`() {
+        assertEquals(AppIconTextures.GlyphFit.FIRST_FRAME, AppIconTextures.glyphFit(16, 64))
+        val glyph = AppIconTextures.glyphFromImage(16, 64) { _, y -> if (y < 16) white else 0 }!!
+        assertEquals(true, glyph.all { it == white })
     }
 
     @Test

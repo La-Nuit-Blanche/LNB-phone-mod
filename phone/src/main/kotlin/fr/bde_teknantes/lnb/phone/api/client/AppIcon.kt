@@ -24,6 +24,9 @@ sealed class AppIcon(
      *   [TileColor.lo], and one accent among `#F28A2E`, `#F2B33A`, `#5BD34A`, `#E5483C` and `#3A8DF0`;
      * - no shadow: the phone adds it.
      *
+     * A picture of another size is fitted, with a warning in the log: a square multiple of 16 (32 x 32...) is sampled
+     * down, a strip 16 wide (an animated texture) shows its first frame, anything else leaves the bare tile.
+     *
      * @property texture The PNG, for instance `ResourceLocation.fromNamespaceAndPath("mymod", "textures/gui/notes.png")`
      * for `assets/mymod/textures/gui/notes.png`.
      */

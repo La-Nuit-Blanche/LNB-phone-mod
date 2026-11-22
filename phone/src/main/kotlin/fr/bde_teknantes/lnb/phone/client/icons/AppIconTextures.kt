@@ -45,32 +45,66 @@ object AppIconTextures : ResourceManagerReloadListener {
     internal fun pixels(icon: AppIcon, readGlyph: (ResourceLocation) -> IntArray?): IntArray =
         IconComposer.compose(icon.tile, (icon as? AppIcon.Glyph)?.let { readGlyph(it.texture) })
 
-    /**
-     * A glyph image's pixels as ARGB, row by row, from [abgr] (NativeImage's order) at each pixel; null when the image
-     * isn't 16 x 16.
-     */
-    internal fun glyphFromImage(width: Int, height: Int, abgr: (Int, Int) -> Int): IntArray? {
-        if (width != IconComposer.GLYPH_SIZE || height != IconComposer.GLYPH_SIZE) return null
-        return IntArray(IconComposer.GLYPH_SIZE * IconComposer.GLYPH_SIZE) { i ->
-            swapRedBlue(abgr(i % IconComposer.GLYPH_SIZE, i / IconComposer.GLYPH_SIZE))
+    /** How a glyph image of some size is turned into the 16 x 16 the icon needs. */
+    internal enum class GlyphFit {
+        /** 16 x 16: as it is. */
+        EXACT,
+
+        /** A square multiple of 16 (32 x 32, 48 x 48...): sampled down, nearest neighbour. */
+        SAMPLED,
+
+        /** 16 wide and a multiple of 16 tall, an animated strip: its first frame. */
+        FIRST_FRAME,
+
+        /** Anything else: no picture, the bare tile. */
+        REFUSED,
+    }
+
+    internal fun glyphFit(width: Int, height: Int): GlyphFit {
+        val size = IconComposer.GLYPH_SIZE
+        return when {
+            width == size && height == size -> GlyphFit.EXACT
+            width == height && width > size && width % size == 0 -> GlyphFit.SAMPLED
+            width == size && height > size && height % size == 0 -> GlyphFit.FIRST_FRAME
+            else -> GlyphFit.REFUSED
         }
     }
 
-    /** The glyph's 16 x 16 pixels as ARGB, or null (and a warning, once) when it is missing or the wrong size. */
+    /**
+     * A glyph image's 16 x 16 pixels as ARGB, row by row, from [abgr] (NativeImage's order) at each pixel, fitted as
+     * [glyphFit] says; null when it is refused.
+     */
+    internal fun glyphFromImage(width: Int, height: Int, abgr: (Int, Int) -> Int): IntArray? {
+        val size = IconComposer.GLYPH_SIZE
+        // A square multiple samples one pixel per step; a strip's first frame and an exact glyph step by one.
+        val step = when (glyphFit(width, height)) {
+            GlyphFit.EXACT, GlyphFit.FIRST_FRAME -> 1
+            GlyphFit.SAMPLED -> width / size
+            GlyphFit.REFUSED -> return null
+        }
+        return IntArray(size * size) { i -> swapRedBlue(abgr(i % size * step, i / size * step)) }
+    }
+
+    /** The glyph's 16 x 16 pixels as ARGB, or null when it is missing or refused; one warning when it isn't 16 x 16. */
     private fun glyphPixels(location: ResourceLocation): IntArray? {
         val image = try {
             Minecraft.getInstance().resourceManager.getResource(location).orElse(null)?.open()?.use(NativeImage::read)
         } catch (e: Exception) {
-            warnOnce(location, "can't be read: $e")
+            warnOnce(location, "can't be read ($e); the icon shows its tile only")
             return null
         } ?: run {
-            warnOnce(location, "is missing")
+            warnOnce(location, "is missing; the icon shows its tile only")
             return null
         }
         image.use {
-            val pixels = glyphFromImage(it.width, it.height, it::getPixelRGBA)
-            if (pixels == null) warnOnce(location, "is ${it.width} x ${it.height} pixels instead of 16 x 16")
-            return pixels
+            val outcome = when (glyphFit(it.width, it.height)) {
+                GlyphFit.EXACT -> null
+                GlyphFit.SAMPLED -> "is sampled down to 16 x 16"
+                GlyphFit.FIRST_FRAME -> "shows its first 16 x 16 frame"
+                GlyphFit.REFUSED -> "isn't used: the icon shows its tile only"
+            }
+            outcome?.let { what -> warnOnce(location, "is ${it.width} x ${it.height} pixels instead of 16 x 16; it $what") }
+            return glyphFromImage(it.width, it.height, it::getPixelRGBA)
         }
     }
 
@@ -83,7 +117,7 @@ object AppIconTextures : ResourceManagerReloadListener {
     }
 
     private fun warnOnce(location: ResourceLocation, problem: String) {
-        if (warned.add(location)) LnbPhone.LOGGER.warn("App icon glyph {} {}; the icon shows its tile only", location, problem)
+        if (warned.add(location)) LnbPhone.LOGGER.warn("App icon glyph {} {}", location, problem)
     }
 
     // NativeImage stores pixels as ABGR; the composer works in ARGB. The swap goes both ways.
