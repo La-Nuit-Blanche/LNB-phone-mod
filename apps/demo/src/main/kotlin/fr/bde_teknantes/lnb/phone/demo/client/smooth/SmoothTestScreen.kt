@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.resources.ResourceLocation
+import org.lwjgl.opengl.GL11
 import kotlin.math.max
 
 /**
@@ -48,6 +49,7 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         graphics.disableScissor()
         if (frames == 0 && before != after) LnbPhone.LOGGER.error("Smooth canvas changed the render state: {} -> {}", before, after)
         if (frames == 0 && before == after) LnbPhone.LOGGER.info("Smooth canvas left the render state as it found it")
+        if (frames == 0) checkFaintOverlay()
         minecraftTtfRow(graphics)
         logCost()
     }
@@ -99,6 +101,32 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         c.fillCircle(212f, top - 8f, 40f, ACCENT_SOFT_2)
         c.popClip()
         c.drawText("pushClip(24, y+4, 208, 32)", 12f, top + 44f, TextStyles.CAPTION, TEXT_3)
+
+        // The kit's faintest fills (art direction 8.3) on bg: overlay-hover 4%, overlay-pressed 8%, banner-edge 6%.
+        for ((i, overlay) in FAINT_OVERLAYS.withIndex()) c.fillRect(FAINT_X + i * 36f, FAINT_Y, 28f, 16f, overlay)
+        c.drawText("4 % · 8 % · 6 %", FAINT_X + 108f, FAINT_Y, TextStyles.CAPTION, TEXT_3)
+    }
+
+    /**
+     * Reads back the 4% overlay and the bg beside it: the same pixel means faint fills are lost, as they were under
+     * vanilla's shader, which discards everything under 10% alpha.
+     */
+    private fun checkFaintOverlay() {
+        val grid = canvas.grid
+        val y = minecraft!!.window.height - 1 - grid.snap(FAINT_Y + 8f)
+        val overlay = readPixel(grid.snap(FAINT_X + 14f), y)
+        val background = readPixel(grid.snap(FAINT_X - 6f), y)
+        if (overlay == background) {
+            LnbPhone.LOGGER.error("Smooth canvas lost a 4% overlay: {} on bg {}", Integer.toHexString(overlay), Integer.toHexString(background))
+        } else {
+            LnbPhone.LOGGER.info("Smooth canvas drew a 4% overlay: {} on bg {}", Integer.toHexString(overlay), Integer.toHexString(background))
+        }
+    }
+
+    private fun readPixel(x: Int, y: Int): Int {
+        val out = IntArray(1)
+        GL11.glReadPixels(x, y, 1, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, out)
+        return out[0] and 0xFFFFFF
     }
 
     /** A post card per art direction 9.3; returns the y of the next cell. */
@@ -273,6 +301,9 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
     private companion object {
         const val SAMPLE_X = 364f
         const val VARIANTS_Y = 166f
+        const val FAINT_X = 12f
+        const val FAINT_Y = 456f
+        val FAINT_OVERLAYS = intArrayOf(0x0AFFFFFF, 0x14FFFFFF, 0x0FFFFFFF)
 
         val TEXT_VARIANTS = listOf(
             Triple("none · 1 px", SmoothFont.Hinting.NONE, 1),

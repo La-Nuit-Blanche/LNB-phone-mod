@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.BufferUploader
 import com.mojang.blaze3d.vertex.ByteBufferBuilder
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat
-import net.minecraft.client.renderer.GameRenderer
 import net.minecraft.client.renderer.texture.AbstractTexture
 import org.joml.Matrix4f
 
@@ -61,7 +60,7 @@ internal class QuadBatch : AutoCloseable {
         val tex = texture!!
         beforeDraw?.invoke()
         tex.setFilter(linear, false)
-        RenderSystem.setShader(GameRenderer::getPositionTexColorShader)
+        RenderSystem.setShader(SmoothShader::get)
         RenderSystem.setShaderTexture(0, tex.id)
         BufferUploader.drawWithShader(mesh)
         drawCalls++
