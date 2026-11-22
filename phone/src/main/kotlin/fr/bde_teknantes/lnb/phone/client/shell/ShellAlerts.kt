@@ -25,6 +25,10 @@ import org.lwjgl.glfw.GLFW
  * - Several notifications at once (an announcement and a reply in the same tick): the last one shows, each swapping
  *   the content in place and restarting the hold as 10.2's queue says, and the chime plays once.
  * - A click on the banner removes it at once, as the notification's screen slides in.
+ * - A pressed banner doesn't change: content and time freeze until the button comes up. Released on it, it opens what
+ *   was pressed (a newer notification stays a badge); released off it, it resumes, showing a newer one with a fresh
+ *   hold. The mouse wheel over the banner is the banner's.
+ * - A banner or a peek whose notification leaves the store (cleared by the server, read) goes away early.
  *
  * Client thread only.
  */
