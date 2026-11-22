@@ -99,6 +99,27 @@ sourceSets.main {
 }
 neoForge.ideSyncTask(generateModMetadata)
 
+// Players with any French game language get French, but Minecraft falls back to en_us only: each fr_fr.json is copied
+// to the other French locales of 1.21.1, unless the mod ships its own file for that locale.
+val otherFrenchLocales = listOf("fr_ca", "fr_ch")
+val mainResources = file("src/main/resources")
+val generateFrenchLocales = tasks.register<Sync>("generateFrenchLocales") {
+    // A locale file added to the sources must take the copy's place, so their presence is an input.
+    inputs.files(fileTree(mainResources) { include(otherFrenchLocales.map { "assets/*/lang/$it.json" }) })
+    for (locale in otherFrenchLocales) {
+        from(mainResources) {
+            include("assets/*/lang/fr_fr.json")
+            exclude { !it.isDirectory && it.file.resolveSibling("$locale.json").exists() }
+            rename { "$locale.json" }
+        }
+    }
+    into(layout.buildDirectory.dir("generated/sources/frenchLocales"))
+}
+sourceSets.main {
+    resources.srcDir(generateFrenchLocales)
+}
+neoForge.ideSyncTask(generateFrenchLocales)
+
 tasks.test {
     useJUnitPlatform()
     workingDir = layout.buildDirectory.dir("test-run").get().asFile.apply { mkdirs() }
