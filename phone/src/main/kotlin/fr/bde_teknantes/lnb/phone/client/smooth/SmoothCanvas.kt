@@ -27,7 +27,8 @@ import kotlin.math.roundToInt
  *
  * Use it between [begin] and [end], inside a Minecraft screen's render. Coordinates are dp from the top-left of the
  * rectangle given to [begin]; colours are ARGB (`0xAARRGGBB`). [end] leaves the pose, scissor, shader, shader texture
- * and colour, blending and depth test as [begin] found them. Render thread only.
+ * and colour, blending and depth test as [begin] found them. Render thread only: every entry point, measuring
+ * included, throws on another thread.
  */
 class SmoothCanvas {
     private val clips = ArrayList<IntArray>()
@@ -99,6 +100,7 @@ class SmoothCanvas {
      * around the canvas does not reach the smooth layer: fade with the alpha of the colours passed to it instead.
      */
     fun begin(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int) {
+        RenderThread.check("SmoothCanvas.begin")
         active?.let { abandoned(it) }
         frameStart = System.nanoTime()
         batch.resetStats()

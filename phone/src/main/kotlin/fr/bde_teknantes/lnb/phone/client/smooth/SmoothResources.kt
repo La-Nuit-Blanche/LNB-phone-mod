@@ -83,6 +83,7 @@ object SmoothResources : ResourceManagerReloadListener {
      * copy in the phone's own jar. Each broken file is logged once per resource reload.
      */
     fun font(weight: FontWeight): SmoothFont {
+        RenderThread.check("Measuring or drawing smooth text")
         fonts[weight]?.let { return it }
         fontFailures[weight]?.let { throw it }
         val location = FONT_FILES.getValue(weight)
@@ -101,8 +102,10 @@ object SmoothResources : ResourceManagerReloadListener {
     }
 
     /** The glyphs of one weight at [sizePx] per em, rasterised with [hinting] at [phases] sub-pixel positions. */
-    fun glyphs(weight: FontWeight, sizePx: Float, hinting: SmoothFont.Hinting, phases: Int): GlyphSet =
-        glyphSets.getOrPut(GlyphSetKey(weight, sizePx, hinting, phases)) { GlyphSet(weight, sizePx, hinting, phases) }
+    fun glyphs(weight: FontWeight, sizePx: Float, hinting: SmoothFont.Hinting, phases: Int): GlyphSet {
+        RenderThread.check("Drawing smooth text")
+        return glyphSets.getOrPut(GlyphSetKey(weight, sizePx, hinting, phases)) { GlyphSet(weight, sizePx, hinting, phases) }
+    }
 
     /** Glyphs rasterised on demand. Look one set up per string, then [get] each glyph without allocating. */
     class GlyphSet internal constructor(
@@ -142,6 +145,7 @@ object SmoothResources : ResourceManagerReloadListener {
      * Null when it is larger than an atlas page.
      */
     fun shape(width: Int, height: Int, radiusPx: Float, strokePx: Int): MaskAtlas.Region? {
+        RenderThread.check("Drawing a smooth shape")
         val radius8 = (radiusPx * 8f).roundToInt()
         val key = (width.toLong() shl 40) or (height.toLong() shl 24) or (radius8.toLong() shl 8) or strokePx.toLong()
         shapes.get(key)?.let { return it }
@@ -157,6 +161,7 @@ object SmoothResources : ResourceManagerReloadListener {
      * anti-aliased circle; null while the skin's pixels are not uploaded yet.
      */
     fun avatar(skin: ResourceLocation, sizePx: Int): MaskAtlas.Region? {
+        RenderThread.check("Drawing a player face")
         avatars[skin to sizePx]?.let { return it }
         val face = skinFace(skin) ?: return null
         val mask = ShapeMask.roundedRect(sizePx, sizePx, sizePx / 2f)
