@@ -116,11 +116,16 @@ object SmoothResources : ResourceManagerReloadListener {
     ) {
         private val glyphs = Int2ObjectOpenHashMap<Glyph>()
 
-        /** [codePoint] shifted right by `phase / phases` px. */
+        /**
+         * [codePoint] shifted right by `phase / phases` px. Keyed by glyph, not code point: every character Inter
+         * lacks is its glyph 0, the missing-glyph box, stored once.
+         */
         fun get(codePoint: Int, phase: Int): Glyph {
-            val key = codePoint * phases + phase
+            val font = font(weight)
+            val glyphId = font.glyphId(codePoint)
+            val key = glyphId * phases + phase
             glyphs.get(key)?.let { return it }
-            val bitmap = font(weight).rasterize(codePoint, sizePx, phase.toFloat() / phases, hinting)
+            val bitmap = font.rasterizeGlyph(glyphId, sizePx, phase.toFloat() / phases, hinting)
             // allocate() may clear the atlas, and this set with it, before returning the region.
             val region = bitmap?.let { allocate(it.width, it.height) }
             val glyph = if (bitmap == null || region == null) {
