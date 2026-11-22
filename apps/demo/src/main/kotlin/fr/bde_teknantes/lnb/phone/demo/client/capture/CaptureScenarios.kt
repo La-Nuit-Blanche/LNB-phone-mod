@@ -22,6 +22,8 @@ object CaptureScenarios {
         "shell" to ShellScenarios::shell,
         "shell-pages" to ShellScenarios::shellPages,
         "shell-window" to ShellScenarios::shellWindow,
+        "settings" to SettingsScenarios::settings,
+        "settings-window" to SettingsScenarios::window,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()

@@ -7,7 +7,9 @@ import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
+import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.client.settings.SettingsApp
 import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
@@ -53,6 +55,8 @@ object LnbPhoneClient {
     // Takes the mod bus because client setup (key mappings, screens) is registered there, not on NeoForge's bus.
     fun init(modBus: IEventBus) {
         modBus.addListener(::onClientSetup)
+        // The phone's own app, on the phone's bus like any mod's apps.
+        modBus.addListener(RegisterPhoneAppsEvent::class.java, SettingsApp::register)
         modBus.addListener(RegisterKeyMappingsEvent::class.java, PhoneKeys::register)
         modBus.addListener(RegisterClientReloadListenersEvent::class.java) {
             // The smooth layer's fonts and atlas, and the composed app icons, come from resources: drop them when

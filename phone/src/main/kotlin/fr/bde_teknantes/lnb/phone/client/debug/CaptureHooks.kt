@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.client.debug
 
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
+import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettings
 import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
 import fr.bde_teknantes.lnb.phone.client.shell.Device
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
@@ -61,6 +62,12 @@ object CaptureHooks {
     fun setCentred(centred: Boolean) {
         if (!enabled) return
         LnbPhoneClient.settings.update { it.copy(placement = if (centred) Placement.CENTRE else Placement.CORNER) }
+    }
+
+    /** Puts the player's settings back to the defaults (corner, sounds on, preview on), saved like a player's choice. */
+    fun resetSettings() {
+        if (!enabled) return
+        LnbPhoneClient.settings.update { PhoneSettings() }
     }
 
     /** Whether the phone stands open with its screen (the slide up is over). */
