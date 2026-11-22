@@ -2,12 +2,13 @@
 
 An app is a mod of its own that depends on the phone. It adds itself to the phone when the game starts; nothing in
 the phone changes. This guide takes you from an empty folder to an app with two screens, a list, a text field, state
-that survives the player leaving, and a notification sent by your server that opens the app on the right screen.
+that survives the player leaving, its own exchanges with your server, and a notification sent by your server that
+opens the app on the right screen.
 
-It walks through **Ping**, the example app in the demo mod (`apps/demo`, package `ping`): pick a player, write a
-short message, and it reaches their phone as a notification; opening it lands on the screen to answer them. Every
-code sample below is lifted from Ping or from code compiled with the demo's tests, and the build checks that they
-still match (`GuideSamplesTest`).
+It walks through **Ping**, the example app in the demo mod (`apps/demo`, package `ping`): pick a player who is online,
+write a short message, and it appears in your conversation with them on their phone, with a notification that opens
+it. Every code sample below is lifted from Ping or from code compiled with the demo's tests, and the build checks that
+they still match (`GuideSamplesTest`).
 
 You need Java 21, the repository building (`./gradlew build`), Kotlin, and the NeoForge basics: a mod class, events,
 payloads. The reference for every class named here is its KDoc, in `phone/src/main/kotlin/fr/bde_teknantes/lnb/phone/api/`;
@@ -41,10 +42,14 @@ Because screens are rebuilt, a value has to live somewhere that lasts as long as
 | Where | Lasts | Ping keeps there |
 |---|---|---|
 | A field of a screen or widget | Until the screen closes: popped, or the player leaves the app | Nothing that matters after the screen |
-| An object of your app, on the client | Until you clear it | Drafts, the conversations, the list's scroll position (cleared at disconnection) |
-| Your server | As long as you store it | Nothing: Ping stores no messages |
+| An object of your app, on the client | Until you clear it | Drafts, conversations, the list's scroll position (cleared at disconnection) |
+| Your server | As long as you store it | Nothing: a ping only travels between two connected players |
 
-The phone keeps one thing for you on the server: notifications, per player, saved with the world.
+**A notification is a pointer, not a container.** The phone keeps notifications per player on the server, but the
+slots are shared by every app and limited (50 per player), they go when the player opens your app, and they expire
+after 30 days. Whatever the player must be able to read lives with your app, sent by your server; the notification
+only says that something is there and where. Ping sends the text of a ping in its own payload and refuses a ping to a
+player who isn't online, since nobody would keep it for them.
 
 The kit is built for this: a `TextField` or `TextArea` takes a `TextState`, a `ScrollList` takes a `ScrollState`. Keep
 those in your app's object and hand them to the new widgets each time; the text and the scroll position carry over.
@@ -62,7 +67,7 @@ the server works there and crashes the dedicated server. Plan for it from the st
   handler, from inside the handler's lambda (the class then loads only when a payload arrives, which never happens
   on a dedicated server).
 - `PhoneNotifications` works on the logical server: a dedicated server, or the integrated server of a single-player
-  game. A client can't send a notification; it asks your server, which sends it.
+  game. A client can't send a notification; it asks your server, which decides.
 
 The only way to be sure is to start a dedicated server with your mod (see "Try it" below).
 
@@ -83,14 +88,15 @@ so an answer that arrives after the player left can't drag them back into your a
 
 - Extend `AppScreen`, `KitScreen`, `Widget` and `Clickable`, and override what their KDoc calls hooks.
 - Pass lambdas for `AppScreenFactory` and `AppTargetScreens` (`PhoneApp`'s last two arguments).
-- **Don't implement `Phone` or `AppCanvas`.** The phone gives you instances; later versions will add methods to them,
-  which would break a class of yours.
+- **Don't implement `Phone`, `AppCanvas` or `TextMeasurer` in your mod.** The phone gives you instances; later
+  versions will add methods to them, which would break a class of yours.
 - Widgets take in their constructor only what they can't exist without; everything else is a property you set with
   `apply { ... }`. New settings arrive as new properties, so your code keeps compiling against a newer phone.
 - Some enums are complete for good (`Interaction`, `Label.Align`, `Avatar.Size`: a `when` may list every value);
   others will grow (`TextStyle`, `Button.Kind`, `Shadow`: keep an `else` branch). Each enum's KDoc says which.
-- An app built against phone 0.1.x declares it accepts phones from 0.1.0 up to 0.2 (the build writes that range): a
-  phone whose API may have broken stops at the loader's screen instead of crashing in the game.
+- An app accepts phones from the version it was built against up to the next minor version (the next major from 1.0
+  on): built against 0.1.2, it accepts `[0.1.2,0.2)`. The build writes that range; a phone whose API may have broken
+  then stops at the loader's screen instead of crashing in the game.
 
 ## Building Ping, step by step
 
@@ -115,7 +121,7 @@ plugins {
 }
 ```
 
-Its `gradle.properties` names the mod (versions are shared, in the root `gradle.properties`):
+Its `gradle.properties` names the mod:
 
 <!-- sample: apps/demo/gradle.properties -->
 ```properties
@@ -127,15 +133,22 @@ mod_description=Example app for LNB Phone, used in development. Never shipped.
 The mod id is lowercase letters, digits and `_`, and is the namespace of your app's id, assets and strings. `lnbphone`
 is taken: the phone keeps that namespace for its own apps and leaves out any app that uses it.
 
-Copy `apps/demo/src/main/templates/META-INF/neoforge.mods.toml` as it is: it is filled from `gradle.properties`, and
-the plugin appends the dependency on `lnbphone` itself.
+Copy `apps/demo/src/main/templates/META-INF/neoforge.mods.toml`. It is filled from the `gradle.properties` files, and
+the plugin appends the dependency on `lnbphone` itself. As it is, it carries the phone repository's values: change
+`issueTrackerURL` and `displayURL` in your copy, and set `mod_version`, `mod_authors` or `mod_license` in your app's
+`gradle.properties` to replace the shared ones from the root `gradle.properties`.
 
 <!-- sample: apps/demo/src/main/templates/META-INF/neoforge.mods.toml -->
 ```toml
 modLoader="kotlinforforge"
 # ...
+issueTrackerURL="https://github.com/La-Nuit-Blanche/LNB-phone-mod/issues"
+# ...
 [[mods]]
 modId="${mod_id}"
+version="${mod_version}"
+# ...
+authors="${mod_authors}"
 # ...
 # The dependency on lnbphone is appended by the lnbphone.app plugin, with the range of the phone built against.
 ```
@@ -159,8 +172,8 @@ and it needs `lnbphone` on the server and on every client.
 
 ### 2. Starting the app
 
-Ping's start-up is common code. It registers Ping's payloads (both sides need them), then starts the client side
-behind the check, naming its class in full so that the server never loads it:
+Ping's start-up is common code. It registers Ping's payloads (both sides need them) and a server event, then starts
+the client side behind the check, naming its class in full so that the server never loads it:
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/Ping.kt -->
 ```kotlin
@@ -174,6 +187,8 @@ object Ping {
     fun init(modBus: IEventBus) {
         // Both sides: the client sends pings, the server receives them.
         modBus.addListener(PingNetwork::register)
+        // The server, dedicated or integrated, forgets a player who leaves.
+        NeoForge.EVENT_BUS.addListener(PingServer::onLoggedOut)
         // Behind the check, by its full name, so a dedicated server never loads a client class.
         if (FMLEnvironment.dist.isClient) fr.bde_teknantes.lnb.phone.demo.ping.client.PingClient.init(modBus)
     }
@@ -194,9 +209,6 @@ class DemoApp(modBus: IEventBus) {
 
     companion object {
         const val ID = "lnbphone_demo"
-        // ...
-    }
-}
 ```
 
 The id in `@Mod` is the `mod_id` of your `gradle.properties`. Kotlin for Forge hands the constructor your mod's
@@ -242,9 +254,9 @@ The icon is a tile colour from the phone's palette (`TileColor`) and a 16 x 16 P
 and shades so that every app's icon looks like one family. Draw it with hard pixels (fully opaque or fully
 transparent), the main shape inside the 12 x 12 square from (2, 2) to (13, 13), at most 4 colours among white
 `#FFFFFF`, light `#D6DCE6`, ink `#1B1E23`, the tile's `lo` colour and one accent (`#F28A2E`, `#F2B33A`, `#5BD34A`,
-`#E5483C` or `#3A8DF0`), and no shadow. Ping's is `assets/lnbphone_demo/textures/gui/ping.png`, a white speech bubble
-with an ink exclamation mark. For a first version, `AppIcon.Item(tile, stack)` puts a Minecraft item on the tile
-instead.
+`#E5483C` or `#3A8DF0`), and no shadow. A picture of another size is fitted, with a warning in the log. Ping's is
+`assets/lnbphone_demo/textures/gui/ping.png`, a white speech bubble with an ink exclamation mark. For a first version,
+`AppIcon.Item(tile, stack)` puts a Minecraft item on the tile instead.
 
 ### 4. The first screen: a list
 
@@ -277,16 +289,43 @@ class PlayersScreen : KitScreen() {
 }
 ```
 
-What it shows:
+The kit's classes are in `fr.bde_teknantes.lnb.phone.api.client.ui`, and so are `at` and `atRight`, which are
+extension functions: without an IDE, import them by name. Ping's conversation screen imports:
+
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreen.kt -->
+```kotlin
+import fr.bde_teknantes.lnb.phone.api.TextLimits
+import fr.bde_teknantes.lnb.phone.api.client.ui.Avatar
+import fr.bde_teknantes.lnb.phone.api.client.ui.Button
+import fr.bde_teknantes.lnb.phone.api.client.ui.Colors
+import fr.bde_teknantes.lnb.phone.api.client.ui.Header
+import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
+import fr.bde_teknantes.lnb.phone.api.client.ui.Label
+import fr.bde_teknantes.lnb.phone.api.client.ui.MessageRow
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
+import fr.bde_teknantes.lnb.phone.api.client.ui.Spacer
+import fr.bde_teknantes.lnb.phone.api.client.ui.TextField
+import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
+import fr.bde_teknantes.lnb.phone.api.client.ui.at
+import fr.bde_teknantes.lnb.phone.api.client.ui.atRight
+// ...
+import net.minecraft.client.resources.language.I18n
+import net.neoforged.neoforge.network.PacketDistributor
+import java.util.UUID
+```
+
+What the list screen shows:
 
 - **Layout.** The header is 44 dp at the top; the content takes the rest, 256 x 326 dp from y 44. Screens keep 12 dp
   from the sides (`Spacing.SCREEN_PADDING`). Put edges on even dp values so they stay sharp at every GUI scale.
 - **Text.** Widgets take plain strings, so translate on the client with `I18n.get(key)`
-  (`net.minecraft.client.resources.language.I18n`, a client class). A screen is built when it
-  opens, so it picks up the player's language each time.
+  (`net.minecraft.client.resources.language.I18n`, a client class). A screen is built when it opens, so it picks up
+  the player's language each time.
 - **Hooks.** `KitScreen` keeps `AppScreen`'s drawing and input methods for itself. You override `onScreenShown`,
-  `onScreenHidden`, `onTick`, `onKey` and `onBack`. Here the rows are rebuilt each time the screen shows, so a player
-  who joined while the player was in a conversation is there on the way back.
+  `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves
+  the phone for good, it is where you stop what the screen started (a listener, a request). Here the rows are rebuilt
+  each time the screen shows, so a player who joined meanwhile is there on the way back.
 - **Kept state.** The list's position is a `ScrollState` from `PingSession` (step 6): coming back to Ping later, the
   list is where the player left it.
 - **Draw it yourself.** When the kit has no widget for something, extend `Widget` (or `Clickable` for something that
@@ -306,7 +345,7 @@ widgets call. Not in the constructor itself; a lambda written there is fine, sin
 
 ### 6. Text input, and state that survives the screen
 
-The screen to write to a player has a text field, a send button, and the pings exchanged with them:
+The conversation screen has a text field, a send button, and the pings exchanged with that player:
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreen.kt -->
 ```kotlin
@@ -315,7 +354,7 @@ class PingScreen(private val player: UUID, private val name: String) : KitScreen
     private val field = TextField(draft)
     private val send = Button(I18n.get("lnbphone_demo.ping.send")) { send() }
     private val conversation = ScrollList()
-    private var shown = 0
+    private var shownRevision = -1
 
     init {
         add(Header(name).at(0f, 0f))
@@ -329,12 +368,6 @@ class PingScreen(private val player: UUID, private val name: String) : KitScreen
         add(send.apply { fixedWidth = 88f }.atRight(244f, 168f))
         updateSend()
         // ...
-    }
-
-    override fun onScreenShown() {
-        // Ready to type: the field takes the keys, so Backspace erases instead of going back.
-        field.requestFocus()
-    }
 ```
 
 The field's text is not the screen's: it is a `TextState` from the app's session object. The screen is new at every
@@ -344,22 +377,38 @@ home screen or a notification:
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingSession.kt -->
 ```kotlin
 object PingSession {
-    /** One line of a conversation: sent by the player ([mine]) or received. */
-    class Message(val text: String, val mine: Boolean)
-
-    /** How far the list of players is scrolled. */
-    val playersScroll = ScrollState()
-
+    /** The most messages kept per conversation: pings keep coming, memory doesn't. */
+    const val MAX_MESSAGES = 50
+    // ...
     private val drafts = HashMap<UUID, TextState>()
-    private val conversations = HashMap<UUID, MutableList<Message>>()
+    private val conversations = HashMap<UUID, ArrayDeque<Message>>()
+    private val waiting = HashSet<UUID>()
+    private val outcomes = HashMap<UUID, PingOutcome>()
+
+    /** Goes up at every change of a conversation, so that screens know when to show them again. */
+    var revision = 0
+        private set
 
     /** The unsent text for [player]: the field shows it again when the player comes back. */
-    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState("", false, Ping.MAX_LENGTH) }
+    fun draft(player: UUID): TextState = drafts.getOrPut(player) { TextState("", multiline = false, maxLength = Ping.MAX_LENGTH) }
 ```
 
-`TextState("", false, Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what goes past is cut as it
-is typed or pasted. A `TextArea` (several lines, with a character counter when you set its `limit`) takes a `TextState`
-the same way.
+`TextState("", multiline = false, maxLength = Ping.MAX_LENGTH)` is a single-line text of at most 100 characters: what
+goes past is cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its
+`limit`) takes a `TextState` the same way.
+
+Everything that keeps coming is bounded. A conversation keeps its newest 50 messages, so a talkative player (or a
+modified client) can't make the screen grow without end:
+
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingSession.kt -->
+```kotlin
+    private fun add(player: UUID, message: Message) {
+        val messages = conversations.getOrPut(player) { ArrayDeque() }
+        messages.addLast(message)
+        if (messages.size > MAX_MESSAGES) messages.removeFirst()
+        revision++
+    }
+```
 
 An object lives as long as the game, across servers: clear what belongs to a server when the player leaves it. The
 event may come from another thread, so the clearing hops to the client thread:
@@ -376,43 +425,52 @@ While a text field has the focus, the screen's `hasTextFocus` is true and the ph
 erases instead of going back, and the phone's own key types instead of putting the phone away. Esc still puts the
 phone away. `KitScreen` does this for you.
 
-Sending checks the text with `TextLimits`, the rule the server applies too, so the two never disagree:
+The screen shows the session and catches up with it at every tick: it rebuilds the conversation when the session's
+revision has moved, and reports the server's answer to the last ping (step 7):
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreen.kt -->
 ```kotlin
-    private fun updateSend() {
-        send.enabled = TextLimits.canSend(draft.text, Ping.MAX_LENGTH)
-    }
-
-    private fun send() {
-        val text = draft.text.trim()
-        if (!TextLimits.canSend(text, Ping.MAX_LENGTH)) return
-        PacketDistributor.sendToServer(SendPingPayload(player, text))
-        PingSession.sent(player, text)
-        draft.clear()
-        PhoneSounds.sent()
-        showSnackbar(I18n.get("lnbphone_demo.ping.sent"))
-        showNewMessages()
+    override fun onTick() {
+        when (PingSession.takeOutcome(player)) {
+            PingOutcome.SENT -> {
+                PhoneSounds.sent()
+                showSnackbar(I18n.get("lnbphone_demo.ping.sent"))
+            }
+            PingOutcome.OFFLINE -> showErrorSnackbar(I18n.get("lnbphone_demo.ping.refused.offline", name))
+            PingOutcome.TOO_FAST -> showErrorSnackbar(I18n.get("lnbphone_demo.ping.refused.too_fast"))
+            null -> {}
+        }
+        showConversation()
     }
 ```
 
-The kit plays the tap sound on every click and the error sound on a click on something disabled. `PhoneSounds` has
-the others (`sent`, `like`); all of them follow the player's Sounds setting. `showSnackbar` shows a short message at
-the bottom; a snackbar shown just before a `pop` is carried over to the screen underneath.
+The kit plays the tap sound on every click, the error sound on a click on something disabled and with an error
+snackbar. `PhoneSounds` has the others (`sent`, `like`); all of them follow the player's Sounds setting. A snackbar
+shown just before a `pop` is carried over to the screen underneath.
 
 ### 7. Talking to your server
 
-The phone carries notifications, nothing else: your app sends its own payloads. Ping has two, registered on both sides
-from `Ping.init`:
+The phone carries notifications, nothing else: your app sends its own payloads. Ping has three, registered on both
+sides from `Ping.init`. Their text codec is bounded, so the server never reads more than a ping can hold:
+
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/PingNetwork.kt -->
+```kotlin
+// Bounded: a client can't make the server read more than a ping can hold. Twice the limit in UTF-16 units, since a
+// character outside the basic plane takes two.
+private val TEXT_CODEC = ByteBufCodecs.stringUtf8(Ping.MAX_LENGTH * 2)
+```
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/PingNetwork.kt -->
 ```kotlin
 object PingNetwork {
     fun register(event: RegisterPayloadHandlersEvent) {
-        val registrar = event.registrar("1")
+        val registrar = event.registrar("2")
         registrar.playToServer(SendPingPayload.TYPE, SendPingPayload.STREAM_CODEC, PingServer::handle)
-        // The client's handler is named in full inside the lambda: its class loads only when a payload arrives, which
-        // never happens on a dedicated server.
+        // The client's handlers are named in full inside the lambdas: their class loads only when a payload arrives,
+        // which never happens on a dedicated server.
+        registrar.playToClient(PingAnswerPayload.TYPE, PingAnswerPayload.STREAM_CODEC) { payload, _ ->
+            fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession.answered(payload.to, payload.text, payload.outcome)
+        }
         registrar.playToClient(PingReceivedPayload.TYPE, PingReceivedPayload.STREAM_CODEC) { payload, _ ->
             fr.bde_teknantes.lnb.phone.demo.ping.client.PingSession.received(payload.from, payload.text)
         }
@@ -420,58 +478,109 @@ object PingNetwork {
 }
 ```
 
-Both handlers run on the game thread of their side, so the client one may touch `PingSession` directly. The
-conversation screen picks new pings up in `onTick`: a screen reads the state, the network code writes it, and neither
-holds the other.
+The client sends a ping and waits for the server's answer before counting it as sent:
 
-### 8. A notification that opens the right screen
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingScreen.kt -->
+```kotlin
+    private fun send() {
+        val text = draft.text.trim()
+        if (!TextLimits.canSend(text, Ping.MAX_LENGTH) || PingSession.isWaiting(player)) return
+        PacketDistributor.sendToServer(SendPingPayload(player, text))
+        PingSession.sending(player)
+        // The server's answer adds the ping to the conversation, or puts the text back if it was refused.
+        draft.clear()
+    }
+```
 
-The server checks what it received, passes the ping on, and notifies the recipient:
+The answer comes to the session, on the client thread like every client payload handler; a refused ping goes back to
+the field, so the player loses nothing:
+
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/client/PingSession.kt -->
+```kotlin
+    fun answered(player: UUID, text: String, outcome: PingOutcome) {
+        waiting -= player
+        outcomes[player] = outcome
+        if (outcome == PingOutcome.SENT) {
+            add(player, Message(text, mine = true))
+        } else {
+            // Refused: the text comes back to the field, unless the player has started another one.
+            val draft = draft(player)
+            if (draft.text.isEmpty()) draft.text = text
+        }
+    }
+```
+
+Bump the registrar's version (`"2"`) whenever a payload changes: a client and a server with different versions then
+refuse to connect instead of misreading each other.
+
+### 8. The server decides, and notifies
+
+**Never trust what a client sends.** A modified client can send any payload, with any content, as often as it likes;
+the checks on the client are for the player's comfort, the checks on the server are the real ones. Ping's server
+checks the text again with the same rule as the client (`TextLimits`), lets each player send one ping a second, and
+only to a player who is connected; it answers every ping, then passes it on with a notification:
 
 <!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/PingServer.kt -->
 ```kotlin
     fun handle(payload: SendPingPayload, context: IPayloadContext) {
         val sender = context.player() as? ServerPlayer ?: return
-        // The client checks the text too, but a server never trusts what a client sends.
         val text = payload.text.trim()
+        // The client never sends that: no answer.
         if (!TextLimits.canSend(text, Ping.MAX_LENGTH)) return
-        // Only players who have been on this server: a notification to anyone else would wait 30 days for nothing.
-        val server = sender.server
-        if (server.profileCache?.get(payload.to)?.isPresent != true) return
+        val now = Util.getMillis()
+        val last = lastPing[sender.uuid]
+        if (last != null && now - last < COOLDOWN_MS) return answer(sender, payload, PingOutcome.TOO_FAST)
+        // The text lives in the recipient's session (PingSession), so a recipient who isn't here could never read it.
+        val recipient = sender.server.playerList.getPlayer(payload.to) ?: return answer(sender, payload, PingOutcome.OFFLINE)
+        lastPing[sender.uuid] = now
 
-        // For the conversation on the recipient's screen, if they are here.
-        server.playerList.getPlayer(payload.to)?.let { PacketDistributor.sendToPlayer(it, PingReceivedPayload(sender.uuid, text)) }
-        // The notification: a badge, a banner or the phone peeking, and the way to the screen to answer. Offline
-        // players get it when they next log in.
+        // The content, for the conversation on the recipient's phone.
+        PacketDistributor.sendToPlayer(recipient, PingReceivedPayload(sender.uuid, text))
+        // The notification points to it: a badge, a banner or the phone peeking, and the way to the conversation.
         PhoneNotifications.send(
-            payload.to,
+            recipient,
             Ping.APP_ID,
             title = Component.translatable("notif.lnbphone_demo.ping.title"),
             // The player's text goes in as an argument, never as the key: see PhoneNotifications.
             text = Component.translatable("notif.lnbphone_demo.ping.text", sender.gameProfile.name, text),
             target = PingTarget(sender.uuid, sender.gameProfile.name).toString(),
         )
+        answer(sender, payload, PingOutcome.SENT)
+    }
+```
+
+Without the cooldown, one modified client could keep a player's phone chiming without end and fill their notification
+slots, which every app shares. When a player leaves, the server forgets them, and clears their Ping notifications: the
+texts were in the session that just ended, so the notifications would point to nothing.
+
+<!-- sample: apps/demo/src/main/kotlin/fr/bde_teknantes/lnb/phone/demo/ping/PingServer.kt -->
+```kotlin
+    fun onLoggedOut(event: PlayerEvent.PlayerLoggedOutEvent) {
+        val player = event.entity.uuid
+        lastPing.remove(player)
+        // The texts of the player's pings left with their session: notifications would now point to nothing.
+        PhoneNotifications.clearApp(player, Ping.APP_ID)
     }
 ```
 
 What `PhoneNotifications.send` gives the player: a badge on the app's icon and the phone's light blinking; a banner
 over the open phone, or the closed phone peeking up from the corner with the banner (unless the player turned the
-preview off); a chime (unless sounds are off). A player who is offline gets it at their next login, as a badge. Each
-player keeps the newest 50 notifications, for 30 days at most; opening the app, by any route, clears its
-notifications. `clearApp` and `clearTarget` take them back (a deleted post, say).
+preview off); a chime (unless sounds are off). A player who is offline gets it when they next log in, as a badge.
+Opening the app, by any route, clears its notifications. `clearApp` and `clearTarget` take them back.
 
 - **Text.** Title and text are translatable components with keys in your language files, so they are shown in the
-  recipient's language even if sent while they were away. What a player wrote goes in as an argument, never as the
-  key. The title names the event in a few words (`New ping`); the text starts with who did it (`Dev: Meet me at the
-  mill`). The banner shows one line of title and two of text; styles are dropped.
+  recipient's language. What a player wrote goes in as an argument, never as the key (see the mistakes below). The
+  title names the event in a few words (`New ping`); the text starts with who did it (`Dev: Meet me at the mill`).
+  The banner shows one line of title and two of text; styles are dropped.
 
 <!-- sample: apps/demo/src/main/resources/assets/lnbphone_demo/lang/fr_fr.json -->
 ```json
   "notif.lnbphone_demo.ping.title": "Nouveau ping",
-  "notif.lnbphone_demo.ping.text": "%s : %s",
+  "notif.lnbphone_demo.ping.text": "%s\u00a0: %s",
 ```
 
-  (French puts a no-break space, U+00A0, before `:`, `?` and `!`, and placeholders end with the `…` character.)
+  French puts a no-break space before `:`, `?` and `!` (written `\u00a0`, so that it shows in reviews), and
+  placeholders end with the `…` character.
 
 - **Target.** The target is a short string that only your app understands, stored with the notification and handed
   back to your app when the player opens it. Keep it to an id or two (at most 256 characters; never the content
@@ -514,7 +623,8 @@ themselves. An empty list (a target it doesn't know) opens the app on its first 
                 },
 ```
 
-These are new screens like any others; they find the draft and the conversation in `PingSession`.
+These are new screens like any others; they find the draft and the conversation in `PingSession`. A target is a
+place to land, nothing more: whatever the player then does there goes through your server, which checks it.
 
 Last, a screen can tell the phone that it already shows what a notification points to. The phone asks the shown
 screen when a notification of its app arrives; if it answers true, no banner covers it (the chime still plays) and the
@@ -533,9 +643,9 @@ notification counts as read. Ping's conversation shows the new ping as it arrive
 ```
 
 Make a world, press the Up arrow, open Ping (the pink icon), click your own name: Ping lets you ping yourself, to try
-it alone. Type and press Enter: "Ping sent" shows, and the ping appears twice in the conversation, sent on the right
-and received on the left. Go home and back into Ping: the list is where you left it, and the draft and the
-conversation are still there.
+it alone. Type and press Enter: "Ping sent", and the ping appears twice in the conversation, received on the left and
+sent on the right. Press Enter again at once with another text: "Wait a moment", and the text is back in the field.
+Go home and back into Ping: the list is where you left it, and the draft and the conversation are still there.
 
 Then check it as a real server will run it:
 
@@ -544,10 +654,10 @@ Then check it as a real server will run it:
 - **Two players**: a ping from another player shows a banner if your phone is open elsewhere, or the phone peeks up
   if it is closed; opening it lands on the conversation with them. `TESTING.md` lists what to try.
 
-Logic that doesn't need the game (parsing a target, a layout, a store) is worth a unit test. Keep it in plain classes,
-as `PingTarget` is, and test it with JUnit under `src/test/kotlin`; see `PingTargetTest`. Tests run with the game
-loaded, which loads Kotlin twice: use JUnit's `assertInstanceOf` and `assertThrows`, not kotlin.test's `assertIs` and
-`assertFailsWith`.
+Logic that doesn't need the game (parsing a target, a session's rules, a layout) is worth a unit test. Keep it in
+plain classes, as `PingTarget` and `PingSession` are, and test it with JUnit under `src/test/kotlin`; see
+`PingTargetTest` and `PingSessionTest`. Tests run with the game loaded, which loads Kotlin twice: use JUnit's
+`assertInstanceOf` and `assertThrows`, not kotlin.test's `assertIs` and `assertFailsWith`.
 
 ## Mistakes to avoid
 
@@ -571,6 +681,10 @@ class NoteScreen : KitScreen() {
     private val field = add(TextField(NoteState.draft).at(12f, 56f))
 }
 ```
+
+**Using a notification to carry content.** Notifications are shared, limited, cleared when the app opens and expire.
+Keep what the player must read with your app, sent by your server; the notification points to it (see "Where state
+lives").
 
 **Touching a client class from common code.** Your mod class and your server handlers run on the dedicated server,
 where client classes don't exist:
@@ -619,8 +733,50 @@ thread, and the phone throws there:
 
 The same goes for widgets and your session object: change them on the client thread only.
 
-**Implementing what the phone implements.** `Phone` and `AppCanvas` are given to you; a later phone adds methods to
-them, and a class of yours that implements them stops loading. A `when` over an enum that may grow needs an `else`:
+**Trusting what a client sends.** A modified client sends what it wants, as often as it wants. Bound every codec
+(`ByteBufCodecs.stringUtf8(max)`, not `STRING_UTF8`, which reads up to 32767 characters), check everything again on
+the server with the same rules as the client, and limit how often a player may act. Ping's `TEXT_CODEC` (step 7)
+and `PingServer.handle` (step 8) do all three.
+
+<!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
+```kotlin
+// Wrong: STRING_UTF8 reads up to 32767 characters, whatever the app allows, and the handler takes it as it comes.
+val CARELESS_TEXT_CODEC: StreamCodec<ByteBuf, String> = ByteBufCodecs.STRING_UTF8
+```
+
+**Using what a player wrote as a translation key.** A key resolves to whatever language entry has that name, of any
+mod or of the game, and shows raw when there is none: a player could make their text read as any string of the game,
+in every recipient's language.
+
+<!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
+```kotlin
+// Wrong: the player's text is used as the key. A player who writes "death.attack.lava" makes the notification read as
+// that string of the game, in every recipient's language; any key of any mod works the same.
+fun carelessNotificationText(sender: ServerPlayer, text: String): Component = Component.translatable(text)
+
+// Right: the key is yours, and the player's words go in as arguments, shown as they are.
+fun notificationText(sender: ServerPlayer, text: String): Component =
+    Component.translatable("notif.lnbphone_demo.ping.text", sender.gameProfile.name, text)
+```
+
+**Taking a target for a permission.** Any server-side code, of any mod, can send a notification to your app's id with
+any target. A target says where to land; it proves nothing about what the player may do there. Whatever is done from
+that screen is a request to your server, which checks it like any other:
+
+<!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
+```kotlin
+// Wrong: the screen acts because a notification led there. Any server-side code can notify your app's id with any
+// target, so landing on this screen proves nothing about what the player may do.
+class CarelessDeleteScreen(private val post: Long) : KitScreen() {
+    override fun onScreenShown() {
+        PacketDistributor.sendToServer(DeletePostPayload(post))
+    }
+}
+```
+
+**Implementing what the phone implements.** `Phone`, `AppCanvas` and `TextMeasurer` are given to you; a later phone
+adds methods to them, and a class of yours that implements them stops loading. A `when` over an enum that may grow
+needs an `else`:
 
 <!-- sample: apps/demo/src/test/kotlin/fr/bde_teknantes/lnb/phone/demo/guide/GuideSnippets.kt -->
 ```kotlin
@@ -646,6 +802,9 @@ is a safety net, not error handling: the player loses what they were doing.
 
 - The KDoc of `api/` and `api/client/`: `PhoneApp`, `AppScreen`, `Phone`, `AppCanvas`, `PhoneNotifications`,
   `AppTarget`, `TextLimits`; and of the kit in `api/client/ui/`, starting with `KitScreen` and `Widget`.
+- The phone's own Settings app, a second and smaller example: one screen with a segmented control and toggles,
+  registered like any app (`phone/.../client/settings/SettingsApp.kt` and `SettingsScreen.kt`; its classes are
+  internal to the phone, but it uses only the public kit).
 - The demo's other apps: the kit's gallery ("UI kit") and the sample Feed ("Feed (sample)"), described in
   `apps/demo/README.md`.
 - `design/art-direction.md` for the look of the phone and of the Feed app (section 9), if you need a value the kit
