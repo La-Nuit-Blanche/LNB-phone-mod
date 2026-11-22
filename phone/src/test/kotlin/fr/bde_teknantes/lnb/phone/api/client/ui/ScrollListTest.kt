@@ -204,6 +204,16 @@ class ScrollListTest {
     }
 
     @Test
+    fun `a position kept in a ScrollState survives the screen being built again`() {
+        val kept = ScrollState(500f)
+        val list = list(kept)
+        list.rows(20)
+        screen.frame()
+        assertEquals(500f, list.offset)
+        assertEquals(500f, kept.offset)
+    }
+
+    @Test
     fun `the bar shows while the pointer is over the list, then fades 800 ms after the last scroll`() {
         val list = list()
         list.rows(20)

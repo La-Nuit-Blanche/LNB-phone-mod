@@ -88,7 +88,9 @@ class ScrollList(val state: ScrollState = ScrollState()) : Widget() {
             y += h
         }
         contentHeight = y
-        if (!animating) setOffset(ScrollMath.clamp(state.offset, contentHeight, height))
+        // With no rows yet (the list was just placed, before its rows were added), there is nothing to clamp a kept
+        // position against: leave it for the rows to come rather than lose it.
+        if (!animating && contentHeight > 0f) setOffset(ScrollMath.clamp(state.offset, contentHeight, height))
     }
 
     override fun layout() = layoutRows()
