@@ -1,0 +1,47 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # On a tag v1.2.3, the jar is built as version 1.2.3.
+      - name: Build and test
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            ./gradlew build -Pmod_version="${GITHUB_REF_NAME#v}"
+          else
+            ./gradlew build
+          fi
+
+      - name: Upload the jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: lnbphone
+          path: phone/build/libs/lnbphone-*.jar
+
+      # Only the phone's jar is published: the demo app is built to check it compiles, never shipped.
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" phone/build/libs/lnbphone-*.jar --title "$GITHUB_REF_NAME" --generate-notes
