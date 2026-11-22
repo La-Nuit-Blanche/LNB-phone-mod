@@ -18,6 +18,8 @@ object CaptureScenarios {
         "shell" to ShellScenarios::shell,
         "shell-pages" to ShellScenarios::shellPages,
         "shell-window" to ShellScenarios::shellWindow,
+        "notifications" to NotificationScenarios::notifications,
+        "notifications-persist" to NotificationScenarios::persistence,
     )
 
     fun get(name: String): CaptureScript? = scenarios[name]?.invoke()
