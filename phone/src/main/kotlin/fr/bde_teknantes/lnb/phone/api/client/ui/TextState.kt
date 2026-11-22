@@ -216,7 +216,9 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
         val room = maxLength - (content.codePointCount(0, content.length) - replacedLength)
         if (room <= 0) return ""
         val count = out.codePointCount(0, out.length)
-        return if (count <= room) out.toString() else out.substring(0, out.offsetByCodePoints(0, room))
+        if (count <= room) return out.toString()
+        // Cut between graphemes: half a family would be a man and a dangling joiner, not what was pasted.
+        return out.substring(0, Graphemes.floor(out.toString(), out.offsetByCodePoints(0, room)))
     }
 
     private fun previous(index: Int): Int = Graphemes.previous(content, index)
