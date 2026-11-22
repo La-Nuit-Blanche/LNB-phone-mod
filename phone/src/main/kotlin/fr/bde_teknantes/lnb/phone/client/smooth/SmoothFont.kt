@@ -5,13 +5,12 @@ import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap
 import net.minecraft.client.gui.font.providers.FreeTypeUtil
-import net.minecraft.resources.ResourceLocation
-import net.minecraft.server.packs.resources.ResourceManager
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil
 import org.lwjgl.util.freetype.FT_Face
 import org.lwjgl.util.freetype.FT_Vector
 import org.lwjgl.util.freetype.FreeType
+import java.io.InputStream
 import java.nio.ByteBuffer
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -35,7 +34,8 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
 
     init {
         val f = face!!
-        unitsPerEm = f.units_per_EM().toFloat()
+        unitsPerEm = (f.units_per_EM().toInt() and 0xFFFF).toFloat()
+        require(unitsPerEm > 0f) { "Font has no units per em (a bitmap-only font?)" }
         ascender = f.ascender() / unitsPerEm
         descender = -f.descender() / unitsPerEm
         gpos = GposKerning(memory!!)
@@ -68,9 +68,9 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
         val cached = advances.get(codePoint)
         if (!cached.isNaN()) return cached
         val units = MemoryStack.stackPush().use { stack ->
-            val out = stack.mallocCLong(1)
-            FreeTypeUtil.checkError(FreeType.FT_Get_Advance(face(), glyphId(codePoint), FreeType.FT_LOAD_NO_SCALE, out), "Glyph advance")
-            out.get(0)
+            val out = stack.callocCLong(1)
+            val failed = FreeTypeUtil.checkError(FreeType.FT_Get_Advance(face(), glyphId(codePoint), FreeType.FT_LOAD_NO_SCALE, out), "Glyph advance")
+            if (failed) 0L else out.get(0)
         }
         return (units / unitsPerEm).also { advances.put(codePoint, it) }
     }
@@ -82,26 +82,32 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
         return (gpos.kerning(glyphId(left), glyphId(right)) / unitsPerEm).also { kernings.put(key, it) }
     }
 
+    /** [rasterizeGlyph] for the glyph of [codePoint]. */
+    fun rasterize(codePoint: Int, sizePx: Float, shiftX: Float, hinting: Hinting): Bitmap? =
+        rasterizeGlyph(glyphId(codePoint), sizePx, shiftX, hinting)
+
     /**
-     * Rasterises [codePoint] at [sizePx] pixels per em, shifted right by [shiftX] pixels (0 to 1, for sub-pixel
-     * positioning). Null when the glyph is empty (a space).
+     * Rasterises glyph [glyphId] at [sizePx] pixels per em, shifted right by [shiftX] pixels (0 to 1, for sub-pixel
+     * positioning). Null when the glyph is empty (a space) or cannot be drawn as an 8-bit coverage mask.
      */
-    fun rasterize(codePoint: Int, sizePx: Float, shiftX: Float, hinting: Hinting): Bitmap? {
+    fun rasterizeGlyph(glyphId: Int, sizePx: Float, shiftX: Float, hinting: Hinting): Bitmap? {
         val f = face()
         FreeTypeUtil.checkError(FreeType.FT_Set_Char_Size(f, 0, (sizePx * 64f).roundToLong(), 72, 72), "Glyph size")
         MemoryStack.stackPush().use { stack ->
             val delta = FT_Vector.malloc(stack).set((shiftX * 64f).roundToLong(), 0)
             FreeType.FT_Set_Transform(f, null, delta)
         }
-        if (FreeTypeUtil.checkError(FreeType.FT_Load_Glyph(f, glyphId(codePoint), FreeType.FT_LOAD_RENDER or hinting.loadFlags), "Glyph render")) {
-            return null
-        }
+        // Outlines only, as Minecraft's own provider loads them: a font with embedded bitmaps (monochrome, or colour)
+        // would otherwise hand back pixels in another format.
+        val flags = FreeType.FT_LOAD_RENDER or FT_LOAD_NO_BITMAP or hinting.loadFlags
+        if (FreeTypeUtil.checkError(FreeType.FT_Load_Glyph(f, glyphId, flags), "Glyph render")) return null
         val slot = f.glyph() ?: return null
         val bitmap = slot.bitmap()
         val width = bitmap.width()
         val height = bitmap.rows()
-        if (width == 0 || height == 0) return null
+        if (width <= 0 || height <= 0) return null
         val pitch = bitmap.pitch()
+        if (bitmap.pixel_mode().toInt() != FT_PIXEL_MODE_GRAY || abs(pitch) < width) return null
         val source = bitmap.buffer(abs(pitch) * height) ?: return null
         val coverage = ByteArray(width * height)
         for (row in 0 until height) {
@@ -124,18 +130,30 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
     }
 
     companion object {
-        fun load(resources: ResourceManager, location: ResourceLocation): SmoothFont {
-            val memory = resources.open(location).use { TextureUtil.readResource(it) }.also { it.flip() }
+        private const val FT_LOAD_NO_BITMAP = 1 shl 3
+        private const val FT_PIXEL_MODE_GRAY = 2
+
+        /** Opens the font file [stream] gives (closing it); [name] is for error messages. */
+        fun load(stream: InputStream, name: String): SmoothFont =
+            fromMemory(stream.use { TextureUtil.readResource(it) }.also { it.flip() }, name)
+
+        /**
+         * Opens a font from [memory] (a buffer from `MemoryUtil.memAlloc`, which the font then owns and frees). On
+         * any failure the buffer and the FreeType face are freed before the error goes up.
+         */
+        fun fromMemory(memory: ByteBuffer, name: String): SmoothFont {
+            var face: FT_Face? = null
             try {
-                val face = synchronized(FreeTypeUtil.LIBRARY_LOCK) {
+                face = synchronized(FreeTypeUtil.LIBRARY_LOCK) {
                     MemoryStack.stackPush().use { stack ->
-                        val out = stack.mallocPointer(1)
-                        FreeTypeUtil.assertError(FreeType.FT_New_Memory_Face(FreeTypeUtil.getLibrary(), memory, 0L, out), "Opening $location")
+                        val out = stack.callocPointer(1)
+                        FreeTypeUtil.assertError(FreeType.FT_New_Memory_Face(FreeTypeUtil.getLibrary(), memory, 0L, out), "Opening $name")
                         FT_Face.create(out.get(0))
                     }
                 }
                 return SmoothFont(memory, face)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
+                face?.let { synchronized(FreeTypeUtil.LIBRARY_LOCK) { FreeType.FT_Done_Face(it) } }
                 MemoryUtil.memFree(memory)
                 throw e
             }

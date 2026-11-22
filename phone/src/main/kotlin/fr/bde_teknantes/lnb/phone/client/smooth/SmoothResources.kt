@@ -27,6 +27,8 @@ object SmoothResources : ResourceManagerReloadListener {
     private const val SKIN_RETRY_NANOS = 500_000_000L
 
     private val fonts = HashMap<FontWeight, SmoothFont>()
+    private val fontFailures = HashMap<FontWeight, IllegalStateException>()
+    private var warnedOversize = false
     private var atlasOrNull: MaskAtlas? = null
     private val glyphSets = HashMap<GlyphSetKey, GlyphSet>()
     private val shapes = Long2ObjectOpenHashMap<MaskAtlas.Region>()
@@ -46,8 +48,28 @@ object SmoothResources : ResourceManagerReloadListener {
 
     val atlas: MaskAtlas get() = atlasOrNull ?: MaskAtlas().also { atlasOrNull = it }
 
-    fun font(weight: FontWeight): SmoothFont =
-        fonts.getOrPut(weight) { SmoothFont.load(Minecraft.getInstance().resourceManager, FONT_FILES.getValue(weight)) }
+    /**
+     * The face of [weight]. The file comes from the highest resource pack that has a working one: a pack (a server's
+     * too) may replace Inter with a broken or unusable file, and then the next pack down is tried, ending with the
+     * copy in the phone's own jar. Each broken file is logged once per resource reload.
+     */
+    fun font(weight: FontWeight): SmoothFont {
+        fonts[weight]?.let { return it }
+        fontFailures[weight]?.let { throw it }
+        val location = FONT_FILES.getValue(weight)
+        val stack = Minecraft.getInstance().resourceManager.getResourceStack(location).asReversed()
+        val font = Fallback.firstLoading(stack, { SmoothFont.load(it.open(), "$location from ${it.sourcePackId()}") }) { resource, e ->
+            LnbPhone.LOGGER.error("Unusable font {} in resource pack '{}', trying the next one down", location, resource.sourcePackId(), e)
+        }
+        if (font == null) {
+            // Not even the jar's copy: remember it rather than reading every pack again on every frame.
+            val failure = IllegalStateException("No usable $location in any resource pack, the phone's own included")
+            fontFailures[weight] = failure
+            throw failure
+        }
+        fonts[weight] = font
+        return font
+    }
 
     /** The glyphs of one weight at [sizePx] per em, rasterised with [hinting] at [phases] sub-pixel positions. */
     fun glyphs(weight: FontWeight, sizePx: Float, hinting: SmoothFont.Hinting, phases: Int): GlyphSet =
@@ -67,11 +89,11 @@ object SmoothResources : ResourceManagerReloadListener {
             val key = codePoint * phases + phase
             glyphs.get(key)?.let { return it }
             val bitmap = font(weight).rasterize(codePoint, sizePx, phase.toFloat() / phases, hinting)
-            val glyph = if (bitmap == null) {
+            // allocate() may clear the atlas, and this set with it, before returning the region.
+            val region = bitmap?.let { allocate(it.width, it.height) }
+            val glyph = if (bitmap == null || region == null) {
                 NO_GLYPH
             } else {
-                // May clear the atlas, and this set with it, before returning the region.
-                val region = allocate(bitmap.width, bitmap.height)
                 atlas.writeMask(region, bitmap.coverage)
                 Glyph(region, bitmap.left, bitmap.top)
             }
@@ -83,18 +105,19 @@ object SmoothResources : ResourceManagerReloadListener {
     }
 
     /** A region holding one fully opaque white texel, for plain rectangles. */
-    fun solid(): MaskAtlas.Region = shape(1, 1, 0f, 0)
+    fun solid(): MaskAtlas.Region = shape(1, 1, 0f, 0)!!
 
     /**
      * Mask of a rounded rectangle [width] x [height] px with corner radius [radiusPx] (and an inner stroke of
      * [strokePx] px, or a fill when 0). Pass the full size for a mask drawn 1:1, or the size of a nine-slice tile.
+     * Null when it is larger than an atlas page.
      */
-    fun shape(width: Int, height: Int, radiusPx: Float, strokePx: Int): MaskAtlas.Region {
+    fun shape(width: Int, height: Int, radiusPx: Float, strokePx: Int): MaskAtlas.Region? {
         val radius8 = (radiusPx * 8f).roundToInt()
         val key = (width.toLong() shl 40) or (height.toLong() shl 24) or (radius8.toLong() shl 8) or strokePx.toLong()
         shapes.get(key)?.let { return it }
+        val region = allocate(width, height) ?: return null
         val coverage = ShapeMask.roundedRect(width, height, radius8 / 8f, strokePx.toFloat())
-        val region = allocate(width, height)
         atlas.writeMask(region, coverage)
         shapes.put(key, region)
         return region
@@ -115,7 +138,7 @@ object SmoothResources : ResourceManagerReloadListener {
             val alpha = (c ushr 24) * (mask[i].toInt() and 0xFF) / 255
             (alpha shl 24) or (c and 0xFFFFFF)
         }
-        val region = allocate(sizePx, sizePx)
+        val region = allocate(sizePx, sizePx) ?: return null
         atlas.writeColors(region, colors)
         avatars[skin to sizePx] = region
         return region
@@ -168,12 +191,20 @@ object SmoothResources : ResourceManagerReloadListener {
         return (0xFF shl 24) or (channel(16) shl 16) or (channel(8) shl 8) or channel(0)
     }
 
-    private fun allocate(width: Int, height: Int): MaskAtlas.Region {
+    /** Room in the atlas, or null (logged once) for something larger than a page, which clearing would not help. */
+    private fun allocate(width: Int, height: Int): MaskAtlas.Region? {
+        if (!atlas.fits(width, height)) {
+            if (!warnedOversize) {
+                warnedOversize = true
+                LnbPhone.LOGGER.warn("Smooth layer skipped a {}x{} px glyph or shape: larger than an atlas page", width, height)
+            }
+            return null
+        }
         atlas.allocate(width, height)?.let { return it }
         // Full: draw what is queued, then start over. Only what the current frames use comes back.
         beforeAtlasClear?.invoke()
         clearAtlas()
-        return atlas.allocate(width, height) ?: throw IllegalArgumentException("${width}x$height does not fit in the smooth atlas")
+        return atlas.allocate(width, height)
     }
 
     private fun clearAtlas() {
@@ -189,6 +220,7 @@ object SmoothResources : ResourceManagerReloadListener {
         clearAtlas()
         fonts.values.forEach(SmoothFont::close)
         fonts.clear()
+        fontFailures.clear()
         skinFaces.clear()
         skinRetries.clear()
     }

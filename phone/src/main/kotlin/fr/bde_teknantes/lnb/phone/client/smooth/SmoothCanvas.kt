@@ -220,13 +220,14 @@ class SmoothCanvas {
 
         val corner = NineSlice.cornerSize(radius, stroke)
         if (NineSlice.fits(pw, ph, corner)) {
-            val tile = SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke)
+            val tile = SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke) ?: return
             NineSlice.forEachSlice(l, t, r, b, corner) { sl, st, sr, sb, u0, v0, u1, v1 ->
                 regionQuad(tile, sl, st, sr, sb, u0, v0, u1, v1, color)
             }
         } else {
             // Too small for corners plus a middle (a 9 px circle at GUI scale 3): its own mask, drawn 1:1.
-            regionQuad(SmoothResources.shape(pw, ph, radius, stroke), l, t, r, b, 0, 0, pw, ph, color)
+            val mask = SmoothResources.shape(pw, ph, radius, stroke) ?: return
+            regionQuad(mask, l, t, r, b, 0, 0, pw, ph, color)
         }
     }
 
