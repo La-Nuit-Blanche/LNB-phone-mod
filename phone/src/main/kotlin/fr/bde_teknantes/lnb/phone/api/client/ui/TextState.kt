@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.TextLimits
+import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
 
 /**
  * The content of a [TextField] or [TextArea]: the text, the caret and the selection, with the editing operations.
@@ -18,8 +19,9 @@ import fr.bde_teknantes.lnb.phone.api.TextLimits
  * TextArea(Drafts.post).apply { placeholder = "What's new?"; limit = 280 }
  * ```
  *
- * Positions are indexes into [text] (UTF-16 units, as everywhere in Kotlin), always on a character boundary: an emoji
- * outside the basic plane is never split. Characters that can't be typed are filtered out of what is inserted (control
+ * Positions are indexes into [text] (UTF-16 units, as everywhere in Kotlin), always between graphemes, what a reader
+ * sees as one character: the caret never stands inside an emoji with its skin tone, a family joined with ZWJ, a flag
+ * or a keycap, and arrows, Backspace and Delete take one whole. Characters that can't be typed are filtered out of what is inserted (control
  * characters, the section sign Minecraft uses for formatting; line feeds unless [multiline]), and the text is kept in
  * Unicode normalisation form C, so a pasted `e` plus combining accent becomes the one character `é`, drawn and counted
  * as such ([TextLimits]). Plain logic: no game classes, usable in tests.
@@ -129,7 +131,7 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
 
     // ---- Caret and selection ----
 
-    /** Moves the caret to [index] (snapped to a character boundary); with [select], extends the selection. */
+    /** Moves the caret to [index] (snapped back to a grapheme boundary); with [select], extends the selection. */
     fun moveTo(index: Int) = moveTo(index, select = false)
 
     /** [moveTo], extending the selection when [select]. */
@@ -186,7 +188,9 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
     private fun replaceAll(newText: String, newCaret: Int) {
         val changed = newText != content
         content = newText
-        caret = boundary(newCaret.coerceIn(0, newText.length))
+        // Forward: what was just typed may have joined the grapheme before it (a skin tone, a ZWJ and the next emoji),
+        // and the caret goes after it rather than back before the whole sequence.
+        caret = Graphemes.ceil(newText, newCaret.coerceIn(0, newText.length))
         anchor = caret
         if (changed) {
             version++
@@ -215,17 +219,12 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
         return if (count <= room) out.toString() else out.substring(0, out.offsetByCodePoints(0, room))
     }
 
-    private fun previous(index: Int): Int = if (index <= 0) 0 else content.offsetByCodePoints(index, -1)
+    private fun previous(index: Int): Int = Graphemes.previous(content, index)
 
-    private fun next(index: Int): Int = if (index >= content.length) content.length else content.offsetByCodePoints(index, 1)
+    private fun next(index: Int): Int = if (index >= content.length) content.length else Graphemes.next(content, index)
 
-    /** [index], moved back off the middle of a surrogate pair. */
-    private fun boundary(index: Int): Int =
-        if (index in 1 until content.length && Character.isLowSurrogate(content[index]) && Character.isHighSurrogate(content[index - 1])) {
-            index - 1
-        } else {
-            index
-        }
+    /** [index], moved back to the start of the grapheme it is inside. */
+    private fun boundary(index: Int): Int = Graphemes.floor(content, index)
 
     /** 0: space, 1: word character, 2: anything else (punctuation). */
     private fun kindAt(index: Int): Int {
