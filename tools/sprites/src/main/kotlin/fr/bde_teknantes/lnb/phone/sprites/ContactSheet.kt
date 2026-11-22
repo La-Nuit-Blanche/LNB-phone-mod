@@ -30,12 +30,26 @@ fun contactSheet(shell: List<Sprite>, smooth: List<Sprite>, format: SmoothFormat
         }
         Entry(sprite.path.removePrefix("sprites/") + "  x$factor", checker(scale(sprite.image, factor), factor))
     }
-    sections += "Smooth set (16.2) at ${format.pxPerDp} px per dp, actual pixels, tinted text-1 on bg" to smooth.map { sprite ->
-        Entry(sprite.path.removePrefix("${format.dir}/"), onBackground(sprite.image, if (sprite.path.contains("/shadow/")) Color(0x8A93A3) else APP_BG, 0xEEF1F5))
+    val shadowPrefix = "$SMOOTH_DIR/${format.shadowDensity.folder}/"
+    sections += "Shadows, ${format.shadowDensity.pxPerDp} px per dp, on a light grey so they show" to
+        smooth.filter { it.path.startsWith(shadowPrefix) }.map { sprite ->
+            Entry(sprite.path.removePrefix("$SMOOTH_DIR/"), onBackground(sprite.image, Color(0x8A93A3), 0xFFFFFF))
+        }
+    for (density in format.iconDensities) {
+        val prefix = "$SMOOTH_DIR/${density.folder}/"
+        val icons = smooth.filter { it.path.startsWith(prefix) }
+        sections += "Icons ${density.folder} (${density.pxPerDp} px per dp), actual pixels, text-1 on bg" to icons.map {
+            Entry(it.path.removePrefix(prefix), onBackground(it.image, APP_BG, 0xEEF1F5))
+        }
     }
-    sections += "Smooth set enlarged x3 (shapes in accent, icons in text-1)" to smooth.filterNot { it.path.contains("/shadow/") }.map { sprite ->
-        val tint = if (sprite.path.contains("/shape/")) 0x3A8DF0 else 0xEEF1F5
-        Entry(sprite.path.removePrefix("${format.dir}/"), scale(onBackground(sprite.image, APP_BG, tint), 3))
+    for (density in format.iconDensities) {
+        val prefix = "$SMOOTH_DIR/${density.folder}/"
+        // Every density enlarged to 6 screen px per dp, nearest-neighbour, so their pixels compare side by side.
+        val factor = (6 / density.pxPerDp).toInt()
+        sections += "Icons ${density.folder} enlarged x$factor, nearest-neighbour (every pixel visible)" to
+            smooth.filter { it.path.startsWith(prefix) }.map {
+                Entry(it.path.removePrefix(prefix), scale(onBackground(it.image, APP_BG, 0xEEF1F5, margin = 2), factor))
+            }
     }
 
     // Lay out: rows of tiles, wrapped at the sheet width.
@@ -104,8 +118,7 @@ private fun checker(image: BufferedImage, cell: Int): BufferedImage {
 }
 
 /** The sprite tinted like the game will (white times [tint]) over [background], with a margin. */
-private fun onBackground(image: BufferedImage, background: Color, tint: Int): BufferedImage {
-    val margin = 8
+private fun onBackground(image: BufferedImage, background: Color, tint: Int, margin: Int = 8): BufferedImage {
     val out = BufferedImage(image.width + 2 * margin, image.height + 2 * margin, BufferedImage.TYPE_INT_ARGB)
     val g = out.createGraphics()
     g.color = background

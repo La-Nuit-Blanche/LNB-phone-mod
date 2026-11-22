@@ -8,16 +8,13 @@ plugins {
 val guiTextures = rootProject.layout.projectDirectory.dir("phone/src/main/resources/assets/lnbphone/textures/gui")
 val mainClassName = "fr.bde_teknantes.lnb.phone.sprites.MainKt"
 
-// Pixels per dp of the smooth set. 2 is the art direction's value; -PpxPerDp=3 re-exports it at another density.
-val pxPerDp = providers.gradleProperty("pxPerDp").orElse("2")
-
 tasks.register<JavaExec>("generateSprites") {
     group = "lnbphone"
     description = "Draws every phone sprite into the phone's assets."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass = mainClassName
     jvmArgs("-Djava.awt.headless=true")
-    args("--out", guiTextures.asFile.absolutePath, "--px-per-dp", pxPerDp.get())
+    args("--out", guiTextures.asFile.absolutePath)
 }
 
 tasks.register<JavaExec>("contactSheet") {
@@ -28,7 +25,7 @@ tasks.register<JavaExec>("contactSheet") {
     jvmArgs("-Djava.awt.headless=true")
     val sheet = providers.gradleProperty("sheet")
         .orElse(layout.buildDirectory.file("contact-sheet.png").map { it.asFile.absolutePath })
-    args("--sheet", sheet.get(), "--px-per-dp", pxPerDp.get())
+    args("--sheet", sheet.get())
 }
 
 tasks.test {

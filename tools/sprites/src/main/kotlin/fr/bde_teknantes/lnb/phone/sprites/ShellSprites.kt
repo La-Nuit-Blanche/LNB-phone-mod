@@ -3,25 +3,26 @@ package fr.bde_teknantes.lnb.phone.sprites
 // Section 16.1: the pixel shell, 1 texel = 1 GUI px, drawn with nearest-neighbour. Every number below is the art
 // direction's; the section that gives it is named next to it.
 
-private const val DIR = "sprites"
+/** The folder of the pixel shell set, the vanilla GUI sprite atlas. */
+const val SHELL_DIR = "sprites"
 
 fun shellSprites(): List<Sprite> = listOf(
-    Sprite("$DIR/phone/frame", frame().toImage()),
-    Sprite("$DIR/phone/home_button", homeButton(Shell.homeRing, Shell.homeFill).toImage()),
-    Sprite("$DIR/phone/home_button_hover", homeButton(Shell.accent, Shell.homeFill).toImage()),
-    Sprite("$DIR/phone/home_button_pressed", homeButton(Shell.accent, Shell.bodyLo).toImage()),
-    *(0..4).map { lit -> Sprite("$DIR/status/signal_$lit", signal(lit).toImage()) }.toTypedArray(),
-    Sprite("$DIR/status/battery", battery().toImage()),
-    Sprite("$DIR/wallpaper/dusk", wallpaper().toImage()),
-    Sprite("$DIR/home/icon_frame", box(20, 20, TWO_STEP, TWO_STEP, BoxColours(Shell.outline, CLEAR)).toImage()),
-    Sprite("$DIR/home/icon_hover", box(24, 24, TWO_STEP, TWO_STEP, BoxColours(Shell.accent, CLEAR)).toImage()),
-    Sprite("$DIR/home/badge", badge(Shell.badge).toImage(), nineSliceMeta(9, 9, 4)),
-    Sprite("$DIR/home/badge_pulse", badge(Shell.badgeHi).toImage(), nineSliceMeta(9, 9, 4)),
-    Sprite("$DIR/inventory/button", inventoryButton(lit = false, hover = false).toImage()),
-    Sprite("$DIR/inventory/button_hover", inventoryButton(lit = false, hover = true).toImage()),
-    Sprite("$DIR/inventory/button_new", inventoryButton(lit = true, hover = false).toImage()),
-    Sprite("$DIR/inventory/button_new_hover", inventoryButton(lit = true, hover = true).toImage()),
-) + Glyph.entries.map { Sprite("$DIR/icon/${it.id}", it.draw().toImage()) }
+    Sprite("$SHELL_DIR/phone/frame", frame().toImage()),
+    Sprite("$SHELL_DIR/phone/home_button", homeButton(Shell.homeRing, Shell.homeFill).toImage()),
+    Sprite("$SHELL_DIR/phone/home_button_hover", homeButton(Shell.accent, Shell.homeFill).toImage()),
+    Sprite("$SHELL_DIR/phone/home_button_pressed", homeButton(Shell.accent, Shell.bodyLo).toImage()),
+    *(0..4).map { lit -> Sprite("$SHELL_DIR/status/signal_$lit", signal(lit).toImage()) }.toTypedArray(),
+    Sprite("$SHELL_DIR/status/battery", battery().toImage()),
+    Sprite("$SHELL_DIR/wallpaper/dusk", wallpaper().toImage()),
+    Sprite("$SHELL_DIR/home/icon_frame", box(20, 20, TWO_STEP, TWO_STEP, BoxColours(Shell.outline, CLEAR)).toImage()),
+    Sprite("$SHELL_DIR/home/icon_hover", box(24, 24, TWO_STEP, TWO_STEP, BoxColours(Shell.accent, CLEAR)).toImage()),
+    Sprite("$SHELL_DIR/home/badge", badge(Shell.badge).toImage(), nineSliceMeta(9, 9, 4)),
+    Sprite("$SHELL_DIR/home/badge_pulse", badge(Shell.badgeHi).toImage(), nineSliceMeta(9, 9, 4)),
+    Sprite("$SHELL_DIR/inventory/button", inventoryButton(lit = false, hover = false).toImage()),
+    Sprite("$SHELL_DIR/inventory/button_hover", inventoryButton(lit = false, hover = true).toImage()),
+    Sprite("$SHELL_DIR/inventory/button_new", inventoryButton(lit = true, hover = false).toImage()),
+    Sprite("$SHELL_DIR/inventory/button_new_hover", inventoryButton(lit = true, hover = true).toImage()),
+) + Glyph.entries.map { Sprite("$SHELL_DIR/icon/${it.id}", it.draw().toImage()) }
 
 /** The `.png.mcmeta` of a nine-slice GUI sprite (16.1), in the vanilla format. */
 fun nineSliceMeta(width: Int, height: Int, border: Int): String =
