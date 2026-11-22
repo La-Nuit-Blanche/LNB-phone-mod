@@ -12,6 +12,10 @@ Version 5. The user validated a storyboard canvas built from version 4, and ten 
 - **Opening.** The device slides over the HUD for 250 ms and the screen opens when the slide ends; the player can still move during the slide. Another screen opening during the rise sends the phone back down. The crosshair is hidden while the phone is open, and F1 hides the sliding device (2.3, 14, P-1, P-2).
 - **Home pages.** The mouse wheel turns one page per whole notch (2.3).
 - **Inventory button.** With unread notifications the button opens the home screen only if the phone was put away on home or on an app's root screen; deeper in an app it reopens on that screen and shows the newest unread notification as the in-phone banner. This settles a contradiction with 2.3 (the phone keeps its screens and drafts until disconnect) in favour of drafts. Opening the phone closes the inventory properly (crafting grid and cursor items go back) and a fresh inventory opens when the phone closes. With the recipe book open the book covers most of the button: the covered part neither lights up nor takes a click, and the badge sits under the book. No button on the creative inventory (11, P-4, P-5, 19).
+- **Peek and banner.** The peek is two layers: the device stays below the hotbar, the banner is drawn above chat lines; F1 hides the peek and the sliding phone. No peek while another screen is open (chat, a container, the pause menu, the death screen): chime only, the badge waits; a screen opening during a peek sends it down. Several notifications at once: the last one shows and the chime plays once. A pressed banner freezes until released; a banner or peek whose notification the server clears goes away early; clicking the banner removes it at once (10.2, 10.3, 6.1).
+- **Read in place.** A notification whose target is already on screen gives no banner, the chime plays, and it counts as read. Reopening the phone onto an app left open keeps that app's badge, except for notifications the shown screen reports as visible, which are read in place. Notifications received while offline show as badges at login, with no peek and no chime (10.2, 10.3, 6.1).
+- **Banner text.** Emoji are dropped and each run of other characters the font lacks becomes one `?`; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
+- **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
 
 ## History
 
@@ -347,6 +351,8 @@ O r r r r r r r O
 Position: 9 x 9 at `(icon.x + 14, icon.y - 3)`; 15 x 9 at `(icon.x + 8, icon.y - 3)`. Drawn over the hover ring.
 
 An app's badge counts its unseen notifications. **It clears when the app is opened**, by any route (home icon, banner, peek). The LED is lit while any app has a badge.
+
+Reopening the phone onto an app that was left open keeps that app's badge (the app was not opened again), except for notifications whose target the shown screen reports as visible (the thread a notification points to): those are read in place, as one arriving there would be (10.3). Notifications received while the player was offline show as badges at login and nothing else: no peek, no chime (10.2).
 
 ---
 
@@ -1025,6 +1031,8 @@ When several notifications are waiting, a click on the app icon follows the usua
 | Hover (phone open only) | fill `surface-3` |
 | Pressed (phone open only) | fill `surface-3` with `overlay-pressed` |
 
+**Text cleaning.** Title and text are drawn plain. Line breaks and tabs become spaces, emoji are dropped, and each run of other characters Inter lacks (CJK, Arabic and the like) becomes one `?`, so a name in an unsupported script still shows that a name is there (`田中 : salut` reads `? : salut`). The two lines above are the rule whatever the text: a longer one ends with an ellipsis on line 2, so the sample banner texts in the flows end earlier than the posts they quote.
+
 No time is shown: a banner always describes something that just happened. Feed contents are in 9.10; other apps give a title and a text.
 
 ### 10.2 Peek (phone closed)
@@ -1034,19 +1042,42 @@ No time is shown: a banner always describes something that just happened. Feed c
 | Horizontal position | `wx = W - 146`, same as the bottom-right placement |
 | Rise | **72 px**: device top at `wy = H - 72`; top bezel and screen rows `sy 0..59` visible |
 | Narrow windows | when `W < 476` the phone rises **112 px** (`wy = H - 112`) so the banner clears the hotbar and food rows |
-| Layering | HUD layer drawn below the hotbar, hearts and food |
+| Layering | two layers: the device is a HUD layer below the hotbar, hearts and food; the banner is drawn on its own layer above the chat lines, so a chat line never covers it. F1 (hidden HUD) hides the peek |
 | Screen content | wallpaper, home-style status bar, banner. No app icons |
 | Banner | screen-local `(4, 14)` GUI px = `sx 4..123`, `sy 14..51` |
 | LED | lit |
 | Interaction | not clickable (mouse captured). Up arrow during the peek opens the phone on the notification's target |
-| Queue | a new notification during the hold swaps the banner content in place and restarts the hold |
+| Queue | a new notification during the hold swaps the banner content in place, restarts the hold and chimes. Several notifications at once (the same tick): the last one shows and the chime plays once. While the device is still sliding down, a peek waits until it is away, then rises |
 | Preview off | no peek at all; the chime still plays (if sounds are on) and the badge waits on the home screen |
+| Another screen open | no peek while chat, a container, the pause menu, the death screen or any other screen is open: the chime plays and the badge waits. A screen that opens during a peek sends it back down |
+| GUI scale 1 | no peek: the chime plays and the badge waits (8.1) |
+| Cleared | a peek whose notification the server clears, or that is read, goes away early: the phone key would lead to a target that is gone |
+| At login | notifications received while the player was offline are not news: they show as badges and nothing else, with no peek and no chime |
 
 In a 480 x 270 window the peeking device sits at `(334, 198)`.
 
 ### 10.3 Banner while the phone is open
 
-Same banner at app-local `(8, 4)` dp (screen-local `(4, 13)` GUI px), over the current screen (home or any app), slid down from above the viewport and clipped to it. Click opens the notification's target with the forward transition. Auto-dismiss after 4000 ms (slides up). Not shown when the target is already on screen (the thread it points to, or the Annonces tab for a new announcement: there the post simply arrives, 9.5). The chime plays in both cases.
+Same banner at app-local `(8, 4)` dp (screen-local `(4, 13)` GUI px), over the current screen (home or any app), slid down from above the viewport and clipped to it. Click opens the notification's target with the forward transition and removes the banner at once. Auto-dismiss after 4000 ms (slides up). Several notifications at once: the last one shows, and the chime plays once.
+
+- **Pressed.** While the left button is down on the banner it freezes, content and timeline. Released on it, it opens what was pressed (a notification that arrived meanwhile stays a badge). Released elsewhere, it resumes, showing the newer notification if one came, with a fresh hold. The mouse wheel over the banner does not scroll the screen under it.
+- **Cleared.** A banner whose notification the server clears, or that is read, goes away early.
+- **Target already on screen** (the thread it points to, or the Annonces tab for a new announcement: there the post simply arrives, 9.5): no banner. The chime plays, and the notification counts as read, so it leaves no badge. The same reading in place happens when the phone reopens onto an app left open (6.1).
+- **GUI scale 1:** no banner (8.1).
+
+### 10.4 Storage and limits (server)
+
+Notifications are kept per player on the server and saved with the world. Apps send them through the phone's server API; the phone enforces these rules whatever the app passes in.
+
+| Rule | Value |
+|---|---|
+| Slots | 50 notifications per player, **shared by all apps**. When the list is full, the oldest notification of the mod that holds the most is dropped, so a busy app cannot push out the others' |
+| Lifetime | 30 days; an older notification is dropped |
+| Title | cut to 128 characters (never refused: an app forwarding the start of a long post gets the start) |
+| Text | cut to 320 characters, likewise. A banner shows far less (10.1) |
+| Rate | a backstop per player and per mod: a burst of 20, then one every 3 seconds; the rest are dropped and logged. Far above what a real app sends, it only stops a looping app from flooding a player |
+
+Opening an app clears that app's notifications (6.1), on the server too.
 
 ---
 
@@ -1431,7 +1462,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | normal play, phone closed | no cursor | A new announcement is posted while the player is playing. |
 | 2 | W | device mid-rise at `(334, 234)`, peek screen (wallpaper, home status bar, banner) | no cursor | The phone rises 72 px from the bottom-right with the chime (200 ms). |
-| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Lune Garnier : La saison 2 commence samedi à 18:00. L'End sera…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
+| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Lune Garnier : La saison 2 commence samedi à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
 | 4 | W | device mid-sink at `(334, 234)` | no cursor | Nothing pressed: the phone sinks away (200 ms). |
 | 5 | W | later, after Up: device open at `(334, 36)` on home (the screen it was closed on), Feed badge `1`, LED lit | `(240, 135)` | Opening the phone later: a red badge on Feed and the LED blinking. |
 | 6 | P | home, hover Feed with badge `1`, label `Feed` | GUI px `(16, 29)` | Hover the badged app. |
@@ -1453,15 +1484,15 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 1 | P | home, nothing hovered | GUI px `(70, 120)` | Phone open on the home screen. |
 | 2 | P | banner mid-slide at app-local `y -36` (half visible), over the icons | same | A notification: the banner slides down from the top (150 ms), with the chime. |
 | 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika Laurent : Je l'ai vu près du moulin, côté est !`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
-| 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. |
-| 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the thread opens (150 ms slide) and the badge clears. |
+| 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. Pressed, the banner would freeze until released. |
+| 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the banner goes at once, the thread opens (150 ms slide) and the badge clears. |
 
 **P-11 Notification while another app is open** (4 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Settings screen | `(128, 300)` | Phone open in Settings. |
-| 2 | P | banner at `(8, 4)` over the Settings header: `Nouvelle annonce` / `Kael_Builder : Événement PvP dimanche à 15:00…` | same | The banner appears over any app. |
+| 2 | P | banner at `(8, 4)` over the Settings header: `Nouvelle annonce` / `Kael_Builder : Événement PvP dimanche à 15:00 à…` | same | The banner appears over any app. |
 | 3 | P | banner mid-slide up at `y -36` | same | Not clicked: after 4 s it slides up (150 ms). |
 | 4 | P | home (after the home button), Feed badge `1` | GUI px `(70, 218)` | The news waits as a badge on the home screen. |
 
