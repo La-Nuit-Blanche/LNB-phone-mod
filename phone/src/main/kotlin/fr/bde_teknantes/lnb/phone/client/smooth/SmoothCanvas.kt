@@ -177,26 +177,15 @@ class SmoothCanvas {
         val stroke = if (strokeDp > 0f) grid.strokePx(strokeDp) else 0
         if (radius <= 0f && stroke == 0) return solidQuad(l, t, r, b, color)
 
-        val corner = SmoothResources.cornerSize(radius, stroke)
-        if (pw >= 2 * corner && ph >= 2 * corner) {
-            nineSlice(SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke), l, t, r, b, corner, color)
+        val corner = NineSlice.cornerSize(radius, stroke)
+        if (NineSlice.fits(pw, ph, corner)) {
+            val tile = SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke)
+            NineSlice.forEachSlice(l, t, r, b, corner) { sl, st, sr, sb, u0, v0, u1, v1 ->
+                regionQuad(tile, sl, st, sr, sb, u0, v0, u1, v1, color)
+            }
         } else {
             // Too small for corners plus a middle (a 9 px circle at GUI scale 3): its own mask, drawn 1:1.
             regionQuad(SmoothResources.shape(pw, ph, radius, stroke), l, t, r, b, 0, 0, pw, ph, color)
-        }
-    }
-
-    /** Draws [tile] (corners of [c] px around a 1 px middle) stretched over l..r x t..b, on whole pixels. */
-    private fun nineSlice(tile: MaskAtlas.Region, l: Int, t: Int, r: Int, b: Int, c: Int, color: Int) {
-        val xs = intArrayOf(l, l + c, r - c, r)
-        val ys = intArrayOf(t, t + c, b - c, b)
-        val us = intArrayOf(0, c, c + 1, 2 * c + 1)
-        for (row in 0..2) {
-            if (ys[row + 1] <= ys[row]) continue
-            for (col in 0..2) {
-                if (xs[col + 1] <= xs[col]) continue
-                regionQuad(tile, xs[col], ys[row], xs[col + 1], ys[row + 1], us[col], us[row], us[col + 1], us[row + 1], color)
-            }
         }
     }
 

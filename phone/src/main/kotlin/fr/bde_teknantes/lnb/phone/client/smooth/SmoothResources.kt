@@ -9,8 +9,6 @@ import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import org.lwjgl.opengl.GL11
-import kotlin.math.ceil
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
@@ -101,12 +99,6 @@ object SmoothResources : ResourceManagerReloadListener {
         shapes.put(key, region)
         return region
     }
-
-    /**
-     * Size of the square tile a rounded rectangle is nine-sliced from: corners of `ceil(radius)` px (at least the
-     * stroke) around a 1 px middle row and column that stretch.
-     */
-    fun cornerSize(radiusPx: Float, strokePx: Int): Int = max(ceil(radiusPx - 1e-3f).toInt(), strokePx)
 
     /**
      * The 8 x 8 face of [skin] with its hat layer, scaled to [sizePx] with nearest-neighbour and cut into an
