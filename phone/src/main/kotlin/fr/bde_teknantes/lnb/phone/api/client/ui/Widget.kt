@@ -14,14 +14,20 @@ import fr.bde_teknantes.lnb.phone.api.client.offset
  * you don't give one.
  *
  * ```kotlin
- * add(Button("Post", fixedWidth = 88f) { send() }.atRight(244f, 6f))
+ * add(Button("Post") { send() }.apply { fixedWidth = 88f }.atRight(244f, 6f))
  * ```
+ *
+ * **Settings** are properties, set after construction (`apply { ... }`); constructors only take what a widget can't
+ * exist without. New settings can then be added in later versions of the phone without breaking compiled apps.
  *
  * **Your own widget** extends this class (or [Clickable] for something that reacts to clicks) and overrides [render],
  * drawing at (0, 0) in its own coordinates; its children are drawn on top. [isHovered], [isFocused] and [now] give
- * what drawing states and animations need. Input methods receive coordinates in the widget's own dp as well.
+ * what drawing states and animations need; [KitDrawing] has the kit's focus ring and tints. Input methods receive
+ * coordinates in the widget's own dp. The methods named `on...` are hooks: override them freely, the kit does its own
+ * work around them.
  *
- * Widgets belong to the client thread, like screens.
+ * Widgets belong to the client thread, like screens. Adding and removing widgets is safe at any time, from any
+ * callback, even while the screen is drawing.
  */
 abstract class Widget {
     /** Left edge in the parent, dp. */
@@ -42,13 +48,25 @@ abstract class Widget {
     var visible = true
 
     /**
-     * Whether the widget reacts. A disabled widget is drawn in its disabled state, ignores clicks and keys (a click
-     * on it plays the "can't" sound), and loses the focus.
+     * Whether the widget reacts. A disabled widget is drawn in its disabled state, ignores clicks and keys (a click on
+     * it plays the "can't" sound), and loses the focus. Disabling a widget disables everything inside it: read
+     * [isEnabled] for the effective state.
      */
-    open var enabled = true
+    var enabled = true
         set(value) {
             field = value
-            if (!value && isFocused) screen?.focus(null)
+            if (!value) screen?.let { if (contains(it.focused)) it.focus(null) }
+        }
+
+    /** Whether this widget and every widget it is inside are enabled. */
+    val isEnabled: Boolean
+        get() {
+            var w: Widget? = this
+            while (w != null) {
+                if (!w.enabled) return false
+                w = w.parent
+            }
+            return true
         }
 
     /**
@@ -91,41 +109,45 @@ abstract class Widget {
     }
 
     /**
-     * Called when the widget's size changes: the place to position children that depend on it. Also call it yourself
-     * after changing what the layout depends on.
+     * Hook: the widget's size changed, the place to position children that depend on it. Also call it yourself after
+     * changing what the layout depends on.
      */
     open fun layout() {}
 
     // ---- Tree ----
 
     /** Adds [child] on top of this widget's other children and returns it. A widget has one parent at a time. */
-    fun <T : Widget> add(child: T): T {
-        require(child !== this) { "A widget can't contain itself" }
-        child.parent?.remove(child)
-        childList.add(child)
-        child.parent = this
-        return child
-    }
+    fun <T : Widget> add(child: T): T = add(childList.size, child)
 
     /** Inserts [child] at [index] in the drawing order and returns it. */
     fun <T : Widget> add(index: Int, child: T): T {
+        var a: Widget? = this
+        while (a != null) {
+            require(a !== child) { "A widget can't be added inside itself" }
+            a = a.parent
+        }
         child.parent?.remove(child)
         childList.add(index.coerceIn(0, childList.size), child)
         child.parent = this
+        onChildrenChanged()
         return child
     }
 
-    /** Takes [child] out of this widget. If it held the focus, the focus goes. */
+    /** Takes [child] out of this widget. If it held the focus or a press, they go. */
     fun remove(child: Widget) {
         if (!childList.remove(child)) return
         screen?.forget(child)
         child.parent = null
+        onChildrenChanged()
     }
 
     /** Takes every child out. */
     fun removeAll() {
         childList.toList().forEach(::remove)
     }
+
+    /** Hook: a child was added or removed. */
+    protected open fun onChildrenChanged() {}
 
     /** The screen this widget is on, or null while it isn't on one. */
     val screen: KitScreen?
@@ -138,6 +160,16 @@ abstract class Widget {
             return null
         }
 
+    /** Whether [other] is this widget or inside it. */
+    fun contains(other: Widget?): Boolean {
+        var w = other
+        while (w != null) {
+            if (w === this) return true
+            w = w.parent
+        }
+        return false
+    }
+
     // ---- State for drawing ----
 
     /** The screen's clock in milliseconds, for animations: advances 50 ms per game tick, smoothly between ticks. */
@@ -145,6 +177,16 @@ abstract class Widget {
 
     /** Whether the pointer is on this widget (and on nothing above it that catches the pointer). */
     open val isHovered: Boolean get() = screen?.hovered === this
+
+    /**
+     * Whether the pointer is over a part of this widget the player can see: the topmost widget there is this one or
+     * one inside it (not an overlay, not a part cut off by a scrolling list).
+     */
+    val isPointerOver: Boolean
+        get() {
+            val s = screen ?: return false
+            return contains(s.widgetAt(s.mouseX, s.mouseY))
+        }
 
     /** Whether the widget has the keyboard focus. */
     val isFocused: Boolean get() = screen?.focused === this
@@ -165,23 +207,31 @@ abstract class Widget {
 
     // ---- Drawing ----
 
-    /** Draws the widget itself, in its own coordinates ((0, 0) is its top-left corner). Children come after, on top. */
+    /** Hook: draws the widget itself, in its own coordinates ((0, 0) is its top-left corner). Children come after. */
     open fun render(canvas: AppCanvas) {}
 
-    /** Draws above the children, for the rare widget that needs it (an indicator over its tabs). */
+    /** Hook: draws above the children, for the rare widget that needs it (an indicator over its tabs). */
     open fun renderOver(canvas: AppCanvas) {}
 
     /** Draws the children, each moved to its place. Override to clip or to skip some (a list does). */
     protected open fun renderChildren(canvas: AppCanvas) {
-        for (child in childList) child.draw(canvas)
+        for (child in childList.toTypedArray()) child.draw(canvas)
     }
 
-    /** Called once per frame before drawing, top-down: the place to move with an animation (a widget's position). */
+    /**
+     * Hook, once per frame before anything is drawn or hit, top-down: the place to follow an animation (a widget's
+     * position) or the state the widget shows.
+     */
     open fun update() {}
+
+    internal fun updateTree() {
+        if (!visible) return
+        update()
+        for (child in childList.toTypedArray()) child.updateTree()
+    }
 
     internal fun draw(canvas: AppCanvas) {
         if (!visible) return
-        update()
         canvas.offset(x, y) {
             render(canvas)
             renderChildren(canvas)
@@ -232,7 +282,7 @@ abstract class Widget {
         return vy
     }
 
-    /** A mouse button went down on the widget. Return true if used. */
+    /** A mouse button went down on the widget. Return true if used: the widget then gets the drag and the release. */
     open fun mousePressed(x: Float, y: Float, button: Int): Boolean = false
 
     /** The button pressed on this widget was released, wherever the pointer is now. */
@@ -267,7 +317,7 @@ abstract class Widget {
      */
     open fun charTyped(codePoint: Int, modifiers: Int): Boolean = false
 
-    /** The widget gained or lost the focus. */
+    /** Hook: the widget gained or lost the focus. */
     open fun focusChanged(focused: Boolean) {}
 
     /** Takes the focus, if [focusable] and on a screen. */
@@ -275,14 +325,26 @@ abstract class Widget {
         screen?.focus(this)
     }
 
-    /** Called 20 times a second while the screen is shown, children included. */
-    open fun tick() {
-        for (child in childList.toList()) child.tick()
+    // ---- Ticks and lost presses ----
+
+    /** Hook: called 20 times a second while the screen is shown. Children get their own call either way. */
+    open fun onTick() {}
+
+    /** Hook: the screen was hidden or the widget removed while the pointer was doing something with it: drop it. */
+    open fun onPointerLost() {}
+
+    internal fun tickTree() {
+        onTick()
+        for (child in childList.toTypedArray()) child.tickTree()
     }
 
-    /** The screen was hidden, or the widget removed: drop a press or drag in progress. Children included. */
-    open fun pointerLost() {
-        for (child in childList) child.pointerLost()
+    /** The kit's own reaction to a lost pointer, which an app's override of [onPointerLost] can't skip. */
+    internal open fun kitPointerLost() {}
+
+    internal fun pointerLostTree() {
+        kitPointerLost()
+        onPointerLost()
+        for (child in childList.toTypedArray()) child.pointerLostTree()
     }
 }
 

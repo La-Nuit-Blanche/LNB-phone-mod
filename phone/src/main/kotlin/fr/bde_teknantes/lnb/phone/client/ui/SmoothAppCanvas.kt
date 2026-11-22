@@ -124,7 +124,7 @@ internal class SmoothAppCanvas(private val smooth: SmoothCanvas) : AppCanvas, Te
         val us = floatArrayOf(0f, b, 1f - b, 1f)
         for (row in 0..2) for (col in 0..2) {
             if (xs[col + 1] <= xs[col] || ys[row + 1] <= ys[row]) continue
-            drawTexture(SHEET_SHADOW, xs[col], ys[row], xs[col + 1] - xs[col], ys[row + 1] - ys[row], -1, us[col], us[row], us[col + 1], us[row + 1])
+            drawTexture(SHEET_SHADOW, xs[col], ys[row], xs[col + 1] - xs[col], ys[row + 1] - ys[row], -1, us[col], us[row], us[col + 1], us[row + 1], true)
         }
     }
 

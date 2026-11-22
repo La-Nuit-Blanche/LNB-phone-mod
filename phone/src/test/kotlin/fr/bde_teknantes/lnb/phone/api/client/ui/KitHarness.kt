@@ -28,13 +28,13 @@ internal class FakeTextEnvironment : TextEnvironment {
 internal object KitFakes {
     fun install(): FakeTextEnvironment {
         TextMetrics.fonts = { MonoFont }
-        PhoneSounds.enabled = { false }
+        PhoneSounds.forcedEnabled = false
         return FakeTextEnvironment().also { TextEnvironment.current = it }
     }
 
     fun uninstall() {
         TextMetrics.fonts = { SmoothResources.font(it) }
-        PhoneSounds.enabled = { true }
+        PhoneSounds.forcedEnabled = null
         TextEnvironment.current = TextEnvironment.Game
     }
 }

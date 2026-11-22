@@ -11,21 +11,28 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  *
  * @param labels One per tab. Each must fit its tab in both languages (2 tabs: 128 dp each, the dot takes 10 more).
  */
-class Tabs(labels: List<String>, selected: Int = 0, var onSelect: ((Int) -> Unit)? = null) : Widget() {
+class Tabs(labels: List<String>) : Widget() {
+    /** Called with the new index when the player picks another tab (not when [selected] is set by code). */
+    var onSelect: ((Int) -> Unit)? = null
+
     private val tabs = labels.mapIndexed { i, label -> add(Tab(i, label)) }
-    private val indicator = Tween(Float.NaN)
+    private val indicator = Tween(0f)
 
     init {
         require(labels.isNotEmpty()) { "Tabs need at least one label" }
     }
 
-    /** The active tab. Setting it moves the indicator (without calling [onSelect]). */
-    var selected: Int = selected.coerceIn(0, labels.size - 1)
+    /** The active tab, the first one at first. Setting it slides the indicator (without calling [onSelect]). */
+    var selected: Int = 0
         set(value) {
             val index = value.coerceIn(0, tabs.size - 1)
             if (index == field) return
             field = index
-            indicator.animateTo(indicatorX(index), now, Motion.SHORT_MS, Easing.OUT)
+            if (width > 0f && screen != null) {
+                indicator.animateTo(indicatorX(index), now, Motion.SHORT_MS, Easing.OUT)
+            } else {
+                indicator.snapTo(indicatorX(index))
+            }
         }
 
     /** Shows or hides the unread dot of tab [index]. The active tab never shows it. */
@@ -69,25 +76,19 @@ class Tabs(labels: List<String>, selected: Int = 0, var onSelect: ((Int) -> Unit
         override fun render(canvas: AppCanvas) {
             val active = selected == index
             val look = interaction
-            if (!active) {
-                when (look) {
-                    Interaction.HOVER -> canvas.fillRect(0f, 0f, width, height, Colors.OVERLAY_HOVER)
-                    Interaction.PRESSED -> canvas.fillRect(0f, 0f, width, height, Colors.OVERLAY_PRESSED)
-                    else -> {}
-                }
-            }
+            if (!active) KitDrawing.stateTint(canvas, look, 0f, 0f, width, height)
             val color = if (active || look == Interaction.HOVER || look == Interaction.PRESSED) Colors.TEXT_1 else Colors.TEXT_2
             val text = canvas.truncate(label, TextStyle.LABEL, width - 24f)
             val labelWidth = canvas.measure(text, TextStyle.LABEL)
             val labelX = (width - labelWidth) / 2f
             canvas.drawText(text, labelX, LABEL_Y, TextStyle.LABEL, color)
             if (unread && !active) canvas.fillCircle(labelX + labelWidth + 4f, LABEL_Y + 5f, 6f, Colors.ACCENT)
-            if (showsFocusRing) canvas.strokeRoundRect(2f, 2f, width - 4f, height - 4f, Radius.SMALL, 2f, Colors.FOCUS_RING)
+            if (showsFocusRing) KitDrawing.focusRing(canvas, 4f, 4f, width - 8f, height - 8f, Radius.SMALL - 4f)
         }
     }
 
     companion object {
-        const val INDICATOR_WIDTH = 48f
+        val INDICATOR_WIDTH = 48f
         private const val LABEL_Y = 14f
     }
 }

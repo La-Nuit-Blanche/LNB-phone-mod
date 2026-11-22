@@ -25,8 +25,11 @@ class KitWidgetsTest {
     @Test
     fun `a click anywhere on a row switches its toggle, once`() {
         val heard = ArrayList<Boolean>()
-        val toggle = Toggle(onChange = { heard += it })
-        screen.add(ListRow("Publier anonymement", subtitle = "Nom masqué aux joueurs", trailing = toggle).at(0f, 0f))
+        val toggle = Toggle().apply { onChange = { heard += it } }
+        screen.add(ListRow("Publier anonymement").apply {
+            subtitle = "Nom masqué aux joueurs"
+            trailing = toggle
+        }.at(0f, 0f))
         screen.frame()
         screen.click(40f, 28f)
         assertTrue(toggle.checked)
@@ -40,9 +43,9 @@ class KitWidgetsTest {
     @Test
     fun `a disabled row disables its toggle, and neither switches`() {
         val toggle = Toggle()
-        val row = screen.add(ListRow("Sons", trailing = toggle).at(0f, 0f))
+        val row = screen.add(ListRow("Sons").apply { trailing = toggle }.at(0f, 0f))
         row.enabled = false
-        assertFalse(toggle.enabled)
+        assertFalse(toggle.isEnabled)
         screen.click(40f, 24f)
         screen.click(230f, 24f)
         assertFalse(toggle.checked)
@@ -53,7 +56,7 @@ class KitWidgetsTest {
     @Test
     fun `setting checked by code moves the knob without calling onChange`() {
         var calls = 0
-        val toggle = screen.add(Toggle(onChange = { calls++ }).at(0f, 0f))
+        val toggle = screen.add(Toggle().apply { onChange = { calls++ } }.at(0f, 0f))
         toggle.checked = true
         assertEquals(0, calls)
         toggle.toggle()
@@ -64,7 +67,7 @@ class KitWidgetsTest {
     @Test
     fun `tabs select on click, not again on the active tab`() {
         val picked = ArrayList<Int>()
-        val tabs = screen.add(Tabs(listOf("Annonces", "Global"), onSelect = { picked += it }).at(0f, 0f))
+        val tabs = screen.add(Tabs(listOf("Annonces", "Global")).apply { onSelect = { picked += it } }.at(0f, 0f))
         screen.frame()
         screen.click(192f, 22f)
         assertEquals(1, tabs.selected)
@@ -77,7 +80,7 @@ class KitWidgetsTest {
     @Test
     fun `setting the tab by code calls nothing and stays in range`() {
         val picked = ArrayList<Int>()
-        val tabs = screen.add(Tabs(listOf("Annonces", "Global"), onSelect = { picked += it }).at(0f, 0f))
+        val tabs = screen.add(Tabs(listOf("Annonces", "Global")).apply { onSelect = { picked += it } }.at(0f, 0f))
         tabs.selected = 5
         assertEquals(1, tabs.selected)
         tabs.selected = -1
@@ -88,7 +91,7 @@ class KitWidgetsTest {
     @Test
     fun `a segmented control picks on click and from the keyboard, and not while disabled`() {
         val picked = ArrayList<Int>()
-        val control = screen.add(SegmentedControl(listOf("Annonces", "Global"), onSelect = { picked += it }).at(12f, 316f))
+        val control = screen.add(SegmentedControl(listOf("Annonces", "Global")).apply { onSelect = { picked += it } }.at(12f, 316f))
         screen.frame()
         screen.click(186f, 332f)
         assertEquals(1, control.selected)
@@ -104,7 +107,7 @@ class KitWidgetsTest {
     @Test
     fun `a loading button ignores clicks and Enter, and keeps its width`() {
         var clicks = 0
-        val button = screen.add(Button("Publier", fixedWidth = 88f) { clicks++ }.atRight(244f, 6f))
+        val button = screen.add(Button("Publier") { clicks++ }.apply { fixedWidth = 88f }.atRight(244f, 6f))
         button.loading = true
         screen.click(200f, 22f)
         screen.focus(button)
@@ -122,7 +125,7 @@ class KitWidgetsTest {
         assertEquals(64f, short.preferredWidth)
         val long = Button("Écrire un post")
         assertEquals(14 * 6.5f + 32f, long.preferredWidth)
-        val text = Button("Réessayer", Button.Kind.TEXT)
+        val text = Button("Réessayer").apply { kind = Button.Kind.TEXT }
         assertEquals(9 * 6.5f + 16f, text.preferredWidth)
         // A new label resizes it.
         val b = screen.add(Button("OK").at(0f, 0f))

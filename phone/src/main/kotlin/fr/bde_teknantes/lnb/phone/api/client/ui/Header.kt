@@ -8,40 +8,47 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * takes the full width.
  *
  * ```kotlin
- * add(Header(tr("thread.title")).at(0f, 0f))                                     // back button on its own
- * add(Header(null, leading = IconButton(Icon.CLOSE) { phone.pop() },            // Compose: close, no title,
- *            trailing = Button(tr("compose.post"), fixedWidth = 88f) { send() }).at(0f, 0f))   // a primary button
+ * add(Header(tr("thread.title")).at(0f, 0f))                                       // back button on its own
+ * add(Header(null).apply {                                                          // Compose: close, no title,
+ *     leading = IconButton(Icon.CLOSE) { phone.pop() }                              // and a primary button
+ *     trailing = Button(tr("compose.post")) { send() }.apply { fixedWidth = 88f }
+ * }.at(0f, 0f))
  * ```
  *
+ * The back button calls the screen's [KitScreen.onBack] before going back, as Backspace does.
+ *
  * @param title The title, cut with an ellipsis before the trailing button; null for none.
- * @param leading A button in the back button's place (32 dp at (6, 6)), such as a close button. When null, the back
- * button shows whenever there is a screen to go back to, and goes back.
- * @param trailing An [IconButton] (placed at (218, 6)) or a [Button] (right-aligned to x 244, at y 6), or null.
- * @param showBack Forces the back button on or off, when [leading] is null; null shows it when the phone can go back.
- * @param onBack What the back button does, when something must happen first (a composer collapses before the screen
- * goes back); null goes back with [Phone.pop][fr.bde_teknantes.lnb.phone.api.client.Phone.pop].
  */
-class Header(
-    title: String?,
-    leading: Clickable? = null,
-    trailing: Clickable? = null,
-    private val showBack: Boolean? = null,
-    private val onBack: (() -> Unit)? = null,
-) : Widget() {
-    var title: String? = title
+class Header(var title: String?) : Widget() {
+    private val back = add(IconButton(Icon.BACK) { screen?.goBack() })
 
-    private val back: IconButton? = if (leading == null) add(IconButton(Icon.BACK) { onBack?.invoke() ?: screen?.goBack() }) else null
+    /**
+     * A button in the back button's place (32 dp at (6, 6)), such as a close button. When null, the back button shows
+     * whenever there is a screen to go back to.
+     */
+    var leading: Clickable? = null
+        set(value) {
+            field?.let(::remove)
+            field = value?.let { add(it) }
+            layout()
+        }
 
-    /** The button at the left: the one given, or the back button. */
-    val leading: Clickable? = leading?.let { add(it) } ?: back
+    /** An [IconButton] (placed at (218, 6)) or a [Button] (right-aligned to x 244, at y 6), or null. */
+    var trailing: Clickable? = null
+        set(value) {
+            field?.let(::remove)
+            field = value?.let { add(it) }
+            layout()
+        }
 
-    /** The button at the right, if any. */
-    val trailing: Clickable? = trailing?.let { add(it) }
+    /** Forces the back button on or off, when there is no [leading] button; null shows it when the phone can go back. */
+    var showBack: Boolean? = null
 
     override val preferredWidth get() = 256f
     override val preferredHeight get() = HEIGHT
 
     override fun layout() {
+        back.at(6f, 6f)
         leading?.at(6f, 6f)
         when (val t = trailing) {
             is IconButton -> t.at(218f, 6f)
@@ -51,19 +58,22 @@ class Header(
     }
 
     override fun update() {
-        back?.visible = showBack ?: (screen?.canGoBack == true)
+        back.visible = leading == null && (showBack ?: (screen?.canGoBack == true))
+        // A trailing button whose label changed keeps its right edge.
+        layout()
     }
 
     override fun render(canvas: AppCanvas) {
         canvas.fillRect(0f, 0f, width, height, Colors.BG)
         canvas.hairline(0f, width, height - 1f)
         val text = title ?: return
-        val x = if (leading?.visible == true) 44f else 12f
+        val start = leading ?: back.takeIf { it.visible }
+        val x = if (start?.visible == true) 44f else 12f
         val right = trailing?.takeIf { it.visible }?.let { it.x - 12f } ?: (width - 12f)
         canvas.drawTextTruncated(text, x, 11f, right - x, TextStyle.TITLE_L, Colors.TEXT_1)
     }
 
     companion object {
-        const val HEIGHT = 44f
+        val HEIGHT = 44f
     }
 }

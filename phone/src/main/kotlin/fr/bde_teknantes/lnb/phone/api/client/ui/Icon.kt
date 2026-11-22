@@ -23,7 +23,10 @@ import net.minecraft.resources.ResourceLocation
  * @property sizes The sizes it was exported at, in dp.
  * @property mirrored Whether it is drawn flipped left to right ([mirrored] returns such a copy).
  */
-class Icon(val namespace: String, val name: String, vararg sizes: Int, val mirrored: Boolean = false) {
+class Icon private constructor(val namespace: String, val name: String, sizes: List<Int>, val mirrored: Boolean) {
+    /** The icon [name] of the mod [namespace], exported at [sizes] dp. */
+    constructor(namespace: String, name: String, vararg sizes: Int) : this(namespace, name, sizes.toList(), false)
+
     val sizes: List<Int> = sizes.sorted()
 
     init {
@@ -31,7 +34,7 @@ class Icon(val namespace: String, val name: String, vararg sizes: Int, val mirro
     }
 
     /** The same icon flipped left to right: a chevron pointing right from the "back" one. */
-    fun mirrored(): Icon = Icon(namespace, name, *sizes.toIntArray(), mirrored = !mirrored)
+    fun mirrored(): Icon = Icon(namespace, name, sizes, !mirrored)
 
     /** The size the texture is taken from to draw the icon at [size] dp: the same, or the nearest larger, or the largest. */
     fun sourceSize(size: Float): Int = sizes.firstOrNull { it >= size - 1e-3f } ?: sizes.last()

@@ -24,28 +24,28 @@ fun interface Easing {
  */
 object Motion {
     /** One game tick. */
-    const val TICK_MS = 50f
+    val TICK_MS = 50f
 
     /** Screens sliding in and out, tabs, segmented controls, snackbars sliding in, the FAB lifting. */
-    const val SHORT_MS = 150f
+    val SHORT_MS = 150f
 
     /** Toggles, menus fading in, dialogs fading out, the like pop. */
-    const val QUICK_MS = 100f
+    val QUICK_MS = 100f
 
     /** Scrolling a list back to the top. */
-    const val SCROLL_TO_TOP_MS = 250f
+    val SCROLL_TO_TOP_MS = 250f
 
     /** A pressed state lasts at least this long, even after a quick click. */
-    const val MIN_PRESS_MS = 100f
+    val MIN_PRESS_MS = 100f
 
     /** How long the pointer rests on something before its tooltip shows. */
-    const val TOOLTIP_DELAY_MS = 500f
+    val TOOLTIP_DELAY_MS = 500f
 
     /** One turn of the spinner. */
-    const val SPINNER_TURN_MS = 800f
+    val SPINNER_TURN_MS = 800f
 
     /** The caret is shown, then hidden, this long each. */
-    const val CARET_BLINK_MS = 500f
+    val CARET_BLINK_MS = 500f
 }
 
 /**

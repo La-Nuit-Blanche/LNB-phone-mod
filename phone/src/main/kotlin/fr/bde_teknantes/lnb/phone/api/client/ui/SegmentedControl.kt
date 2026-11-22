@@ -6,30 +6,25 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * A choice between a few options shown side by side (art direction 8.7): a 32 dp pill track split into equal segments,
  * the selected one a lighter pill inset 3 dp that slides in 150 ms. 232 dp wide in the phone's layouts.
  *
- * @param onSelect Called with the new index when the player picks another segment (not when [selected] is set by code).
  */
-class SegmentedControl(labels: List<String>, selected: Int = 0, var onSelect: ((Int) -> Unit)? = null) : Widget() {
+class SegmentedControl(labels: List<String>) : Widget() {
+    /** Called with the new index when the player picks another segment (not when [selected] is set by code). */
+    var onSelect: ((Int) -> Unit)? = null
+
     private val segments = labels.mapIndexed { i, label -> add(Segment(i, label)) }
-    private val pill = Tween(Float.NaN)
+    private val pill = Tween(0f)
 
     init {
         require(labels.isNotEmpty()) { "A segmented control needs at least one label" }
     }
 
     /** The selected segment. Setting it slides the pill, without calling [onSelect]. */
-    var selected: Int = selected.coerceIn(0, labels.size - 1)
+    var selected: Int = 0
         set(value) {
             val index = value.coerceIn(0, segments.size - 1)
             if (index == field) return
             field = index
-            pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT)
-        }
-
-    override var enabled: Boolean
-        get() = super.enabled
-        set(value) {
-            super.enabled = value
-            segments.forEach { it.enabled = value }
+            if (width > 0f && screen != null) pill.animateTo(pillX(index), now, Motion.SHORT_MS, Easing.OUT) else pill.snapTo(pillX(index))
         }
 
     override val preferredWidth get() = 232f
@@ -71,9 +66,7 @@ class SegmentedControl(labels: List<String>, selected: Int = 0, var onSelect: ((
             }
             val text = canvas.truncate(label, TextStyle.LABEL, width - 2 * INSET - 16f)
             canvas.drawTextCentered(text, width / 2f, (height - TextStyle.LABEL.lineHeight) / 2f, TextStyle.LABEL, color)
-            if (showsFocusRing) {
-                canvas.strokeRoundRect(INSET - 4f, INSET - 4f, width - 2 * INSET + 8f, height - 2 * INSET + 8f, Radius.FULL, 2f, Colors.FOCUS_RING)
-            }
+            if (showsFocusRing) KitDrawing.focusRing(canvas, INSET, INSET, width - 2 * INSET, height - 2 * INSET, Radius.FULL)
         }
     }
 

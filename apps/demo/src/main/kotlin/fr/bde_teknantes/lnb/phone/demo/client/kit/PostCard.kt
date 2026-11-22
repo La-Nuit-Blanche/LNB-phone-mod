@@ -9,6 +9,8 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Easing
 import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
 import fr.bde_teknantes.lnb.phone.api.client.ui.IconButton
 import fr.bde_teknantes.lnb.phone.api.client.ui.Interaction
+import fr.bde_teknantes.lnb.phone.api.client.ui.KitDrawing
+import fr.bde_teknantes.lnb.phone.api.client.ui.Radius
 import fr.bde_teknantes.lnb.phone.api.client.ui.MenuItem
 import fr.bde_teknantes.lnb.phone.api.client.ui.Motion
 import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
@@ -58,8 +60,7 @@ class PostCardLayout(post: Post, measurer: TextMeasurer) {
  * with action buttons, an optional "more" button, the announcer badge and the private line as children. Its height
  * follows its text, so it sits in a [fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList] as is.
  */
-class PostCard(val post: Post, onOpen: (() -> Unit)? = null) : Clickable(onOpen) {
-    private val highlight = Tween(0f)
+class PostCard(val post: Post) : Clickable() {
     private var highlightAt = Float.NEGATIVE_INFINITY
     private val collapse = Tween(1f)
     private var layout: PostCardLayout? = null
@@ -79,13 +80,25 @@ class PostCard(val post: Post, onOpen: (() -> Unit)? = null) : Clickable(onOpen)
         active = post.pinned
         tooltip = tr(if (post.pinned) "action.unpin" else "action.pin")
     }) else null
-    val more: IconButton? = if (post.canDelete) add(IconButton(Icon.MORE, 28f, Colors.TEXT_2).apply { tooltip = tr("action.more") }) else null
-    val badge: Widget? = if (post.author.announcer && !post.anonymous) add(AnnouncerBadge(tr("badge.announcer"))) else null
+    val more: IconButton? = if (post.canDelete) {
+        add(IconButton(Icon.MORE).apply {
+            size = 28f
+            tint = Colors.TEXT_2
+            tooltip = tr("action.more")
+        })
+    } else {
+        null
+    }
+    val badge: Widget? = if (post.author.announcer && !post.anonymous) add(AnnouncerBadge().apply { tooltip = tr("badge.announcer") }) else null
     val privateArea: Widget? = post.privateLine?.let { add(TooltipArea(post.privateTooltip)) }
 
     init {
         more?.onClick = {
-            screen?.showMenu(more!!, listOf(MenuItem(tr("menu.delete"), Icon.TRASH, destructive = true) { onDelete?.invoke() }))
+            val delete = MenuItem(tr("menu.delete")) { onDelete?.invoke() }.apply {
+                icon = Icon.TRASH
+                destructive = true
+            }
+            screen?.showMenu(more!!, listOf(delete))
         }
     }
 
@@ -149,11 +162,8 @@ class PostCard(val post: Post, onOpen: (() -> Unit)? = null) : Clickable(onOpen)
         canvas.pushClip(0f, 0f, width, height)
         canvas.pushAlpha(fold)
         if (post.pinned) canvas.fillRect(0f, 0f, width, l.height, Colors.SURFACE)
-        when (interaction) {
-            Interaction.HOVER -> canvas.fillRect(0f, 0f, width, l.height, Colors.OVERLAY_HOVER)
-            Interaction.PRESSED -> canvas.fillRect(0f, 0f, width, l.height, Colors.OVERLAY_PRESSED)
-            else -> {}
-        }
+        KitDrawing.stateTint(canvas, interaction, 0f, 0f, width, l.height)
+        if (showsFocusRing) KitDrawing.focusRing(canvas, 4f, 4f, width - 8f, l.height - 9f, Radius.SMALL - 4f)
         val since = now - highlightAt
         if (since < 1000f) {
             val a = if (since < 600f) 1f else 1f - (since - 600f) / 400f
@@ -163,7 +173,7 @@ class PostCard(val post: Post, onOpen: (() -> Unit)? = null) : Clickable(onOpen)
             canvas.drawIcon(Icon.PIN, 28f, 8f, Colors.TEXT_2, 16f)
             canvas.drawText(tr("post.pinned"), 56f, 8f, TextStyle.CAPTION_STRONG, Colors.TEXT_2)
         }
-        Avatar.paint(canvas, 12f, 10f + l.shift, if (post.anonymous) null else post.author.skin())
+        Avatar.paintSkin(canvas, 12f, 10f + l.shift, Avatar.Size.MEDIUM, if (post.anonymous) null else post.author.skin())
         val name = if (post.anonymous) tr("post.anonymous") else post.author.displayName
         canvas.drawTextTruncated(name, 56f, l.nameY, l.nameMaxWidth, TextStyle.TITLE_M, if (post.anonymous) Colors.TEXT_2 else Colors.TEXT_1)
         canvas.drawText(post.time(), l.timeRight - l.timeWidth, l.nameY + 1f, TextStyle.CAPTION, Colors.TEXT_2)
@@ -230,6 +240,7 @@ class ActionButton(private val icon: Icon, private val activeIcon: Icon, private
             Interaction.PRESSED -> canvas.fillCircle(0f, 0f, 28f, tint.soft2)
             else -> {}
         }
+        if (showsFocusRing) KitDrawing.focusRing(canvas, 0f, 0f, 28f, 28f, Radius.FULL)
         val hot = look == Interaction.HOVER || look == Interaction.PRESSED
         val color = if (active || marked || hot) tint.color else Colors.TEXT_2
         val t = ((now - poppedAt) / Motion.QUICK_MS).coerceIn(0f, 1f)

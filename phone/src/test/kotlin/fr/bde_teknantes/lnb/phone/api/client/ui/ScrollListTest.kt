@@ -245,7 +245,7 @@ class ScrollListTest {
     @Test
     fun `a text area that can't scroll lets the list scroll`() {
         val list = list()
-        list.add(TextArea(TextState("court"), limit = 280))
+        list.add(TextArea(TextState("court")).apply { limit = 280 })
         list.rows(20)
         screen.frame()
         assertTrue(screen.wheel(100f, top + 20f, -1f))

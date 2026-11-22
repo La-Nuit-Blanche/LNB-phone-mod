@@ -9,11 +9,15 @@ import fr.bde_teknantes.lnb.phone.client.ui.Placement
  * One entry of a menu opened with [KitScreen.showMenu].
  *
  * @property label What the item says.
- * @property icon A 16 dp icon before the label, or null.
- * @property destructive Draws the item in red: for deleting and other actions that can't be undone.
  * @property onClick What the item does. The menu is already closed when it runs.
  */
-class MenuItem(val label: String, val icon: Icon? = null, val destructive: Boolean = false, val onClick: () -> Unit)
+class MenuItem(val label: String, val onClick: () -> Unit) {
+    /** A 16 dp icon before the label, or null. */
+    var icon: Icon? = null
+
+    /** Draws the item in red: for deleting and other actions that can't be undone. */
+    var destructive = false
+}
 
 /**
  * The popover menu (art direction 8.7): 168 dp wide, items of 40 dp, fading in over 100 ms. Covers the viewport with an
@@ -70,11 +74,8 @@ internal class Menu(items: List<MenuItem>, private val box: Box, private val ope
         }
 
         override fun render(canvas: AppCanvas) {
-            when (interaction) {
-                Interaction.HOVER -> canvas.fillRect(0f, 0f, width, height, Colors.OVERLAY_HOVER)
-                Interaction.PRESSED -> canvas.fillRect(0f, 0f, width, height, Colors.OVERLAY_PRESSED)
-                else -> {}
-            }
+            KitDrawing.stateTint(canvas, interaction, 0f, 0f, width, height)
+            if (showsFocusRing) KitDrawing.focusRing(canvas, 4f, 4f, width - 8f, height - 8f, Radius.SMALL - 4f)
             val color = if (item.destructive) Colors.DANGER else Colors.TEXT_1
             item.icon?.let { canvas.drawIcon(it, 12f, (height - 16f) / 2f, color, 16f) }
             canvas.drawTextTruncated(item.label, 40f, (height - 18f) / 2f, width - 40f - 12f, TextStyle.BODY, color)

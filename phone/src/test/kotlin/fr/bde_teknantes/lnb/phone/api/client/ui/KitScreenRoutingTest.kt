@@ -299,12 +299,13 @@ class KitScreenRoutingTest {
         }
 
         @Test
-        fun `children come right after their parent in the order`() {
-            val row = screen.add(ListRow("Publier anonymement", trailing = Toggle()).at(0f, 0f))
+        fun `a row with a toggle is one stop`() {
+            val row = screen.add(ListRow("Publier anonymement").apply { trailing = Toggle() }.at(0f, 0f))
             val after = spot(0f, 100f)
             val order = (1..3).map { screen.key(GLFW_KEY_TAB); screen.focused }
-            // Both the row and its toggle take the focus: two stops for one setting.
-            assertEquals(listOf(row, row.trailing, after), order)
+            // The row takes the focus for its toggle, which shows the ring: one stop for one setting.
+            assertEquals(listOf<Widget?>(row, after, row), order)
+            assertTrue(row.trailing!!.showsFocusRing)
         }
 
         @Test

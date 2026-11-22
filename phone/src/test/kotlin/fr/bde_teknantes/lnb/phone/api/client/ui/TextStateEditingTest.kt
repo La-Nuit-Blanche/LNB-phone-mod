@@ -54,8 +54,8 @@ class TextStateEditingTest {
         fun `on an empty text every move stays at 0`() {
             val s = TextState("")
             s.moveLeft()
-            s.moveRight(word = true)
-            s.moveLeft(select = true, word = true)
+            s.moveRight(false, true)
+            s.moveLeft(true, true)
             assertEquals(0, s.caret)
             assertFalse(s.hasSelection)
         }
@@ -66,12 +66,12 @@ class TextStateEditingTest {
         @Test
         fun `shift extends the selection from the anchor, in both directions, across it`() {
             val s = state("abcdef", caret = 2)
-            s.moveRight(select = true)
-            s.moveRight(select = true)
+            s.moveRight(true, false)
+            s.moveRight(true, false)
             assertEquals(2, s.anchor)
             assertEquals("cd", s.selectedText)
             // Back over the anchor: the selection flips to the other side of it.
-            repeat(4) { s.moveLeft(select = true) }
+            repeat(4) { s.moveLeft(true, false) }
             assertEquals(0, s.caret)
             assertEquals(2, s.anchor)
             assertEquals("ab", s.selectedText)
@@ -82,8 +82,8 @@ class TextStateEditingTest {
         @Test
         fun `coming back to the anchor leaves nothing selected`() {
             val s = state("abcdef", caret = 2)
-            s.moveRight(select = true)
-            s.moveLeft(select = true)
+            s.moveRight(true, false)
+            s.moveLeft(true, false)
             assertFalse(s.hasSelection)
             assertEquals("", s.selectedText)
         }
@@ -108,7 +108,7 @@ class TextStateEditingTest {
         @Test
         fun `a word move without shift also only collapses a selection`() {
             val s = state("un deux trois", caret = 7, anchor = 3)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(7, s.caret)
             assertFalse(s.hasSelection)
         }
@@ -116,10 +116,10 @@ class TextStateEditingTest {
         @Test
         fun `shift with ctrl extends by words`() {
             val s = state("un deux trois", caret = 0)
-            s.moveRight(select = true, word = true)
-            s.moveRight(select = true, word = true)
+            s.moveRight(true, true)
+            s.moveRight(true, true)
             assertEquals("un deux ", s.selectedText)
-            s.moveLeft(select = true, word = true)
+            s.moveLeft(true, true)
             assertEquals("un ", s.selectedText)
         }
 
@@ -150,32 +150,32 @@ class TextStateEditingTest {
         @Test
         fun `an apostrophe stays inside a word, straight or curly`() {
             val s = state("l'End est là", caret = 0)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals("l'End ".length, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals("l'End est ".length, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(12, s.caret)
 
             val curly = state("l’heure", caret = 0)
-            curly.moveRight(word = true)
+            curly.moveRight(false, true)
             assertEquals(7, curly.caret)
         }
 
         @Test
         fun `aujourd'hui is one word, and the comma after it is a stop of its own`() {
             val s = state("aujourd'hui, c'est", caret = 0)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(11, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(13, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(18, s.caret)
-            s.moveLeft(word = true)
+            s.moveLeft(false, true)
             assertEquals(13, s.caret)
-            s.moveLeft(word = true)
+            s.moveLeft(false, true)
             assertEquals(11, s.caret)
-            s.moveLeft(word = true)
+            s.moveLeft(false, true)
             assertEquals(0, s.caret)
         }
 
@@ -183,16 +183,16 @@ class TextStateEditingTest {
         fun `a hyphen splits est-ce into three stops`() {
             // Decided by the code, not by the art direction: the hyphen is punctuation, a run of its own.
             val s = state("est-ce que", caret = 0)
-            val stops = (1..4).map { s.moveRight(word = true); s.caret }
+            val stops = (1..4).map { s.moveRight(false, true); s.caret }
             assertEquals(listOf(3, 4, 7, 10), stops)
-            val back = (1..4).map { s.moveLeft(word = true); s.caret }
+            val back = (1..4).map { s.moveLeft(false, true); s.caret }
             assertEquals(listOf(7, 4, 3, 0), back)
         }
 
         @Test
         fun `ctrl+left skips the spaces before the word`() {
             val s = state("Bonjour   ")
-            s.moveLeft(word = true)
+            s.moveLeft(false, true)
             assertEquals(0, s.caret)
         }
 
@@ -201,18 +201,18 @@ class TextStateEditingTest {
             // Java doesn't count U+00A0 as white space, so " !" is one punctuation run.
             val s = state("Salut ! Oui")
             s.moveTo(0)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(5, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(8, s.caret)
         }
 
         @Test
         fun `digits are word characters, the colon of a time is not`() {
             val s = state("à 15:00", caret = 2)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(4, s.caret)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(5, s.caret)
         }
     }
@@ -338,14 +338,14 @@ class TextStateEditingTest {
 
         @Test
         fun `line breaks pasted into a single-line field become spaces, whatever their kind`() {
-            val s = TextState(multiline = false)
+            val s = TextState("", false)
             s.insert("un\ndeux\r\ntrois\rquatre")
             assertEquals("un deux trois quatre", s.text)
         }
 
         @Test
         fun `Windows line ends become one line feed in a text area and count as one character`() {
-            val s = TextState(maxLength = 5)
+            val s = TextState("", true, 5)
             s.insert("a\r\nb\r\nc")
             assertEquals("a\nb\nc", s.text)
             assertEquals(5, s.length)
@@ -383,12 +383,12 @@ class TextStateEditingTest {
 
         @Test
         fun `an initial text over the maximum is cut too`() {
-            assertEquals("abc", TextState("abcdef", maxLength = 3).text)
+            assertEquals("abc", TextState("abcdef", true, 3).text)
         }
 
         @Test
         fun `a maximum below 1 is refused`() {
-            assertThrows(IllegalArgumentException::class.java) { TextState(maxLength = 0) }
+            assertThrows(IllegalArgumentException::class.java) { TextState("", true, 0) }
         }
 
         @Test
@@ -436,14 +436,14 @@ class TextStateEditingTest {
         @Test
         fun `shift selection takes whole emoji`() {
             val s = state("${smile}${smile}", caret = 0)
-            s.moveRight(select = true)
+            s.moveRight(true, false)
             assertEquals(smile, s.selectedText)
         }
 
         @Test
         fun `emoji are a punctuation run for word moves`() {
             val s = state("Salut ${smile}${smile} toi", caret = 6)
-            s.moveRight(word = true)
+            s.moveRight(false, true)
             assertEquals(11, s.caret)
             s.deleteBackward(word = true)
             assertEquals("Salut toi", s.text)
@@ -451,7 +451,7 @@ class TextStateEditingTest {
 
         @Test
         fun `the maximum never cuts a pair in two`() {
-            val s = TextState("a", maxLength = 2)
+            val s = TextState("a", true, 2)
             s.insert("$smile$smile")
             assertEquals("a$smile", s.text)
             assertEquals(2, s.length)
@@ -487,12 +487,18 @@ class TextStateEditingTest {
         }
 
         @Test
-        fun `a decomposed accent counts two and backspace takes the accent alone`() {
-            // What a dead key gives on most systems is the precomposed letter; a pasted decomposed one stays two.
+        fun `a decomposed accent becomes one character, typed or pasted`() {
+            // Text is kept in NFC: a pasted decomposed é is stored, drawn and counted as one, and Backspace takes it whole.
             val s = TextState("é")
-            assertEquals(2, s.length)
+            assertEquals("é", s.text)
+            assertEquals(1, s.length)
             s.deleteBackward()
-            assertEquals("e", s.text)
+            assertEquals("", s.text)
+            // A combining accent typed after its letter joins it.
+            s.insert("e")
+            s.insert("́")
+            assertEquals("é", s.text)
+            assertEquals(1, s.caret)
         }
     }
 

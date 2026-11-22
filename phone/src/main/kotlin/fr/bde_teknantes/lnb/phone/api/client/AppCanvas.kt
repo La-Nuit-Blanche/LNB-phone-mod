@@ -22,6 +22,10 @@ import net.minecraft.resources.ResourceLocation
  *
  * **Order**: what is drawn later is drawn on top. A canvas is only valid during the [AppScreen.render] call that
  * received it; don't keep it.
+ *
+ * The phone provides the canvas; don't implement this interface yourself (for tests, draw through a
+ * [fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen] and check the widgets' state instead). Later versions of the
+ * phone will add methods to it, which would break a class of yours.
  */
 interface AppCanvas : TextMeasurer {
     /** Width of the viewport in dp: [WIDTH]. */
@@ -55,10 +59,16 @@ interface AppCanvas : TextMeasurer {
      * 4. It always ends at the bottom of that row, so a line drawn on the last dp of an area (a header's at y 43, a
      * row's at its bottom) never spills onto what follows.
      */
-    fun hairline(x0: Float, x1: Float, y: Float, color: Int = Colors.HAIRLINE)
+    fun hairline(x0: Float, x1: Float, y: Float, color: Int)
+
+    /** [hairline] in [Colors.HAIRLINE]. */
+    fun hairline(x0: Float, x1: Float, y: Float) = hairline(x0, x1, y, Colors.HAIRLINE)
 
     /** A vertical divider from [y0] to [y1], occupying the dp column [x]..[x]+1 (see [hairline]). */
-    fun verticalHairline(x: Float, y0: Float, y1: Float, color: Int = Colors.HAIRLINE)
+    fun verticalHairline(x: Float, y0: Float, y1: Float, color: Int)
+
+    /** [verticalHairline] in [Colors.HAIRLINE]. */
+    fun verticalHairline(x: Float, y0: Float, y1: Float) = verticalHairline(x, y0, y1, Colors.HAIRLINE)
 
     // ---- Text ----
 
@@ -73,10 +83,13 @@ interface AppCanvas : TextMeasurer {
         drawText(truncate(text, style, maxWidth), x, y, style, color)
 
     /**
-     * Draws [text] wrapped at [maxWidth] dp, one line box of [style] under the other. With [maxLines], the last line
-     * shown ends with an ellipsis when text remains. Returns the number of lines drawn.
+     * Draws [text] wrapped at [maxWidth] dp, one line box of [style] under the other. Returns the number of lines drawn.
      */
-    fun drawTextWrapped(text: String, x: Float, y: Float, maxWidth: Float, style: TextStyle, color: Int, maxLines: Int = Int.MAX_VALUE): Int {
+    fun drawTextWrapped(text: String, x: Float, y: Float, maxWidth: Float, style: TextStyle, color: Int): Int =
+        drawTextWrapped(text, x, y, maxWidth, style, color, Int.MAX_VALUE)
+
+    /** [drawTextWrapped] on at most [maxLines] lines, the last one ending with an ellipsis when text remains. */
+    fun drawTextWrapped(text: String, x: Float, y: Float, maxWidth: Float, style: TextStyle, color: Int, maxLines: Int): Int {
         val lines = wrap(text, style, maxWidth, maxLines)
         lines.forEachIndexed { i, line -> drawText(line, x, y + i * style.lineHeight, style, color) }
         return lines.size
@@ -90,9 +103,12 @@ interface AppCanvas : TextMeasurer {
 
     /**
      * Draws [icon] as a [size] dp square tinted with [color], its top-left corner at ([x], [y]). Use one of the icon's
-     * [sizes][Icon.sizes] (the default is its smallest): the icon is then drawn pixel for pixel.
+     * [sizes][Icon.sizes]: the icon is then drawn pixel for pixel.
      */
-    fun drawIcon(icon: Icon, x: Float, y: Float, color: Int, size: Float = icon.sizes.first().toFloat())
+    fun drawIcon(icon: Icon, x: Float, y: Float, color: Int, size: Float)
+
+    /** [drawIcon] at the icon's smallest size. */
+    fun drawIcon(icon: Icon, x: Float, y: Float, color: Int) = drawIcon(icon, x, y, color, icon.sizes.first().toFloat())
 
     /**
      * Draws the loading spinner, a quarter arc on a faint ring, as a [size] dp square (20 dp, or 16 inside buttons),
@@ -107,8 +123,12 @@ interface AppCanvas : TextMeasurer {
      */
     fun drawTexture(
         texture: ResourceLocation, x: Float, y: Float, w: Float, h: Float,
-        color: Int = -1, u0: Float = 0f, v0: Float = 0f, u1: Float = 1f, v1: Float = 1f, linear: Boolean = true,
+        color: Int, u0: Float, v0: Float, u1: Float, v1: Float, linear: Boolean,
     )
+
+    /** The whole of [texture], as it is, smoothed when stretched. */
+    fun drawTexture(texture: ResourceLocation, x: Float, y: Float, w: Float, h: Float) =
+        drawTexture(texture, x, y, w, h, -1, 0f, 0f, 1f, 1f, true)
 
     /**
      * Draws a player's face (the 8 x 8 face of [skin] with its hat layer, in sharp pixels) in a circle of [size] dp.
@@ -193,7 +213,7 @@ inline fun AppCanvas.faded(alpha: Float, block: () -> Unit) {
     }
 }
 
-/** The shadows of the phone, pre-blurred (the phone draws no other effect). */
+/** The shadows of the phone, pre-blurred (the phone draws no other effect). More may be added: `when` needs an `else`. */
 enum class Shadow {
     /**
      * Under rounded sheets with a radius of 10 to 14 dp: menus, dialogs, snackbars. Reaches 8 dp past the element on

@@ -12,7 +12,8 @@ import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
-import fr.bde_teknantes.lnb.phone.client.shell.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.PlayerSkins
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import fr.bde_teknantes.lnb.phone.client.ui.SmoothTextures
@@ -101,6 +102,7 @@ object LnbPhoneClient {
             navigator.reset()
             notifications.reset()
             PhoneShell.reset()
+            PlayerSkins.clear()
         }
     }
 }

@@ -7,6 +7,7 @@ import fr.bde_teknantes.lnb.phone.client.ui.Box
 import fr.bde_teknantes.lnb.phone.client.ui.FocusOrder
 import fr.bde_teknantes.lnb.phone.client.ui.Placement
 import org.lwjgl.glfw.GLFW
+import java.util.WeakHashMap
 
 /**
  * A screen built from the UI kit's widgets: the usual way to write an app screen. Create your widgets in the
@@ -19,19 +20,25 @@ import org.lwjgl.glfw.GLFW
  *         add(Header("Notes").at(0f, 0f))
  *         val list = add(ScrollList().at(0f, 44f, 256f, 326f))
  *         for (note in notes) list.add(ListRow(note) { phone.push(NoteScreen(note)) })
- *         add(Fab(Icon.COMPOSE) { phone.push(EditScreen()) })
+ *         addFloating(Fab { phone.push(EditScreen()) })
  *     }
  * }
  * ```
  *
- * The screen fills the viewport with [background] first. Esc closes an open menu or dialog (otherwise the phone is
- * put away), Tab moves the focus, and [AppScreen.hasTextFocus] is true exactly while a text field has the focus, so the
- * phone leaves Backspace and its own key to the field. For anything the widgets don't cover, override [onKey] and
- * [onTick], or write a widget of your own ([Widget]).
+ * The screen fills the viewport with [background] first, then draws what was [add]ed, then what was added with
+ * [addFloating] (a floating action button stays on top however the content is rebuilt), then the overlays.
  *
- * The input and drawing methods of [AppScreen] are taken by the kit and final here. Like any screen, a [KitScreen] is
- * created anew each time the app opens: keep what must last (drafts, scroll positions) in state objects of your app
- * and hand them to the widgets ([TextState], [ScrollState]).
+ * **Keys.** Esc closes an open menu or dialog (otherwise the phone is put away), Tab moves the focus (inside the menu
+ * or dialog when one is open), and [AppScreen.hasTextFocus] is true exactly while a text field has the focus, so the
+ * phone leaves Backspace and its own key to the field. Backspace and the header's back arrow both call [onBack] first,
+ * then go back; with a menu or dialog open, Backspace does nothing.
+ *
+ * **Hooks.** The input and drawing methods of [AppScreen] are taken by the kit and final here, as are [onShown] and
+ * [onHidden]: override [onKey], [onTick], [onBack], [onScreenShown] and [onScreenHidden] instead, or write a widget of
+ * your own ([Widget]).
+ *
+ * Like any screen, a [KitScreen] is created anew each time the app opens: keep what must last (drafts, scroll
+ * positions) in state objects of your app and hand them to the widgets ([TextState], [ScrollState]).
  */
 abstract class KitScreen : AppScreen() {
     internal class Root(val owner: KitScreen) : Widget() {
@@ -41,6 +48,7 @@ abstract class KitScreen : AppScreen() {
     }
 
     private val content = Root(this)
+    private val floating = Root(this)
     private val overlays = Root(this)
     private var ticks = 0
     private var pendingHighSurrogate: Char? = null
@@ -83,11 +91,6 @@ abstract class KitScreen : AppScreen() {
     /** The phone, for widgets of the kit: null before the screen is on it. */
     internal val phoneOrNull: Phone? get() = host
 
-    /** [Phone.pop], for back buttons: does nothing before the screen is on the phone. */
-    internal fun goBack() {
-        host?.pop()
-    }
-
     /** Whether the back button should show: there is a screen to go back to. */
     internal val canGoBack: Boolean get() = host?.canGoBack == true
 
@@ -96,23 +99,50 @@ abstract class KitScreen : AppScreen() {
     /** Adds [widget] to the screen, on top of what was added before, and returns it. */
     fun <T : Widget> add(widget: T): T = content.add(widget)
 
-    /** Takes [widget] off the screen. */
-    fun remove(widget: Widget) = content.remove(widget)
+    /**
+     * Adds [widget] to the floating layer, above everything [add]ed whenever it was added, under the overlays: for a
+     * floating action button, which then stays on top while the content is rebuilt.
+     */
+    fun <T : Widget> addFloating(widget: T): T = floating.add(widget)
 
-    /** The widgets added to the screen. */
+    /** Takes [widget] off the screen, from either layer. */
+    fun remove(widget: Widget) {
+        content.remove(widget)
+        floating.remove(widget)
+    }
+
+    /** The widgets added to the screen with [add]. */
     val widgets: List<Widget> get() = content.children
 
     // ---- Hooks ----
 
     /**
      * A key no widget used (the focused widget and its parents get it first). Return true to keep it: the phone then
-     * doesn't act on it (Esc would put the phone away, Backspace go back). Esc arrives here only with no menu or
-     * dialog open.
+     * doesn't act on it (Esc would put the phone away). Esc arrives here only with no menu or dialog open; Backspace
+     * goes to [onBack].
      */
     open fun onKey(keyCode: Int, scanCode: Int, modifiers: Int): Boolean = false
 
-    /** Called 20 times a second while the screen is shown, after the widgets' own [Widget.tick]. */
+    /**
+     * The player asked to go back: the header's back arrow, or Backspace with no text field focused and no menu or
+     * dialog open. Return true when the screen handled it itself (a reply composer collapses); false goes back a
+     * screen.
+     */
+    open fun onBack(): Boolean = false
+
+    /** Called 20 times a second while the screen is shown, after the widgets' own [Widget.onTick]. */
     open fun onTick() {}
+
+    /** The screen became the one the player sees (see [AppScreen.onShown]). */
+    open fun onScreenShown() {}
+
+    /** The screen stopped being seen but stays alive (see [AppScreen.onHidden]). */
+    open fun onScreenHidden() {}
+
+    /** Goes back as the header's arrow does: [onBack], then the previous screen. */
+    fun goBack() {
+        if (!onBack()) host?.pop()
+    }
 
     // ---- Focus ----
 
@@ -131,18 +161,10 @@ abstract class KitScreen : AppScreen() {
 
     /** Forgets a widget leaving the screen: focus, hover and press go if they were on it or inside it. */
     internal fun forget(widget: Widget) {
-        fun inside(w: Widget?): Boolean {
-            var p = w
-            while (p != null) {
-                if (p === widget) return true
-                p = p.parent
-            }
-            return false
-        }
-        if (inside(focused)) focus(null)
-        if (inside(hovered)) hovered = null
-        if (inside(capturing)) capturing = null
-        widget.pointerLost()
+        if (widget.contains(focused)) focus(null)
+        if (widget.contains(hovered)) hovered = null
+        if (widget.contains(capturing)) capturing = null
+        widget.pointerLostTree()
     }
 
     private fun focusOrder(): List<Widget> {
@@ -152,8 +174,27 @@ abstract class KitScreen : AppScreen() {
             if (w.focusable && w !is Root) out += w
             w.children.forEach(::walk)
         }
-        walk(dialog?.takeIf { it.isOpen } ?: content)
+        val modal = menu ?: dialog?.takeIf { it.isOpen }
+        if (modal != null) {
+            walk(modal)
+        } else {
+            walk(content)
+            walk(floating)
+        }
         return out
+    }
+
+    /** After a Tab: a row scrolled out of its list comes into view. */
+    private fun revealFocused() {
+        var w = focused ?: return
+        while (true) {
+            val p = w.parent ?: return
+            if (p is ScrollList) {
+                p.reveal(w)
+                return
+            }
+            w = p
+        }
     }
 
     // ---- Overlays ----
@@ -189,16 +230,28 @@ abstract class KitScreen : AppScreen() {
         focus(null)
     }
 
-    /** Whether a dialog is open (or still fading out). */
+    /** Whether a dialog is open (not counting one fading out). */
     val isDialogOpen: Boolean get() = dialog?.isOpen == true
 
     /**
-     * Shows a snackbar: a short message at the bottom of the viewport for 3 seconds (6 with an [action]), replacing
-     * the one showing. With [error], an alert icon in red goes before the text and the error sound plays.
+     * Shows a snackbar: a short message at the bottom of the viewport for 3 seconds, replacing the one showing. It
+     * outlives the screen: popped right after, the screen hands it to the one the player comes back to (Compose
+     * closes, "Posted" shows on the feed).
      */
-    fun showSnackbar(text: String, action: SnackbarAction? = null, error: Boolean = false) {
-        snackbar?.let(overlays::remove)
+    fun showSnackbar(text: String) = snackbar(text, null, error = false)
+
+    /** [showSnackbar] with a button such as "Retry", held 6 seconds. */
+    fun showSnackbar(text: String, action: SnackbarAction) = snackbar(text, action, error = false)
+
+    /** An error snackbar: a red alert icon before the text, and the error sound. */
+    fun showErrorSnackbar(text: String) = snackbar(text, null, error = true)
+
+    /** An error snackbar with a button such as "Retry". */
+    fun showErrorSnackbar(text: String, action: SnackbarAction) = snackbar(text, action, error = true)
+
+    private fun snackbar(text: String, action: SnackbarAction?, error: Boolean) {
         val wasShowing = snackbar?.isShowing(now) == true
+        dismissSnackbar()
         snackbar = overlays.add(0, Snackbar(text, action, error, now, slideIn = !wasShowing))
         if (error) PhoneSounds.error()
     }
@@ -218,9 +271,15 @@ abstract class KitScreen : AppScreen() {
         now = (ticks + partialTick) * Motion.TICK_MS
         this.mouseX = mouseX
         this.mouseY = mouseY
+        // Animations and layout first, so that what is hit and what is drawn agree within the frame.
+        content.updateTree()
+        floating.updateTree()
+        overlays.updateTree()
+        focused?.let { if (!it.isEnabled || !it.isShowing || it.screen !== this) focus(null) }
         updateHover()
         canvas.fillRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), background)
         content.draw(canvas)
+        floating.draw(canvas)
         overlays.draw(canvas)
         drawTooltip(canvas)
     }
@@ -236,33 +295,49 @@ abstract class KitScreen : AppScreen() {
                 dialog = null
             }
         }
-        content.tick()
-        overlays.tick()
+        content.tickTree()
+        floating.tickTree()
+        overlays.tickTree()
         onTick()
     }
 
-    override fun onHidden() {
+    final override fun onShown() {
+        restoreSnackbar()
+        onScreenShown()
+    }
+
+    final override fun onHidden() {
         // The release of a press in progress may never come: drop it, and the hover with it.
         capturing = null
         hovered = null
-        content.pointerLost()
-        overlays.pointerLost()
+        content.pointerLostTree()
+        floating.pointerLostTree()
+        overlays.pointerLostTree()
+        saveSnackbar()
+        onScreenHidden()
     }
 
     final override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
         moveMouse(x, y)
-        val target = hitTest(x, y) ?: run {
+        capturing?.let { held ->
+            // While a button is held on a widget, other buttons don't take its press away.
+            if (button != captureButton) return true
+            // The same button pressed again: its release was lost (let go outside the window). Start afresh.
+            capturing = null
+            held.pointerLostTree()
+        }
+        val target = widgetAt(x, y) ?: run {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) focus(null)
             return false
         }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && target !is Overlay) focus(target.takeIf { it.focusable })
         var w: Widget? = target
         while (w != null && w !is Root) {
-            if (w.mousePressed(x - w.toViewportX(0f), y - w.toViewportY(0f), button)) {
-                capturing = w
-                captureButton = button
-                return true
-            }
+            // Set before the call: a press that navigates hides the screen, which must find the capture to drop.
+            capturing = w
+            captureButton = button
+            if (w.mousePressed(x - w.toViewportX(0f), y - w.toViewportY(0f), button)) return true
+            if (capturing === w) capturing = null
             w = w.parent
         }
         return true
@@ -279,12 +354,13 @@ abstract class KitScreen : AppScreen() {
     final override fun mouseDragged(x: Float, y: Float, button: Int, dragX: Float, dragY: Float): Boolean {
         moveMouse(x, y)
         val w = capturing ?: return false
+        if (button != captureButton) return false
         return w.mouseDragged(x - w.toViewportX(0f), y - w.toViewportY(0f), button, dragX, dragY)
     }
 
     final override fun mouseScrolled(x: Float, y: Float, scrollX: Float, scrollY: Float): Boolean {
         moveMouse(x, y)
-        var w: Widget? = hitTest(x, y)
+        var w: Widget? = widgetAt(x, y)
         while (w != null && w !is Root) {
             if (w.mouseScrolled(x - w.toViewportX(0f), y - w.toViewportY(0f), scrollY)) return true
             w = w.parent
@@ -293,6 +369,7 @@ abstract class KitScreen : AppScreen() {
     }
 
     final override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        val overlayOpen = menu != null || isDialogOpen
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (menu != null) {
                 closeMenu()
@@ -305,14 +382,20 @@ abstract class KitScreen : AppScreen() {
         }
         if (keyCode == GLFW.GLFW_KEY_TAB) {
             focus(FocusOrder.next(focusOrder(), focused, backwards = modifiers and GLFW.GLFW_MOD_SHIFT != 0), visible = true)
+            revealFocused()
             return true
         }
-        var w: Widget? = focused?.takeIf { it.enabled && it.isShowing }
+        var w: Widget? = focused?.takeIf { it.isEnabled && it.isShowing }
         while (w != null && w !is Root) {
             if (w.keyPressed(keyCode, scanCode, modifiers)) return true
             w = w.parent
         }
-        if (isDialogOpen) return false
+        if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
+            // Under a menu or dialog nothing goes back: the dialog may be waiting for the server on this screen.
+            if (overlayOpen) return true
+            return onBack()
+        }
+        if (overlayOpen) return false
         return onKey(keyCode, scanCode, modifiers)
     }
 
@@ -331,12 +414,12 @@ abstract class KitScreen : AppScreen() {
             else -> codePoint.code
         }
         pendingHighSurrogate = null
-        val w = focused?.takeIf { it.enabled && it.isShowing } ?: return false
+        val w = focused?.takeIf { it.isEnabled && it.isShowing } ?: return false
         return w.charTyped(code, modifiers)
     }
 
     final override val hasTextFocus: Boolean
-        get() = focused?.let { it.acceptsText && it.enabled && it.isShowing } == true
+        get() = focused?.let { it.acceptsText && it.isEnabled && it.isShowing } == true
 
     // ---- Internals ----
 
@@ -345,13 +428,14 @@ abstract class KitScreen : AppScreen() {
         mouseY = y
     }
 
-    private fun hitTest(x: Float, y: Float): Widget? {
+    /** The topmost widget catching the pointer at ([x], [y]) in viewport dp: overlays, then floating, then content. */
+    fun widgetAt(x: Float, y: Float): Widget? {
         if (x < 0f || y < 0f || x >= AppCanvas.WIDTH || y >= AppCanvas.HEIGHT) return null
-        return overlays.hitTest(x, y) ?: content.hitTest(x, y)
+        return overlays.hitTest(x, y) ?: floating.hitTest(x, y) ?: content.hitTest(x, y)
     }
 
     private fun updateHover() {
-        val target = hitTest(mouseX, mouseY)
+        val target = widgetAt(mouseX, mouseY)
         if (target !== hovered) {
             hovered = target
             hoverStart = now
@@ -372,6 +456,25 @@ abstract class KitScreen : AppScreen() {
         lines.forEachIndexed { i, line ->
             canvas.drawText(line, box.x + Placement.TOOLTIP_PAD_X, box.y + Placement.TOOLTIP_PAD_Y + i * TextStyle.CAPTION.lineHeight, TextStyle.CAPTION, Colors.TEXT_1)
         }
+    }
+
+    // A snackbar outlives its screen within the app: handed over through the app's session when the screen is hidden.
+    private fun saveSnackbar() {
+        val session = host?.session ?: return
+        val s = snackbar?.takeIf { it.isShowing(now) }
+        if (s == null) handedOver.remove(session) else handedOver[session] = s.saved(now)
+        dismissSnackbar()
+    }
+
+    private fun restoreSnackbar() {
+        val session = host?.session ?: return
+        val saved = handedOver.remove(session) ?: return
+        dismissSnackbar()
+        snackbar = overlays.add(0, Snackbar.restore(saved, now))
+    }
+
+    private companion object {
+        val handedOver = WeakHashMap<Any, Snackbar.Saved>()
     }
 }
 

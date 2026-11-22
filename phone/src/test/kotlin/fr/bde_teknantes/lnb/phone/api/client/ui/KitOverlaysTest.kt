@@ -51,7 +51,7 @@ class KitOverlaysTest {
                 more,
                 listOf(
                     MenuItem("Copier") { ran += "copy"; menuOpenWhenRun = screen.isMenuOpen },
-                    MenuItem("Supprimer", destructive = true) { ran += "delete" },
+                    MenuItem("Supprimer") { ran += "delete" }.apply { destructive = true },
                 ),
             )
             screen.frame()
@@ -132,7 +132,12 @@ class KitOverlaysTest {
         @BeforeEach
         fun open() {
             behind = screen.add(Counter().at(0f, 0f, 256f, 370f))
-            dialog = Dialog("Supprimer ce post ?", "C'est définitif.", "Annuler", "Supprimer", danger = true, onCancel = { cancels++ }) { confirms++ }
+            dialog = Dialog("Supprimer ce post ?", "Annuler", "Supprimer").apply {
+                text = "C'est définitif."
+                danger = true
+                onCancel = { cancels++ }
+                onConfirm = { confirms++ }
+            }
             screen.showDialog(dialog)
             screen.frame()
         }
@@ -160,6 +165,7 @@ class KitOverlaysTest {
 
         @Test
         fun `a click on the scrim cancels`() {
+            screen.advance(150f)
             screen.click(128f, 20f)
             assertEquals(1, cancels)
             assertFalse(screen.isDialogOpen)
@@ -206,14 +212,21 @@ class KitOverlaysTest {
         }
 
         @Test
-        fun `a closed dialog fades for 100 ms, then leaves and lets clicks through`() {
+        fun `a closed dialog fades for 100 ms, catching clicks, then leaves and lets them through`() {
             dialog.cancel()
             screen.advance(50f)
             screen.click(128f, 20f)
-            assertEquals(1, behind.clicks, "a closing dialog no longer catches the pointer")
+            assertEquals(0, behind.clicks, "the second click of a double click must not reach what is behind")
             screen.advance(50f)
             screen.click(128f, 20f)
-            assertEquals(2, behind.clicks)
+            assertEquals(1, behind.clicks)
+        }
+
+        @Test
+        fun `a press on the scrim in its first 150 ms is the end of a double click`() {
+            screen.click(128f, 20f)
+            assertEquals(0, cancels)
+            assertTrue(screen.isDialogOpen)
         }
 
         @Test
@@ -237,7 +250,7 @@ class KitOverlaysTest {
             screen.advance(100f)
             val field = screen.add(TextField().at(0f, 0f))
             screen.focus(field)
-            screen.showDialog(Dialog("T", "", "Annuler", "OK") {})
+            screen.showDialog(Dialog("T", "Annuler", "OK").apply { onConfirm = {} })
             assertNull(screen.focused)
             assertFalse(screen.hasTextFocus)
             screen.type("x")
@@ -284,7 +297,7 @@ class KitOverlaysTest {
 
         @Test
         fun `with an action it holds 6 seconds`() {
-            screen.showSnackbar("Échec de l'envoi", SnackbarAction("Réessayer") {}, error = true)
+            screen.showErrorSnackbar("Échec de l'envoi", SnackbarAction("Réessayer") {})
             screen.advance(6250f)
             assertTrue(showing("Échec de l'envoi"))
             screen.advance(50f)

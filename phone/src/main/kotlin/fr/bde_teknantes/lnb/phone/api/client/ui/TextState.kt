@@ -1,5 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
+import fr.bde_teknantes.lnb.phone.api.TextLimits
+
 /**
  * The content of a [TextField] or [TextArea]: the text, the caret and the selection, with the editing operations.
  *
@@ -9,19 +11,29 @@ package fr.bde_teknantes.lnb.phone.api.client.ui
  *
  * ```kotlin
  * object Drafts { val post = TextState() }
- * TextArea(Drafts.post, placeholder = "What's new?", limit = 280)
+ * TextArea(Drafts.post).apply { placeholder = "What's new?"; limit = 280 }
  * ```
  *
  * Positions are indexes into [text] (UTF-16 units, as everywhere in Kotlin), always on a character boundary: an emoji
  * outside the basic plane is never split. Characters that can't be typed are filtered out of what is inserted (control
- * characters, the section sign Minecraft uses for formatting; line feeds unless [multiline]). Plain logic: no game
- * classes, usable in tests.
+ * characters, the section sign Minecraft uses for formatting; line feeds unless [multiline]), and the text is kept in
+ * Unicode normalisation form C, so a pasted `e` plus combining accent becomes the one character `é`, drawn and counted
+ * as such ([TextLimits]). Plain logic: no game classes, usable in tests.
  *
  * @param multiline Whether line feeds are kept (a text area) or turned into spaces (a single-line field).
  * @param maxLength The most characters (code points) the text can hold; what would go past is cut. Separate from a
  * text area's visible limit, which may be exceeded and is then marked.
  */
-class TextState(initial: String = "", val multiline: Boolean = true, val maxLength: Int = DEFAULT_MAX_LENGTH) {
+class TextState(initial: String, val multiline: Boolean, val maxLength: Int) {
+    /** An empty multi-line text. */
+    constructor() : this("", true, DEFAULT_MAX_LENGTH)
+
+    /** A multi-line text starting as [initial]. */
+    constructor(initial: String) : this(initial, true, DEFAULT_MAX_LENGTH)
+
+    /** A text starting as [initial], on one line unless [multiline]. */
+    constructor(initial: String, multiline: Boolean) : this(initial, multiline, DEFAULT_MAX_LENGTH)
+
     private var content = ""
     private val listeners = ArrayList<(TextState) -> Unit>()
 
@@ -39,7 +51,7 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
 
     init {
         require(maxLength > 0) { "maxLength must be positive" }
-        content = clean(initial, replacedLength = 0)
+        content = TextLimits.normalize(clean(initial, replacedLength = 0))
         caret = content.length
         anchor = caret
     }
@@ -48,7 +60,7 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
     var text: String
         get() = content
         set(value) {
-            val cleaned = clean(value, replacedLength = length)
+            val cleaned = TextLimits.normalize(clean(value, replacedLength = length))
             replaceAll(cleaned, cleaned.length)
         }
 
@@ -57,7 +69,10 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
     val hasSelection: Boolean get() = caret != anchor
     val selectedText: String get() = content.substring(selectionStart, selectionEnd)
 
-    /** Number of characters as a player counts them (code points: `é` is one, an emoji is one). */
+    /**
+     * Number of characters as limits count them ([TextLimits]): code points of the normalised text, which is how the
+     * text is stored, so `é` is one however it was typed or pasted, and an emoji is one.
+     */
     val length: Int get() = content.codePointCount(0, content.length)
 
     /** Whether the text is empty once spaces and line feeds are trimmed: nothing to send. */
@@ -85,11 +100,16 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
         val end = selectionEnd
         val cleaned = clean(typed, replacedLength = content.codePointCount(start, end))
         if (cleaned.isEmpty() && start == end) return
-        replaceAll(content.substring(0, start) + cleaned + content.substring(end), start + cleaned.length)
+        // Normalised with what is around it: a combining accent typed after its letter becomes one character.
+        val before = TextLimits.normalize(content.substring(0, start) + cleaned)
+        replaceAll(TextLimits.normalize(before + content.substring(end)), before.length)
     }
 
     /** Backspace: deletes the selection, or the character (with [word], the word) before the caret. */
-    fun deleteBackward(word: Boolean = false) {
+    fun deleteBackward() = deleteBackward(word = false)
+
+    /** Backspace with Ctrl when [word]: the word before the caret. */
+    fun deleteBackward(word: Boolean) {
         if (hasSelection) return insert("")
         if (caret == 0) return
         val start = if (word) previousWord(caret) else previous(caret)
@@ -97,7 +117,10 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
     }
 
     /** Delete: deletes the selection, or the character (with [word], the word) after the caret. */
-    fun deleteForward(word: Boolean = false) {
+    fun deleteForward() = deleteForward(word = false)
+
+    /** Delete with Ctrl when [word]: the word after the caret. */
+    fun deleteForward(word: Boolean) {
         if (hasSelection) return insert("")
         if (caret == content.length) return
         val end = if (word) nextWord(caret) else next(caret)
@@ -107,19 +130,28 @@ class TextState(initial: String = "", val multiline: Boolean = true, val maxLeng
     // ---- Caret and selection ----
 
     /** Moves the caret to [index] (snapped to a character boundary); with [select], extends the selection. */
-    fun moveTo(index: Int, select: Boolean = false) {
+    fun moveTo(index: Int) = moveTo(index, select = false)
+
+    /** [moveTo], extending the selection when [select]. */
+    fun moveTo(index: Int, select: Boolean) {
         caret = boundary(index.coerceIn(0, content.length))
         if (!select) anchor = caret
     }
 
     /** Left arrow: one character, or one word with [word]. Without [select], a selection collapses to its start. */
-    fun moveLeft(select: Boolean = false, word: Boolean = false) {
+    fun moveLeft() = moveLeft(select = false, word = false)
+
+    /** [moveLeft] with Shift ([select]) and Ctrl ([word]). */
+    fun moveLeft(select: Boolean, word: Boolean) {
         if (hasSelection && !select) return moveTo(selectionStart)
         moveTo(if (word) previousWord(caret) else previous(caret), select)
     }
 
     /** Right arrow: one character, or one word with [word]. Without [select], a selection collapses to its end. */
-    fun moveRight(select: Boolean = false, word: Boolean = false) {
+    fun moveRight() = moveRight(select = false, word = false)
+
+    /** [moveRight] with Shift ([select]) and Ctrl ([word]). */
+    fun moveRight(select: Boolean, word: Boolean) {
         if (hasSelection && !select) return moveTo(selectionEnd)
         moveTo(if (word) nextWord(caret) else next(caret), select)
     }

@@ -10,8 +10,10 @@ import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
  * once holds everywhere.
  *
  * The [AppCanvas][fr.bde_teknantes.lnb.phone.api.client.AppCanvas] you draw on is one; outside drawing (to lay out a
- * list when data arrives, to hit-test a click) use [TextMetrics]. Code that lays text out can take a [TextMeasurer]
- * so that a test can hand it a fake one.
+ * list when data arrives, to hit-test a click) use [TextMetrics]. Code that lays text out can take a [TextMeasurer].
+ *
+ * Don't implement it in an app, not even for tests: later versions of the phone may add methods to it, which would
+ * break your class. Lay text out through [TextMetrics] in the game, and keep what you test free of measuring.
  */
 interface TextMeasurer {
     /** Width of [text] on one line in [style], in dp. */

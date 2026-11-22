@@ -24,8 +24,11 @@ class ComposeSessionTest {
 
     private class Compose(draft: TextState) : TestScreen() {
         val posted = ArrayList<String>()
-        val area = add(TextArea(draft, placeholder = "Quoi de neuf sur le serveur ?", limit = 280).at(12f, 96f, 232f, 196f))
-        val publish = add(Button("Publier", fixedWidth = 88f) { posted += area.text }.atRight(244f, 6f))
+        val area = add(TextArea(draft).apply {
+            placeholder = "Quoi de neuf sur le serveur ?"
+            limit = 280
+        }.at(12f, 96f, 232f, 196f))
+        val publish = add(Button("Publier") { posted += area.text }.apply { fixedWidth = 88f }.atRight(244f, 6f))
 
         init {
             publish.enabled = CharacterCounter.canSend(draft.text, 280)
@@ -67,7 +70,8 @@ class ComposeSessionTest {
 
         // Type a sentence; the ê comes from a dead key: the key itself types nothing, the composed letter follows.
         s.type("Rendez-vous à l'ar")
-        assertFalse(s.key(GLFW_KEY_LEFT_BRACKET))
+        // The field keeps the dead key, so no shortcut of the screen and no other mod sees it.
+        assertTrue(s.key(GLFW_KEY_LEFT_BRACKET))
         assertEquals("Rendez-vous à l'ar", s.area.text)
         s.type("ène demain")
         assertEquals("Rendez-vous à l'arène demain", s.area.text)

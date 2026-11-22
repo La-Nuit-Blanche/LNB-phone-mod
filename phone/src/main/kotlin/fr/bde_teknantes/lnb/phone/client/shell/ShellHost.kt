@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator

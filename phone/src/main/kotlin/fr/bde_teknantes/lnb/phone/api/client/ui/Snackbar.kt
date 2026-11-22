@@ -16,16 +16,16 @@ class SnackbarAction(val label: String, val onClick: () -> Unit)
  */
 internal class Snackbar(
     private val text: String,
-    action: SnackbarAction?,
+    private val action: SnackbarAction?,
     private val error: Boolean,
     private val shownAt: Float,
     private val slideIn: Boolean,
 ) : Widget() {
     private val actionButton = action?.let { a ->
-        add(Button(a.label, Button.Kind.TEXT) {
+        add(Button(a.label) {
             fadeFrom = now
             a.onClick()
-        })
+        }.apply { kind = Button.Kind.TEXT })
     }
     private val inEnd = shownAt + if (slideIn) Motion.SHORT_MS else 0f
     private val holdEnd = inEnd + if (action != null) HOLD_WITH_ACTION_MS else HOLD_MS
@@ -77,8 +77,21 @@ internal class Snackbar(
         canvas.popAlpha()
     }
 
-    private companion object {
+    /** What a snackbar is, with where it is in its timeline: handed from a screen to the next. */
+    class Saved(val text: String, val action: SnackbarAction?, val error: Boolean, val elapsed: Float, val fadeAfter: Float)
+
+    fun saved(now: Float) = Saved(text, action, error, now - shownAt, fadeFrom - shownAt)
+
+    companion object {
         const val HOLD_MS = 3000f
         const val HOLD_WITH_ACTION_MS = 6000f
+
+        /** The snackbar [saved] described, carrying on from where it was at [now]. */
+        fun restore(saved: Saved, now: Float): Snackbar {
+            val shownAt = now - saved.elapsed
+            return Snackbar(saved.text, saved.action, saved.error, shownAt, slideIn = saved.elapsed < Motion.SHORT_MS).also {
+                it.fadeFrom = shownAt + saved.fadeAfter
+            }
+        }
     }
 }

@@ -21,7 +21,7 @@ class TextStateTest {
 
     @Test
     fun `filters what can't be typed`() {
-        val single = TextState(multiline = false)
+        val single = TextState("", false)
         single.insert("a\u0007b§c\r\nd\te")
         assertEquals("abc d e", single.text)
         val area = TextState()
@@ -43,12 +43,12 @@ class TextStateTest {
     @Test
     fun `moves and deletes by words`() {
         val s = TextState("Premier arrivé, premier servi")
-        s.moveLeft(word = true)
+        s.moveLeft(false, true)
         assertEquals("Premier arrivé, premier ".length, s.caret)
         s.deleteBackward(word = true)
         assertEquals("Premier arrivé, servi", s.text)
         s.moveTo(0)
-        s.moveRight(word = true)
+        s.moveRight(false, true)
         assertEquals("Premier ".length, s.caret)
     }
 
@@ -64,7 +64,7 @@ class TextStateTest {
 
     @Test
     fun `keeps to the maximum length`() {
-        val s = TextState(maxLength = 5)
+        val s = TextState("", true, 5)
         s.insert("abcdefgh")
         assertEquals("abcde", s.text)
         s.selectAll()

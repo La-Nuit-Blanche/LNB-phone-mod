@@ -3,24 +3,28 @@ package fr.bde_teknantes.lnb.phone.api.client.ui
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
 
 /**
- * A pill button, 32 dp tall, its label centred (art direction 8.7).
+ * A pill button, 32 dp tall, its label centred (art direction 8.7). A [Kind.PRIMARY] button unless told otherwise.
  *
  * Give buttons that sit in a fixed layout a [fixedWidth] wide enough for the longer of the English and French labels
  * (art direction 13.3); without one, the button is as wide as its label plus padding (at least 64 dp, except
  * [Kind.TEXT]). [loading] swaps the label for a spinner and makes the button unclickable while keeping its width.
+ * A button whose width follows its label keeps its left edge when the label changes; a [Header] places its trailing
+ * button again by its right edge.
  *
  * ```kotlin
- * val publish = Button(tr("compose.post"), fixedWidth = 88f) { send() }
- * publish.enabled = CharacterCounter.canSend(draft.text, 280)
+ * val publish = Button(tr("compose.post")) { send() }.apply { fixedWidth = 88f }
+ * publish.enabled = TextLimits.canSend(draft.text, 280)
  * ```
  */
-class Button(
-    label: String,
-    val kind: Kind = Kind.PRIMARY,
-    private val fixedWidth: Float? = null,
-    onClick: (() -> Unit)? = null,
-) : Clickable(onClick) {
-    /** The four looks of buttons. */
+class Button(label: String) : Clickable() {
+    /** A button that runs [onClick] when clicked. */
+    constructor(label: String, onClick: () -> Unit) : this(label) {
+        this.onClick = onClick
+    }
+
+    /**
+     * The looks of buttons. More may be added in later versions of the phone: a `when` over it needs an `else` branch.
+     */
     enum class Kind {
         /** Filled with the accent: the main action of a screen. */
         PRIMARY,
@@ -35,10 +39,24 @@ class Button(
         TEXT,
     }
 
+    /** The look. */
+    var kind: Kind = Kind.PRIMARY
+        set(value) {
+            field = value
+            resize()
+        }
+
     var label: String = label
         set(value) {
             field = value
-            if (fixedWidth == null) setBounds(x, y, preferredWidth, height)
+            resize()
+        }
+
+    /** A width that doesn't follow the label, in dp; null to follow it. */
+    var fixedWidth: Float? = null
+        set(value) {
+            field = value
+            resize()
         }
 
     /**
@@ -47,7 +65,11 @@ class Button(
      */
     var loading = false
 
-    private val spinner = Spinner(16f)
+    private val spinner = Spinner().apply { size = 16f }
+
+    private fun resize() {
+        if (width > 0f) setBounds(x, y, preferredWidth, height)
+    }
 
     override val preferredWidth: Float
         get() = fixedWidth ?: run {
@@ -71,14 +93,13 @@ class Button(
         val (fill, border, text) = colors(look)
         if (fill != 0) canvas.fillRoundRect(0f, 0f, width, height, Radius.FULL, fill)
         if (border != 0) canvas.strokeRoundRect(0f, 0f, width, height, Radius.FULL, 1f, border)
-        if (showsFocusRing) focusRing(canvas, width, height)
+        if (showsFocusRing) KitDrawing.focusRing(canvas, 0f, 0f, width, height, Radius.FULL)
         if (loading && !disabled) {
             val color = if (kind == Kind.PRIMARY || kind == Kind.DANGER) Colors.ON_ACCENT else Colors.ACCENT
             spinner.paint(canvas, (width - 16f) / 2f, (height - 16f) / 2f, color, now)
         } else {
             // A label too long for a fixed width keeps 8 dp from the edges and ends with an ellipsis.
-            val maxWidth = width - 16f
-            val shown = canvas.truncate(label, TextStyle.LABEL, maxWidth)
+            val shown = canvas.truncate(label, TextStyle.LABEL, width - 16f)
             canvas.drawTextCentered(shown, width / 2f, (height - TextStyle.LABEL.lineHeight) / 2f, TextStyle.LABEL, text)
         }
     }
@@ -116,12 +137,7 @@ class Button(
     }
 
     companion object {
-        const val HEIGHT = 32f
-        const val MIN_WIDTH = 64f
+        val HEIGHT = 32f
+        val MIN_WIDTH = 64f
     }
-}
-
-/** The keyboard focus ring around a pill-shaped widget of [w] x [h]: 2 dp of [Colors.FOCUS_RING], 2 dp outside it. */
-internal fun focusRing(canvas: AppCanvas, w: Float, h: Float, radius: Float = Radius.FULL) {
-    canvas.strokeRoundRect(-4f, -4f, w + 8f, h + 8f, if (radius >= Radius.FULL) Radius.FULL else radius + 4f, 2f, Colors.FOCUS_RING)
 }

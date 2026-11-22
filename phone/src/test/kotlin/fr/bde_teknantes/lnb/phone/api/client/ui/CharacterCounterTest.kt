@@ -65,11 +65,11 @@ class CharacterCounterTest {
     }
 
     @Test
-    fun `accents count one when precomposed, two when decomposed`() {
-        // What a "character" is isn't written in the art direction; the code counts code points. A decomposed é
-        // (pasted from some systems) looks like one character and counts two.
+    fun `an accent counts one, precomposed or decomposed`() {
+        // A character is a code point after NFC normalisation (TextLimits): a decomposed é (pasted from some systems)
+        // looks like one character and counts one, on the client and on an app's server alike.
         assertEquals(1, CharacterCounter.count("é"))
-        assertEquals(2, CharacterCounter.count("é"))
+        assertEquals(1, CharacterCounter.count("é"))
         // A flag is two code points, a family emoji five.
         assertEquals(2, CharacterCounter.count("🇫🇷"))
         assertEquals(5, CharacterCounter.count("👨‍👩‍👧"))

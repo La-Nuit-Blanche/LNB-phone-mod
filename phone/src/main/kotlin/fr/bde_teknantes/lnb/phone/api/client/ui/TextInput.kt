@@ -7,21 +7,35 @@ import fr.bde_teknantes.lnb.phone.client.ui.EditKey
 import fr.bde_teknantes.lnb.phone.client.ui.TextEnvironment
 import fr.bde_teknantes.lnb.phone.client.ui.TextKeys
 import org.lwjgl.glfw.GLFW
+import kotlin.math.abs
 
 /**
  * What [TextField] and [TextArea] share: the caret blinking 500 ms on, 500 ms off, selection with the mouse and Shift,
  * word moves with Ctrl (Alt on a Mac), the clipboard, double click to select a word, and the focus. Typed text arrives
- * whole, accents and dead keys included. While one has the focus, the screen's
- * [hasTextFocus][fr.bde_teknantes.lnb.phone.api.client.AppScreen.hasTextFocus] is true and the phone leaves Backspace and
- * its own key to it.
+ * whole, accents and dead keys included.
+ *
+ * While one has the focus, the screen's [hasTextFocus][fr.bde_teknantes.lnb.phone.api.client.AppScreen.hasTextFocus] is
+ * true and every key but Esc and Tab belongs to it, letters included: the phone leaves Backspace and its own key to it,
+ * and neither your screen's shortcuts nor other mods see what the player types.
  */
-sealed class TextInput(val state: TextState, var placeholder: String) : Widget() {
+sealed class TextInput(val state: TextState) : Widget() {
     private var lastActivity = 0f
     private var lastClickAt = Float.NEGATIVE_INFINITY
-    private var lastClickIndex = -1
+    private var lastClickX = 0f
+    private var lastClickY = 0f
     private var selecting = false
+    private var notifiedVersion = state.version
+    private var revealedVersion = -1
+    private var goalX: Float? = null
 
-    /** Called after each change the player makes to the text. */
+    /** Grey text shown while the field is empty. */
+    var placeholder: String = ""
+
+    /**
+     * Called after each change of the text: at once for the player's typing, by the next frame for changes made by
+     * code (a draft restored, a field cleared after sending). The widget asks; it never registers on the state, so a
+     * long-lived [TextState] keeps no reference to the screen.
+     */
     var onChange: ((TextState) -> Unit)? = null
 
     /** Called when the player submits: Enter in a field, Ctrl+Enter in a text area. */
@@ -31,17 +45,19 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
     var onFocusChange: ((Boolean) -> Unit)? = null
 
     /** Draws the focused look (border and a steady caret) without the focus: for galleries and screenshots. */
+    @KitPreview
     var showFocused = false
 
     /** Draws the hover look without the pointer: for galleries and screenshots. */
+    @KitPreview
     var showHovered = false
 
-    /** Whether the player can type in it now. */
-    protected open val editable: Boolean get() = enabled
+    /** Whether the text can be changed now (not while sending). */
+    protected open val editable: Boolean get() = isEnabled
 
     override val catchesPointer get() = true
-    override val focusable get() = editable
-    override val acceptsText get() = editable
+    override val focusable get() = isEnabled
+    override val acceptsText get() = isEnabled
 
     /** The text, as a shortcut for [state]'s. */
     var text: String
@@ -50,17 +66,24 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
             state.text = value
         }
 
+    @OptIn(KitPreview::class)
+    protected val looksFocused: Boolean get() = isFocused || showFocused
+
+    @OptIn(KitPreview::class)
+    protected val looksHovered: Boolean get() = isHovered || showHovered
+
     /** Whether the caret shows now: focused, editable, and in the "on" half of its blink (always on just after a key). */
+    @OptIn(KitPreview::class)
     protected val caretVisible: Boolean
         get() = (showFocused && editable) ||
             (isFocused && editable && ((now - lastActivity) % (2 * Motion.CARET_BLINK_MS)) < Motion.CARET_BLINK_MS)
 
     /** The border colour and thickness for the current state. */
     protected fun border(error: Boolean): Pair<Int, Float> = when {
-        !enabled -> Colors.HAIRLINE to 1f
+        !isEnabled -> Colors.HAIRLINE to 1f
         error -> Colors.DANGER to 2f
-        (isFocused || showFocused) && editable -> Colors.ACCENT to 2f
-        (isHovered || showHovered) && editable -> Colors.STROKE_HOVER to 1f
+        looksFocused && editable -> Colors.ACCENT to 2f
+        looksHovered && editable -> Colors.STROKE_HOVER to 1f
         else -> Colors.STROKE to 1f
     }
 
@@ -68,6 +91,18 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
         lastActivity = now
         if (!focused) selecting = false
         onFocusChange?.invoke(focused)
+    }
+
+    override fun update() {
+        // Changes made by code since the last frame (and the text the field opened with): the caret comes into view.
+        if (state.version != revealedVersion) {
+            revealedVersion = state.version
+            revealCaret()
+        }
+        if (state.version != notifiedVersion) {
+            notifiedVersion = state.version
+            onChange?.invoke(state)
+        }
     }
 
     // ---- Layout, by subclass ----
@@ -79,8 +114,11 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
     protected abstract fun lineStart(index: Int): Int
     protected abstract fun lineEnd(index: Int): Int
 
-    /** The index one line up ([lines] < 0) or down from [index], or null at the first or last line. */
-    protected abstract fun verticalMove(index: Int, lines: Int): Int?
+    /** Distance of [index] from the start of its line, in dp: the column Up and Down keep. */
+    protected abstract fun columnOf(index: Int): Float
+
+    /** The index one line up ([lines] < 0) or down from [index], nearest to column [x], or null past the first or last line. */
+    protected abstract fun verticalMove(index: Int, lines: Int, x: Float): Int?
 
     /** Scrolls so the caret is visible. */
     protected abstract fun revealCaret()
@@ -89,16 +127,19 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
 
     override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true
-        if (!editable) return true
+        if (!isEnabled) return true
         val index = indexAt(x, y)
-        val double = now - lastClickAt < DOUBLE_CLICK_MS && index == lastClickIndex
+        // A double click is two presses close in time and place; the caret may land a character apart.
+        val double = now - lastClickAt < DOUBLE_CLICK_MS && abs(x - lastClickX) <= DOUBLE_CLICK_DP && abs(y - lastClickY) <= DOUBLE_CLICK_DP
+        goalX = null
         if (double) {
             state.selectWordAt(index)
             lastClickAt = Float.NEGATIVE_INFINITY
         } else {
-            state.moveTo(index, select = modifierShift())
+            state.moveTo(index, select = TextEnvironment.current.shiftDown)
             lastClickAt = now
-            lastClickIndex = index
+            lastClickX = x
+            lastClickY = y
             selecting = true
         }
         lastActivity = now
@@ -106,7 +147,7 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
     }
 
     override fun mouseDragged(x: Float, y: Float, button: Int, dragX: Float, dragY: Float): Boolean {
-        if (!selecting || !editable) return false
+        if (!selecting || !isEnabled) return false
         state.moveTo(indexAt(x, y), select = true)
         revealCaret()
         lastActivity = now
@@ -118,22 +159,26 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
         return true
     }
 
-    override fun pointerLost() {
+    override fun kitPointerLost() {
         selecting = false
-        super.pointerLost()
     }
 
     override fun charTyped(codePoint: Int, modifiers: Int): Boolean {
-        if (!editable) return false
+        if (!isEnabled) return false
+        if (!editable) return true
         val before = state.version
+        goalX = null
         state.insert(String(Character.toChars(codePoint)))
         edited(before)
         return true
     }
 
     override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
-        if (!editable) return false
-        val key = TextKeys.read(keyCode, modifiers, state.multiline, TextEnvironment.current.mac) ?: return false
+        if (!isEnabled) return false
+        // Esc keeps its meaning (close the overlay or the phone) and Tab moves the focus; every other key is the
+        // field's, even one it doesn't use (a letter, which arrives through charTyped; a dead key; AltGr).
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_TAB) return false
+        val key = TextKeys.read(keyCode, modifiers, state.multiline, TextEnvironment.current.mac) ?: return true
         val before = state.version
         apply(key)
         edited(before)
@@ -142,11 +187,22 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
 
     private fun apply(key: EditKey) {
         val s = state
+        if (key.command != EditCommand.UP && key.command != EditCommand.DOWN) goalX = null
+        // While sending, the text stays as it is: moving, selecting and copying are all that work.
+        val changes = when (key.command) {
+            EditCommand.DELETE_BACKWARD, EditCommand.DELETE_FORWARD, EditCommand.CUT, EditCommand.PASTE,
+            EditCommand.NEWLINE, EditCommand.SUBMIT -> true
+            else -> false
+        }
+        if (changes && !editable) return
         when (key.command) {
             EditCommand.LEFT -> s.moveLeft(key.select, key.word)
             EditCommand.RIGHT -> s.moveRight(key.select, key.word)
-            EditCommand.UP -> s.moveTo(verticalMove(s.caret, -1) ?: 0, key.select)
-            EditCommand.DOWN -> s.moveTo(verticalMove(s.caret, 1) ?: s.text.length, key.select)
+            EditCommand.UP, EditCommand.DOWN -> {
+                val column = goalX ?: columnOf(s.caret).also { goalX = it }
+                val up = key.command == EditCommand.UP
+                s.moveTo(verticalMove(s.caret, if (up) -1 else 1, column) ?: if (up) 0 else s.text.length, key.select)
+            }
             EditCommand.LINE_START -> s.moveTo(lineStart(s.caret), key.select)
             EditCommand.LINE_END -> s.moveTo(lineEnd(s.caret), key.select)
             EditCommand.TEXT_START -> s.moveTo(0, key.select)
@@ -168,7 +224,11 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
     private fun edited(versionBefore: Int) {
         lastActivity = now
         revealCaret()
-        if (state.version != versionBefore) onChange?.invoke(state)
+        revealedVersion = state.version
+        if (state.version != versionBefore) {
+            notifiedVersion = state.version
+            onChange?.invoke(state)
+        }
     }
 
     private var clipboard: String
@@ -177,13 +237,11 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
             TextEnvironment.current.clipboard = value
         }
 
-    private fun modifierShift(): Boolean = TextEnvironment.current.shiftDown
-
     // ---- Drawing helpers ----
 
     /** Draws the selection behind `text[start, end)` of a line drawn from [x], [y]. */
     protected fun drawSelection(canvas: AppCanvas, line: String, lineStart: Int, lineEnd: Int, x: Float, y: Float) {
-        if (!state.hasSelection || !(isFocused || showFocused)) return
+        if (!state.hasSelection || !looksFocused) return
         val from = state.selectionStart.coerceIn(lineStart, lineEnd)
         val to = state.selectionEnd.coerceIn(lineStart, lineEnd)
         if (from >= to) return
@@ -199,23 +257,28 @@ sealed class TextInput(val state: TextState, var placeholder: String) : Widget()
 
     /** Where the placeholder starts: after the caret while it is focused, so the caret never covers its first letter. */
     protected val placeholderX: Float
-        get() = if ((isFocused || showFocused) && editable) PADDING + CARET_WIDTH + CARET_GAP else PADDING
+        get() = if (looksFocused && editable) PADDING + CARET_WIDTH + CARET_GAP else PADDING
 
     protected companion object {
         const val PADDING = 12f
         const val CARET_WIDTH = 2f
         const val CARET_GAP = 1f
         const val DOUBLE_CLICK_MS = 400f
+        const val DOUBLE_CLICK_DP = 4f
     }
 }
 
 /**
- * A single-line text field (art direction 8.7): 40 dp tall, 232 wide by default, the placeholder in grey until
+ * A single-line text field (art direction 8.7): 40 dp tall, 232 wide by default, the [placeholder] in grey until
  * something is typed. Enter calls [onSubmit]. With [error] set, a red border and the message under the field.
  *
- * @param state What is typed; pass a [TextState] of your own (single line: `TextState(multiline = false)`) to keep it.
+ * Without a state of its own, it creates a single-line one; pass a [TextState] of yours (`TextState("", false)`)
+ * to keep what is typed.
  */
-class TextField(state: TextState = TextState(multiline = false), placeholder: String = "") : TextInput(state, placeholder) {
+class TextField(state: TextState) : TextInput(state) {
+    /** A field with a text of its own. */
+    constructor() : this(TextState("", false))
+
     private var scrollX = 0f
 
     /** An error message shown in red under the field (4 dp below it), with a red border; null for none. */
@@ -233,7 +296,8 @@ class TextField(state: TextState = TextState(multiline = false), placeholder: St
 
     override fun lineStart(index: Int) = 0
     override fun lineEnd(index: Int) = text.length
-    override fun verticalMove(index: Int, lines: Int): Int? = null
+    override fun columnOf(index: Int) = TextMetrics.measure(text.substring(0, index), TextStyle.BODY)
+    override fun verticalMove(index: Int, lines: Int, x: Float): Int? = null
 
     override fun revealCaret() {
         val caretX = TextMetrics.measure(text.substring(0, state.caret), TextStyle.BODY)
@@ -248,7 +312,7 @@ class TextField(state: TextState = TextState(multiline = false), placeholder: St
 
     override fun render(canvas: AppCanvas) {
         val (borderColor, thickness) = border(error != null)
-        canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, if (enabled) Colors.FIELD else Colors.BG)
+        canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, if (isEnabled) Colors.FIELD else Colors.BG)
         canvas.strokeRoundRect(0f, 0f, width, height, Radius.SMALL, thickness, borderColor)
         val y = (height - TextStyle.BODY.lineHeight) / 2f
         canvas.pushClip(PADDING - CARET_WIDTH, 0f, innerWidth + 2 * CARET_WIDTH, height)
@@ -258,7 +322,7 @@ class TextField(state: TextState = TextState(multiline = false), placeholder: St
         } else {
             val x = PADDING - scrollX
             drawSelection(canvas, text, 0, text.length, x, y)
-            canvas.drawText(text, x, y, TextStyle.BODY, if (enabled) Colors.TEXT_1 else Colors.TEXT_3)
+            canvas.drawText(text, x, y, TextStyle.BODY, if (isEnabled) Colors.TEXT_1 else Colors.TEXT_3)
             drawCaret(canvas, x + canvas.measure(text.substring(0, state.caret), TextStyle.BODY), y)
         }
         canvas.popClip()
@@ -272,21 +336,28 @@ class TextField(state: TextState = TextState(multiline = false), placeholder: St
  * red past the limit) and the characters past the limit get a red background. Enter starts a new line; Ctrl+Enter
  * calls [onSubmit].
  *
- * Whether the text can be sent is [CharacterCounter.canSend]: enable your send button with it in [onChange].
+ * Whether the text can be sent is [TextLimits.canSend][fr.bde_teknantes.lnb.phone.api.TextLimits.canSend]: enable your
+ * send button with it in [onChange]. Send the text trimmed.
  *
- * @param state What is typed; pass a [TextState] kept by your app to keep a draft.
- * @param limit The number of characters allowed, shown by the counter; null for no counter.
+ * Without a state of its own, it creates one; pass a [TextState] kept by your app to keep a draft.
  */
-class TextArea(state: TextState = TextState(), placeholder: String = "", val limit: Int? = null) : TextInput(state, placeholder) {
+class TextArea(state: TextState) : TextInput(state) {
+    /** A text area with a text of its own. */
+    constructor() : this(TextState())
+
     private var scrollY = 0f
 
+    /** The number of characters allowed, shown by the counter; null for no counter. */
+    var limit: Int? = null
+
     /**
-     * The sending state: the text turns grey, the caret goes and nothing can be typed, while what was typed is on its
-     * way. The field keeps the focus and gets the caret back when set to false.
+     * The sending state: the text turns grey and the caret goes, while what was typed is on its way. The field keeps
+     * the focus and its keys (so Backspace never leaves the screen), but the text can't change; it gets the caret back
+     * when set to false.
      */
     var sending = false
 
-    override val editable get() = enabled && !sending
+    override val editable get() = isEnabled && !sending
 
     override val preferredWidth get() = 232f
     override val preferredHeight get() = 112f
@@ -313,12 +384,16 @@ class TextArea(state: TextState = TextState(), placeholder: String = "", val lim
         return lines[TextLayout.lineOf(lines, index)].end
     }
 
-    override fun verticalMove(index: Int, lines: Int): Int? {
+    override fun columnOf(index: Int): Float {
+        val lines = lines()
+        val line = lines[TextLayout.lineOf(lines, index)]
+        return TextMetrics.measure(text.substring(line.start, index.coerceIn(line.start, line.end)), TextStyle.BODY)
+    }
+
+    override fun verticalMove(index: Int, lines: Int, x: Float): Int? {
         val all = lines()
-        val n = TextLayout.lineOf(all, index)
-        val target = n + lines
+        val target = TextLayout.lineOf(all, index) + lines
         if (target !in all.indices) return null
-        val x = TextMetrics.measure(text.substring(all[n].start, index), TextStyle.BODY)
         return TextLayout.indexAt(text, all[target], x, TextMetrics.font(TextStyle.BODY), TextStyle.BODY.size)
     }
 
@@ -348,16 +423,9 @@ class TextArea(state: TextState = TextState(), placeholder: String = "", val lim
         return true
     }
 
-    private var seenVersion = -1
-
     override fun render(canvas: AppCanvas) {
-        // Text set by code (a draft restored, a limit test) moves the caret too: keep it in view as typing does.
-        if (state.version != seenVersion) {
-            seenVersion = state.version
-            revealCaret()
-        }
         val (borderColor, thickness) = if (sending) Colors.STROKE to 1f else border(false)
-        canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, if (enabled) Colors.FIELD else Colors.BG)
+        canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, if (isEnabled) Colors.FIELD else Colors.BG)
         canvas.strokeRoundRect(0f, 0f, width, height, Radius.SMALL, thickness, borderColor)
 
         val lines = lines()
@@ -370,7 +438,7 @@ class TextArea(state: TextState = TextState(), placeholder: String = "", val lim
         } else {
             val overflow = limit?.let { CharacterCounter.overflowStart(text, it) }
             val color = when {
-                !enabled -> Colors.TEXT_3
+                !isEnabled -> Colors.TEXT_3
                 sending -> Colors.TEXT_2
                 else -> Colors.TEXT_1
             }

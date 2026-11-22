@@ -10,32 +10,42 @@ import fr.bde_teknantes.lnb.phone.client.ui.Placement
  *
  * Confirming puts the confirm button in its loading state and calls [onConfirm] with the dialog; call [close] when the
  * action is over (the server answered, whatever it said), and the dialog fades out. Call it at once for an action
- * that has nothing to wait for. While it loads, the dialog can't be cancelled. Cancel, Esc and a click on the dark
- * area call [onCancel] and close it.
+ * that has nothing to wait for (without [onConfirm], confirming just closes). While it loads, the dialog can't be
+ * cancelled. Cancel, Esc and a click on the dark area call [onCancel] and close it.
  *
  * ```kotlin
- * showDialog(Dialog(
- *     title = tr("dialog.delete_post.title"), text = tr("dialog.delete_post.text"),
- *     cancelLabel = tr("dialog.cancel"), confirmLabel = tr("dialog.delete.confirm"), danger = true,
- * ) { dialog -> server.delete(post) { ok -> dialog.close(); if (!ok) showSnackbar(tr("snackbar.action_failed"), error = true) } })
+ * showDialog(Dialog(tr("dialog.delete_post.title"), tr("dialog.cancel"), tr("dialog.delete.confirm")).apply {
+ *     text = tr("dialog.delete_post.text")
+ *     danger = true
+ *     onConfirm = { dialog -> server.delete(post) { ok -> dialog.close(); if (!ok) showErrorSnackbar(tr("snackbar.action_failed")) } }
+ * })
  * ```
  *
  * @param title Up to 2 lines.
- * @param text Up to 3 lines, under the title; empty for none.
- * @param danger A red confirm button, for what can't be undone.
  */
-class Dialog(
-    val title: String,
-    val text: String,
-    cancelLabel: String,
-    confirmLabel: String,
-    danger: Boolean = false,
-    private val onCancel: () -> Unit = {},
-    private val onConfirm: (Dialog) -> Unit,
-) : Widget(), Overlay {
+class Dialog(val title: String, cancelLabel: String, confirmLabel: String) : Widget(), Overlay {
     private val card = add(Card())
-    private val cancel = card.add(Button(cancelLabel, Button.Kind.SECONDARY, Placement.DIALOG_CANCEL_WIDTH) { cancel() })
-    private val confirm = card.add(Button(confirmLabel, if (danger) Button.Kind.DANGER else Button.Kind.PRIMARY, Placement.DIALOG_CONFIRM_WIDTH) { confirm() })
+    private val cancelButton = card.add(Button(cancelLabel) { cancel() }.apply {
+        kind = Button.Kind.SECONDARY
+        fixedWidth = Placement.DIALOG_CANCEL_WIDTH
+    })
+    private val confirmButton = card.add(Button(confirmLabel) { confirm() }.apply { fixedWidth = Placement.DIALOG_CONFIRM_WIDTH })
+
+    /** Up to 3 lines under the title; empty for none. */
+    var text: String = ""
+
+    /** A red confirm button, for what can't be undone. */
+    var danger = false
+        set(value) {
+            field = value
+            confirmButton.kind = if (value) Button.Kind.DANGER else Button.Kind.PRIMARY
+        }
+
+    /** What confirming does; it must [close] the dialog when done. Null closes it at once. */
+    var onConfirm: ((Dialog) -> Unit)? = null
+
+    /** What cancelling does, before the dialog closes. */
+    var onCancel: (() -> Unit)? = null
 
     private var openedAt = 0f
     private var closedAt = Float.POSITIVE_INFINITY
@@ -44,13 +54,13 @@ class Dialog(
     val isOpen: Boolean get() = closedAt == Float.POSITIVE_INFINITY
 
     /** Whether the confirm button is waiting for [close]. */
-    val isLoading: Boolean get() = confirm.loading
+    val isLoading: Boolean get() = confirmButton.loading
 
     internal fun opened(now: Float) {
         openedAt = now
         closedAt = Float.POSITIVE_INFINITY
-        confirm.loading = false
-        cancel.enabled = true
+        confirmButton.loading = false
+        cancelButton.enabled = true
     }
 
     /** Whether the fade-out is over at [now]: the screen then takes the dialog away. */
@@ -60,46 +70,43 @@ class Dialog(
     fun close() {
         if (!isOpen) return
         closedAt = now
-        screen?.let { if (isInside(it.focused)) it.focus(null) }
+        screen?.let { if (contains(it.focused)) it.focus(null) }
     }
 
     /** What cancel, Esc and the dark area do: [onCancel], then [close]. Ignored while loading. */
     fun cancel() {
-        if (!isOpen || confirm.loading) return
+        if (!isOpen || confirmButton.loading) return
         close()
-        onCancel()
+        onCancel?.invoke()
     }
 
     /** What the confirm button does: its loading state, then [onConfirm]. Ignored while loading or closed. */
     fun confirm() {
-        if (!isOpen || confirm.loading) return
-        confirm.loading = true
-        cancel.enabled = false
-        onConfirm(this)
-    }
-
-    private fun isInside(w: Widget?): Boolean {
-        var p = w
-        while (p != null) {
-            if (p === this) return true
-            p = p.parent
-        }
-        return false
+        if (!isOpen || confirmButton.loading) return
+        val action = onConfirm ?: return close()
+        confirmButton.loading = true
+        cancelButton.enabled = false
+        action(this)
     }
 
     override val catchesPointer get() = true
 
     override fun mousePressed(x: Float, y: Float, button: Int): Boolean {
-        // The dark area around the card.
-        cancel()
+        // The dark area around the card. A press in the first 150 ms is the end of a double click that opened the
+        // dialog (on a menu item), not a wish to cancel it.
+        if (now - openedAt >= Motion.SHORT_MS) cancel()
         return true
     }
 
     override fun mouseScrolled(x: Float, y: Float, notches: Float): Boolean = true
 
-    override fun hitTest(localX: Float, localY: Float): Widget? = if (isOpen) super.hitTest(localX, localY) else null
+    // Until it is gone, the dialog keeps the pointer: a second click while it fades out must not reach what is behind.
+    override fun hitTest(localX: Float, localY: Float): Widget? {
+        if (isOpen) return super.hitTest(localX, localY)
+        return if (localX >= 0f && localY >= 0f && localX < width && localY < height) this else null
+    }
 
-    override fun layout() {
+    override fun update() {
         val inner = Placement.DIALOG_WIDTH - 2 * Placement.DIALOG_PADDING
         val titleLines = TextMetrics.wrap(title, TextStyle.TITLE_M, inner, Placement.DIALOG_MAX_TITLE_LINES)
         val textLines = if (text.isEmpty()) emptyList() else TextMetrics.wrap(text, TextStyle.BODY, inner, Placement.DIALOG_MAX_TEXT_LINES)
@@ -109,9 +116,11 @@ class Dialog(
         card.setBounds(Placement.DIALOG_X, Placement.dialogTop(h), Placement.DIALOG_WIDTH, h)
         val buttonsY = h - Placement.DIALOG_PADDING - 32f
         val right = Placement.DIALOG_WIDTH - Placement.DIALOG_PADDING
-        confirm.atRight(right, buttonsY)
-        cancel.atRight(right - Placement.DIALOG_CONFIRM_WIDTH - 8f, buttonsY)
+        confirmButton.atRight(right, buttonsY)
+        cancelButton.atRight(right - Placement.DIALOG_CONFIRM_WIDTH - 8f, buttonsY)
     }
+
+    override fun layout() = update()
 
     private fun alpha(): Float = if (isOpen) {
         ((now - openedAt) / Motion.SHORT_MS).coerceIn(0f, 1f)

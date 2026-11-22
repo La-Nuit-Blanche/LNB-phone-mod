@@ -55,7 +55,7 @@ class TextInputTest {
 
         @BeforeEach
         fun place() {
-            area = screen.add(TextArea(TextState(text), limit = 280).at(0f, 0f))
+            area = screen.add(TextArea(TextState(text)).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
         }
 
@@ -193,7 +193,7 @@ class TextInputTest {
     inner class TextAreaLines {
         @Test
         fun `a click in the empty line after a final line feed puts the caret there`() {
-            val area = screen.add(TextArea(TextState("abc\n"), limit = 280).at(0f, 0f))
+            val area = screen.add(TextArea(TextState("abc\n")).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             screen.clickAt(1, 5f)
             assertEquals(4, area.state.caret)
@@ -204,21 +204,21 @@ class TextInputTest {
         }
 
         @Test
-        fun `up and down don't remember the column across a short line`() {
-            // Undecided by the art direction; editors usually keep the column. Here the short line takes it.
-            val area = screen.add(TextArea(TextState("a".repeat(20) + "\nbb\n" + "c".repeat(20)), limit = 280).at(0f, 0f))
+        fun `up and down keep their column across a short line`() {
+            // As editors do: the short line puts the caret at its end, the next long line finds the column again.
+            val area = screen.add(TextArea(TextState("a".repeat(20) + "\nbb\n" + "c".repeat(20))).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             screen.clickAt(0, 15f)
             screen.key(GLFW_KEY_DOWN)
             assertEquals(23, area.state.caret)
             screen.key(GLFW_KEY_DOWN)
-            assertEquals(26, area.state.caret)
+            assertEquals(39, area.state.caret)
         }
 
         @Test
         fun `end on a line cut inside a long word draws the caret at the next line's start`() {
             // Reported: a caret at a mid-word cut belongs to the line below, so End on the first line jumps there.
-            val area = screen.add(TextArea(TextState("x".repeat(40)), limit = 280).at(0f, 0f))
+            val area = screen.add(TextArea(TextState("x".repeat(40))).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             screen.clickAt(0, 3f)
             screen.key(GLFW_KEY_END)
@@ -230,23 +230,26 @@ class TextInputTest {
         @Test
         fun `a long text scrolls to the caret, and the wheel scrolls it two lines a notch`() {
             val text = (0..9).joinToString("\n") { "l$it" }
-            val area = screen.add(TextArea(TextState(text), limit = 280).at(0f, 0f))
+            val area = screen.add(TextArea(TextState(text)).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             // The caret is at the end: line 9 shows last, so line 6 is at the top of the 4 visible.
             screen.clickAt(0, 0f)
             assertEquals(18, area.state.caret)
             assertTrue(screen.wheel(50f, 50f, 1f))
+            // Half a second apart, so the clicks at the same spot aren't a double click.
+            screen.advance(500f)
             screen.clickAt(0, 0f)
             assertEquals(12, area.state.caret)
             // At the top the wheel stays with the area.
             assertTrue(screen.wheel(50f, 50f, 10f))
+            screen.advance(500f)
             screen.clickAt(0, 0f)
             assertEquals(0, area.state.caret)
         }
 
         @Test
         fun `a short text leaves the wheel to what is under it`() {
-            screen.add(TextArea(TextState("court"), limit = 280).at(0f, 0f))
+            screen.add(TextArea(TextState("court")).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             assertFalse(screen.wheel(50f, 50f, -1f))
         }
@@ -254,7 +257,7 @@ class TextInputTest {
         @Test
         fun `moving the caret with the keys scrolls it into view`() {
             val text = (0..9).joinToString("\n") { "l$it" }
-            val area = screen.add(TextArea(TextState(text), limit = 280).at(0f, 0f))
+            val area = screen.add(TextArea(TextState(text)).apply { limit = 280 }.at(0f, 0f))
             screen.frame()
             screen.focus(area)
             screen.key(GLFW_KEY_HOME, CTRL)
@@ -272,7 +275,7 @@ class TextInputTest {
 
         @BeforeEach
         fun place() {
-            area = screen.add(TextArea(limit = 280).at(0f, 0f))
+            area = screen.add(TextArea().apply { limit = 280 }.at(0f, 0f))
             area.onChange = { changes += it.text }
             area.onSubmit = { submits++ }
             screen.frame()
@@ -366,17 +369,17 @@ class TextInputTest {
         }
 
         @Test
-        fun `while sending, nothing can be typed and the screen gets the keys`() {
+        fun `while sending, nothing can be typed and the field keeps the keys`() {
             screen.type("Envoi")
             area.sending = true
             screen.type("x")
             assertEquals("Envoi", area.text)
-            // The field keeps the focus but no longer takes text, so the phone may act on Backspace (it goes back).
+            // The field keeps the focus and its keys: Backspace must not leave the screen while the post is on its way.
             assertSame(area, screen.focused)
-            assertFalse(screen.hasTextFocus)
+            assertTrue(screen.hasTextFocus)
             val before = screen.keysToScreen
-            screen.key(GLFW_KEY_BACKSPACE)
-            assertEquals(before + 1, screen.keysToScreen)
+            assertTrue(screen.key(GLFW_KEY_BACKSPACE))
+            assertEquals(before, screen.keysToScreen)
             assertEquals("Envoi", area.text)
             area.sending = false
             assertTrue(screen.hasTextFocus)
@@ -450,7 +453,7 @@ class TextInputTest {
 
         @Test
         fun `a field with a maximum length takes no more`() {
-            val short = screen.add(TextField(TextState(multiline = false, maxLength = 4)).at(0f, 60f))
+            val short = screen.add(TextField(TextState("", false, 4)).at(0f, 60f))
             screen.frame()
             screen.click(50f, 80f)
             screen.type("123456")

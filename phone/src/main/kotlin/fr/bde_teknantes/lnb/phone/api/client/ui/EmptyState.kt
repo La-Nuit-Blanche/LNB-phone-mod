@@ -10,17 +10,25 @@ import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
  * saying so, and a [Button.Kind.SECONDARY] retry button of 104 dp, set [loading][Button.loading] while it retries.
  *
  * ```kotlin
- * add(EmptyState(Icon.INBOX, tr("empty.global.title"), tr("empty.global.text"),
- *     Button(tr("empty.global.button"), fixedWidth = 136f) { openCompose() }).at(0f, 44f, 256f, 326f))
+ * add(EmptyState(Icon.INBOX, tr("empty.global.title")).apply {
+ *     text = tr("empty.global.text")
+ *     button = Button(tr("empty.global.button")) { openCompose() }.apply { fixedWidth = 136f }
+ * }.at(0f, 44f, 256f, 326f))
  * ```
  *
  * @param icon Drawn at 40 dp: use an icon that has that size.
  * @param title Up to 2 lines of 200 dp.
- * @param text Up to 2 lines of 200 dp; empty for none.
  */
-class EmptyState(var icon: Icon, var title: String, var text: String, button: Button? = null) : Widget() {
+class EmptyState(var icon: Icon, var title: String) : Widget() {
+    /** Up to 2 lines of 200 dp under the title; empty for none. */
+    var text: String = ""
+
     /** The button under the text, if any. */
-    val button: Button? = button?.let { add(it) }
+    var button: Button? = null
+        set(value) {
+            field?.let(::remove)
+            field = value?.let { add(it) }
+        }
 
     override val preferredWidth get() = 256f
 
@@ -32,7 +40,7 @@ class EmptyState(var icon: Icon, var title: String, var text: String, button: Bu
     private fun blockHeight(titles: Int, texts: Int): Float =
         DISC + 16f + titles * TextStyle.TITLE_M.lineHeight +
             (if (texts > 0) 4f + texts * TextStyle.BODY.lineHeight else 0f) +
-            (button?.let { 16f + Button.HEIGHT } ?: 0f)
+            (if (button != null) 16f + Button.HEIGHT else 0f)
 
     private fun top(titles: Int, texts: Int) = evenFloor((height - blockHeight(titles, texts)) / 2f)
 

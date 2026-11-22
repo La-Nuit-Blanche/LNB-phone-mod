@@ -11,6 +11,8 @@ import fr.bde_teknantes.lnb.phone.client.smooth.TextStyle as SmoothStyle
  * [AppCanvas.drawText][fr.bde_teknantes.lnb.phone.api.client.AppCanvas.drawText] is the top of that box, which is how
  * the art direction places text ("line box at y 11").
  *
+ * More styles may be added in later versions of the phone: a `when` over this enum needs an `else` branch.
+ *
  * @property size The font size in dp.
  * @property lineHeight The height of the line box in dp; also the distance between two lines of wrapped text.
  * @property semibold Whether the style uses Inter SemiBold (600) rather than Regular (400).

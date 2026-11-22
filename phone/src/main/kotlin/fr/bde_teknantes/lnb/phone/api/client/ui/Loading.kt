@@ -7,7 +7,12 @@ import kotlin.math.abs
  * The loading spinner (art direction 8.7): a quarter arc on a faint ring, one turn per 800 ms. 20 dp by default, 16
  * inside buttons; in the accent unless told otherwise.
  */
-class Spinner(val size: Float = 20f, var color: Int = Colors.ACCENT) : Widget() {
+class Spinner : Widget() {
+    /** 20 dp, or 16 inside buttons. */
+    var size = 20f
+
+    var color = Colors.ACCENT
+
     override val preferredWidth get() = size
     override val preferredHeight get() = size
 
@@ -32,7 +37,10 @@ class SpinnerRow : Widget() {
  * A 48 dp row with a short caption centred in it: the end of a list ("You're all caught up", in [Colors.TEXT_3]), or a
  * list with nothing in it yet ("No replies yet", in [Colors.TEXT_2]).
  */
-class MessageRow(var text: String, var color: Int = Colors.TEXT_3) : Widget() {
+class MessageRow(var text: String) : Widget() {
+    /** [Colors.TEXT_3] at the end of a list, [Colors.TEXT_2] for an empty one. */
+    var color = Colors.TEXT_3
+
     override val preferredWidth get() = 256f
     override val preferredHeight get() = 48f
 
