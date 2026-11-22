@@ -27,7 +27,8 @@ import kotlin.math.roundToInt
  *
  * Use it between [begin] and [end], inside a Minecraft screen's render. Coordinates are dp from the top-left of the
  * rectangle given to [begin]; colours are ARGB (`0xAARRGGBB`). [end] leaves the pose, scissor, shader, shader texture
- * and colour, blending and depth test as [begin] found them. Render thread only.
+ * and colour, blending and depth test as [begin] found them. Render thread only: every entry point, measuring
+ * included, throws on another thread.
  */
 class SmoothCanvas {
     private val clips = ArrayList<IntArray>()
@@ -75,14 +76,32 @@ class SmoothCanvas {
     private var savedDepthTest = true
 
     /**
+     * Draws [block] into the rectangle at ([left], [top]), [widthGui] x [heightGui] GUI px: [begin], then [block],
+     * then [end] even when [block] throws. The recommended way in; see [begin] for the rules.
+     */
+    inline fun draw(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int, block: SmoothCanvas.() -> Unit) {
+        begin(graphics, left, top, widthGui, heightGui)
+        try {
+            block()
+        } finally {
+            end()
+        }
+    }
+
+    /**
      * Starts drawing into the rectangle at ([left], [top]), [widthGui] x [heightGui] GUI px, in the current pose.
      * The pose may translate (even by fractions, as during a slide), but must not scale: the origin is snapped to a
      * whole pixel and drawing happens in real pixels from there. Everything drawn is clipped to the rectangle.
+     *
+     * Every [begin] needs its [end], in a `finally` block; [draw] does both. A canvas left drawing (an exception
+     * caught above it) is ended at the next [begin] or at the end of the frame, whichever comes first, with a warning.
+     *
+     * The shader colour is set to opaque white while drawing, so a fade applied with `RenderSystem.setShaderColor`
+     * around the canvas does not reach the smooth layer: fade with the alpha of the colours passed to it instead.
      */
     fun begin(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int) {
-        check(active == null) { "begin() while a smooth canvas is already drawing" }
-        active = this
-        drawing = true
+        RenderThread.check("SmoothCanvas.begin")
+        active?.let { abandoned(it) }
         frameStart = System.nanoTime()
         batch.resetStats()
         // What the GUI batched before us must be drawn under us. flush() switches the depth test on whatever it was
@@ -90,10 +109,22 @@ class SmoothCanvas {
         savedDepthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST)
         graphics.flush()
         setDepthTest(savedDepthTest)
+        saveState()
+        active = this
+        drawing = true
+        try {
+            setUp(graphics, left, top, widthGui, heightGui)
+        } catch (e: Throwable) {
+            finish(discard = true)
+            throw e
+        }
+    }
 
+    private fun setUp(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int) {
         val window = Minecraft.getInstance().window
         val scale = window.guiScale.roundToInt().coerceAtLeast(1)
         if (scale != grid.guiScale) grid = PixelGrid(scale)
+        SmoothResources.useScale(scale)
         framebufferHeight = window.height
         width = widthGui * 2f
         height = heightGui * 2f
@@ -105,7 +136,6 @@ class SmoothCanvas {
         originY = (vector.y * scale).roundToInt()
         batch.matrix = Matrix4f().translation(0f, 0f, pose.m32()).scale(1f / scale, 1f / scale, 1f)
 
-        saveState()
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
@@ -122,17 +152,31 @@ class SmoothCanvas {
         applyScissor(viewport)
     }
 
-    /** Draws what is still queued and restores the state [begin] found. */
+    /** Draws what is still queued and restores the state [begin] found, even if drawing fails. */
     fun end() {
         check(drawing) { "end() without begin()" }
-        batch.flush()
-        SmoothResources.beforeAtlasClear = null
-        restoreState()
-        clips.clear()
-        drawing = false
-        active = null
+        var drawn = false
+        try {
+            batch.flush()
+            drawn = true
+        } finally {
+            finish(discard = !drawn)
+        }
         lastFrameDrawCalls = batch.drawCalls
         lastFrameNanos = System.nanoTime() - frameStart
+    }
+
+    /** Puts the render state back as [begin] found it and frees the shared batch; [discard] drops unsent quads. */
+    private fun finish(discard: Boolean) {
+        try {
+            if (discard) batch.discard()
+        } finally {
+            SmoothResources.beforeAtlasClear = null
+            clips.clear()
+            drawing = false
+            active = null
+            restoreState()
+        }
     }
 
     // ---- Shapes ----
@@ -177,26 +221,14 @@ class SmoothCanvas {
         val stroke = if (strokeDp > 0f) grid.strokePx(strokeDp) else 0
         if (radius <= 0f && stroke == 0) return solidQuad(l, t, r, b, color)
 
-        val corner = SmoothResources.cornerSize(radius, stroke)
-        if (pw >= 2 * corner && ph >= 2 * corner) {
-            nineSlice(SmoothResources.shape(2 * corner + 1, 2 * corner + 1, radius, stroke), l, t, r, b, corner, color)
-        } else {
-            // Too small for corners plus a middle (a 9 px circle at GUI scale 3): its own mask, drawn 1:1.
-            regionQuad(SmoothResources.shape(pw, ph, radius, stroke), l, t, r, b, 0, 0, pw, ph, color)
-        }
-    }
-
-    /** Draws [tile] (corners of [c] px around a 1 px middle) stretched over l..r x t..b, on whole pixels. */
-    private fun nineSlice(tile: MaskAtlas.Region, l: Int, t: Int, r: Int, b: Int, c: Int, color: Int) {
-        val xs = intArrayOf(l, l + c, r - c, r)
-        val ys = intArrayOf(t, t + c, b - c, b)
-        val us = intArrayOf(0, c, c + 1, 2 * c + 1)
-        for (row in 0..2) {
-            if (ys[row + 1] <= ys[row]) continue
-            for (col in 0..2) {
-                if (xs[col + 1] <= xs[col]) continue
-                regionQuad(tile, xs[col], ys[row], xs[col + 1], ys[row + 1], us[col], us[row], us[col + 1], us[row + 1], color)
-            }
+        // Each axis slices if it holds two corners; one that does not (a 9 px circle at GUI scale 3, a pill of odd
+        // height) is taken whole from the tile, which then still serves every length of the other axis.
+        val corner = NineSlice.cornerSize(radius, stroke)
+        val sliceX = NineSlice.slices(pw, corner)
+        val sliceY = NineSlice.slices(ph, corner)
+        val tile = SmoothResources.shape(NineSlice.tileSize(pw, corner), NineSlice.tileSize(ph, corner), radius, stroke) ?: return
+        NineSlice.forEachSlice(l, t, r, b, corner, sliceX, sliceY) { sl, st, sr, sb, u0, v0, u1, v1 ->
+            regionQuad(tile, sl, st, sr, sb, u0, v0, u1, v1, color)
         }
     }
 
@@ -260,7 +292,11 @@ class SmoothCanvas {
     fun icon(texture: ResourceLocation, x: Float, y: Float, size: Float, color: Int) =
         image(texture, x, y, size, size, 0f, 0f, 1f, 1f, color, linear = true)
 
-    /** Part [u0]..[u1] x [v0]..[v1] (0..1) of a texture, stretched over a rectangle in dp and tinted with [color]. */
+    /**
+     * Part [u0]..[u1] x [v0]..[v1] (0..1) of a texture, stretched over a rectangle in dp and tinted with [color],
+     * filtered linearly or not ([linear]) for this draw only: the texture keeps its own filter for everyone else.
+     * Any texture size works; nothing here assumes a set of densities.
+     */
     fun image(texture: ResourceLocation, x: Float, y: Float, w: Float, h: Float, u0: Float, v0: Float, u1: Float, v1: Float, color: Int, linear: Boolean) {
         val tex = Minecraft.getInstance().textureManager.getTexture(texture)
         batch.quad(
@@ -339,7 +375,7 @@ class SmoothCanvas {
         val page = region.page
         val texel = 1f / page.size
         batch.quad(
-            page.texture, false,
+            page.texture, null,
             l.toFloat(), t.toFloat(), r.toFloat(), b.toFloat(),
             (region.x + u0) * texel, (region.y + v0) * texel, (region.x + u1) * texel, (region.y + v1) * texel,
             color, page.uploader,
@@ -390,14 +426,42 @@ class SmoothCanvas {
         if (enabled) RenderSystem.enableDepthTest() else RenderSystem.disableDepthTest()
     }
 
-    private companion object {
+    companion object {
         // One vertex buffer for every canvas: its memory is native and canvases come and go with screens. Canvases
         // draw one after the other (app, then banner), never inside each other, so sharing it is safe.
-        val batch by lazy { QuadBatch() }
-        var active: SmoothCanvas? = null
-        var warnedScaledPose = false
+        private val batch by lazy { QuadBatch() }
+        private var active: SmoothCanvas? = null
+        private var warnedScaledPose = false
+        private var warnedAbandoned = false
 
-        fun warnScaledPose() {
+        /**
+         * Prepares the smooth layer for the current GUI scale ahead of time: loads the fonts, rasterises the common
+         * characters in every text style, and the kit's shapes. Call it on the render thread when the phone is about
+         * to open (the phone key), so its first frames do not hitch. Returns the time it took, in nanoseconds.
+         */
+        fun prewarm(): Long =
+            SmoothResources.prewarm(Minecraft.getInstance().window.guiScale.roundToInt().coerceAtLeast(1))
+
+        /**
+         * Ends a canvas still drawing at the end of a frame (its [end] skipped by an exception), so its scissor does
+         * not clip the next frame's world and HUD to the phone's viewport. Called by the phone after every frame.
+         */
+        internal fun endAbandoned() {
+            active?.let { abandoned(it) }
+        }
+
+        private fun abandoned(canvas: SmoothCanvas) {
+            if (!warnedAbandoned) {
+                warnedAbandoned = true
+                LnbPhone.LOGGER.warn(
+                    "A SmoothCanvas was left drawing without end(), probably after an exception; its render state was " +
+                        "restored. Draw with canvas.draw { } or call end() in a finally block.",
+                )
+            }
+            canvas.finish(discard = true)
+        }
+
+        private fun warnScaledPose() {
             if (warnedScaledPose) return
             warnedScaledPose = true
             LnbPhone.LOGGER.warn("SmoothCanvas drawn under a scaled pose; the smooth layer ignores the scale")

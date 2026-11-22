@@ -118,6 +118,7 @@ object TextLayout {
     private fun wrapParagraph(text: String, from: Int, to: Int, font: FontMetrics, size: Float, maxWidth: Float, out: MutableList<Line>) {
         fun width(a: Int, b: Int) = width(text.substring(a, b), font, size)
         fun fits(a: Int, b: Int) = width(a, b) <= maxWidth + EPSILON
+        val first = out.size
         var lineStart = from
         var lineEnd = from
         var hasContent = false
@@ -136,6 +137,15 @@ object TextLayout {
                     out.add(Line(lineStart, lineEnd, wordStart, width(lineStart, lineEnd)))
                     hasContent = false
                 }
+            }
+            if (!hasContent && wordStart == i && out.size > first) {
+                // A space right after a break: the line it would start is not drawn with it.
+                lineStart = i + 1
+                lineEnd = i + 1
+                if (i == to) break
+                wordStart = i + 1
+                i++
+                continue
             }
             if (!hasContent) {
                 var pieceStart = wordStart
@@ -159,10 +169,29 @@ object TextLayout {
             wordStart = i + 1
             i++
         }
-        out.add(Line(lineStart, lineEnd, to, width(lineStart, lineEnd)))
+        // Empty here after earlier lines means the paragraph ended in spaces it broke at: they make no line of their
+        // own, and the line before them reaches the paragraph's end.
+        if (lineEnd > lineStart || out.size == first) {
+            out.add(Line(lineStart, lineEnd, to, width(lineStart, lineEnd)))
+        } else {
+            out[out.size - 1] = out.last().copy(next = to)
+        }
     }
 
-    /** Whether a line may break at the space at [i]: not before high punctuation, not after an opening guillemet. */
+    /** Splits a paragraph at the spaces a line may break at, as [wrap] does. */
+    internal fun words(paragraph: String): List<String> {
+        val words = ArrayList<String>()
+        var start = 0
+        for (i in paragraph.indices) {
+            if (paragraph[i] != ' ' || !breakable(paragraph, i)) continue
+            words.add(paragraph.substring(start, i))
+            start = i + 1
+        }
+        words.add(paragraph.substring(start))
+        return words
+    }
+
+        /** Whether a line may break at the space at [i]: not before high punctuation, not after an opening guillemet. */
     private fun breakable(text: String, i: Int): Boolean {
         val next = text.getOrNull(i + 1)
         val previous = text.getOrNull(i - 1)

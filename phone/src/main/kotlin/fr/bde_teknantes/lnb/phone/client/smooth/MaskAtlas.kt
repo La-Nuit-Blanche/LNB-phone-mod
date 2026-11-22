@@ -49,9 +49,12 @@ class MaskAtlas(private val pageSize: Int = 1024, private val maxPages: Int = 4)
 
     private val pages = ArrayList<Page>()
 
+    /** Whether a [width] x [height] region fits on an empty page (with the packer's padding). */
+    fun fits(width: Int, height: Int): Boolean = width in 1..pageSize - 2 && height in 1..pageSize - 2
+
     /** Room for a [width] x [height] region, or null when every page is full (then [clear] and try again). */
     fun allocate(width: Int, height: Int): Region? {
-        if (width > pageSize - 2 || height > pageSize - 2) return null
+        if (!fits(width, height)) return null
         for (page in pages) page.packer.insert(width, height)?.let { (x, y) -> return Region(page, x, y, width, height) }
         if (pages.size >= maxPages) return null
         val page = Page(pageSize).also(pages::add)

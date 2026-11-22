@@ -100,12 +100,13 @@ class TextLayoutCaretTest {
     }
 
     @Test
-    fun `spaces past the width wrap to a line of their own`() {
+    fun `spaces past the width make no line of their own`() {
+        // As wrap() does (a space the line breaks at never becomes an empty line): the line reaches the paragraph's
+        // end, and the caret after the spaces stays on it.
         val text = "aaaaa   "
         val l = lines(text)
-        assertEquals(listOf(Line(0, 6, 7, 30f), Line(7, 8, 8, 5f)), l)
-        // Every caret position belongs to a line.
-        assertEquals(listOf(0, 0, 0, 0, 0, 0, 0, 1, 1), (0..8).map { TextLayout.lineOf(l, it) })
+        assertEquals(listOf(Line(0, 6, 8, 30f)), l)
+        assertEquals(List(9) { 0 }, (0..8).map { TextLayout.lineOf(l, it) })
     }
 
     @Test

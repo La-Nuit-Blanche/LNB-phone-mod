@@ -156,4 +156,16 @@ abstract class AppScreen {
      * @return true if the screen used it.
      */
     open fun charTyped(codePoint: Char, modifiers: Int): Boolean = false
+
+    /**
+     * Whether this screen already shows what [target] points to, as the player sees it now: the thread a reply
+     * notification leads to, the tab where a new announcement simply arrives. [target] is a notification's
+     * [fr.bde_teknantes.lnb.phone.api.AppTarget] for this screen's app.
+     *
+     * The phone asks the shown screen when a notification for its app arrives (art direction 10.3): if true, no banner
+     * slides over the screen (the chime still plays) and the notification counts as read, since the player is looking
+     * at its content. If false, the banner shows as usual. Answer from your state, quickly and without side effects;
+     * the default, false, always lets the banner show.
+     */
+    open fun showsTarget(target: String): Boolean = false
 }

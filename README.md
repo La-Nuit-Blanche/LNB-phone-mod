@@ -54,3 +54,7 @@ Shots go to `captureDir`, or `apps/demo/run/captures/<scenario>/`. Scenarios are
 ## License
 
 AGPL-3.0-or-later.
+
+The bundled Inter font files (`phone/src/main/resources/assets/lnbphone/font/inter_*.ttf`) are not covered by that
+licence: they are © The Inter Project Authors under the SIL Open Font License 1.1 (text in `inter_ofl.txt` next to
+them), which allows bundling them but not relicensing them.

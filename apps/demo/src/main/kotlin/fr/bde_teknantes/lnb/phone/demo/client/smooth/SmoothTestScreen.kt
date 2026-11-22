@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
 import net.minecraft.resources.ResourceLocation
+import org.lwjgl.opengl.GL11
 import kotlin.math.max
 
 /**
@@ -18,9 +19,15 @@ import kotlin.math.max
  * column at the real viewport width (header, two post cards, a clipping test) and, on the right, the type ramp, text
  * rendering variants, shapes, avatars, icons, and native masks next to the art direction's 2x sprites.
  */
-class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
+class SmoothTestScreen(
+    private val abandonOnce: Boolean = false,
+    /** Scrolls the sheet by this many dp (even), to show its far parts at GUI scales too large for the window. */
+    private val offsetX: Int = 0,
+    private val offsetY: Int = 0,
+) : Screen(Component.literal("Smooth layer test")) {
     private val canvas = SmoothCanvas()
     private var frames = 0
+    private var firstFrameStart: GlStateSnapshot? = null
 
     override fun isPauseScreen() = false
 
@@ -30,12 +37,16 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
     }
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        if (abandonOnce) checkAbandonedCanvas(graphics)
         renderBackground(graphics, mouseX, mouseY, partialTick)
         // Inside a scissor of the caller's, with an odd shader colour, to check the canvas puts both back.
         graphics.enableScissor(0, 0, width, height)
         RenderSystem.setShaderColor(1f, 1f, 1f, 0.999f)
-        val before = GlStateSnapshot.take(graphics)
-        canvas.begin(graphics, 0, 0, width, height)
+        graphics.pose().pushPose()
+        graphics.pose().translate(-offsetX / 2f, -offsetY / 2f, 0f)
+        val before = GlStateSnapshot.take(graphics, BORROWED_TEXTURES)
+        // The whole 640 x 480 dp sheet, even where it runs off the window.
+        canvas.begin(graphics, 0, 0, maxOf(width, 320), maxOf(height, 240))
         canvas.fillRect(0f, 0f, 256f, 480f, BG)
         canvas.fillRect(264f, 0f, 376f, 480f, BG)
         feedColumn()
@@ -43,13 +54,42 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         textVariants()
         shapes()
         canvas.end()
-        val after = GlStateSnapshot.take(graphics)
+        val after = GlStateSnapshot.take(graphics, BORROWED_TEXTURES)
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+        minecraftTtfRow(graphics)
+        graphics.pose().popPose()
         graphics.disableScissor()
         if (frames == 0 && before != after) LnbPhone.LOGGER.error("Smooth canvas changed the render state: {} -> {}", before, after)
         if (frames == 0 && before == after) LnbPhone.LOGGER.info("Smooth canvas left the render state as it found it")
-        minecraftTtfRow(graphics)
+        // Only where the swatches are on screen (not at forced high scales).
+        if (frames == 0 && offsetX == 0 && offsetY == 0 && height * 2 >= 480) checkFaintOverlay()
+        if (abandonOnce && frames == 0) abandonCanvas(graphics)
         logCost()
+    }
+
+    /** An app failing mid-draw, caught above the canvas without reaching end(): its scissor is left on. */
+    private fun abandonCanvas(graphics: GuiGraphics) {
+        try {
+            SmoothCanvas().begin(graphics, 8, 8, 40, 40)
+            throw IllegalStateException("app failure")
+        } catch (_: IllegalStateException) {
+        }
+    }
+
+    /** On the next frame, before anything is drawn, the state must be back as it was at the start of the first. */
+    private fun checkAbandonedCanvas(graphics: GuiGraphics) {
+        val now = GlStateSnapshot.take(graphics)
+        val first = firstFrameStart
+        if (first == null) {
+            firstFrameStart = now
+        } else if (frames == 1) {
+            val recovered = now.scissor == first.scissor && now.blend == first.blend && now.depthTest == first.depthTest
+            if (recovered) {
+                LnbPhone.LOGGER.info("Abandoned smooth canvas was ended at the end of the frame")
+            } else {
+                LnbPhone.LOGGER.error("Abandoned smooth canvas still clips the next frame: {} -> {}", first, now)
+            }
+        }
     }
 
     // ---- Feed column, x 0..256 ----
@@ -99,6 +139,32 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         c.fillCircle(212f, top - 8f, 40f, ACCENT_SOFT_2)
         c.popClip()
         c.drawText("pushClip(24, y+4, 208, 32)", 12f, top + 44f, TextStyles.CAPTION, TEXT_3)
+
+        // The kit's faintest fills (art direction 8.3) on bg: overlay-hover 4%, overlay-pressed 8%, banner-edge 6%.
+        for ((i, overlay) in FAINT_OVERLAYS.withIndex()) c.fillRect(FAINT_X + i * 36f, FAINT_Y, 28f, 16f, overlay)
+        c.drawText("4 % · 8 % · 6 %", FAINT_X + 108f, FAINT_Y, TextStyles.CAPTION, TEXT_3)
+    }
+
+    /**
+     * Reads back the 4% overlay and the bg beside it: the same pixel means faint fills are lost, as they were under
+     * vanilla's shader, which discards everything under 10% alpha.
+     */
+    private fun checkFaintOverlay() {
+        val grid = canvas.grid
+        val y = minecraft!!.window.height - 1 - grid.snap(FAINT_Y + 8f)
+        val overlay = readPixel(grid.snap(FAINT_X + 14f), y)
+        val background = readPixel(grid.snap(FAINT_X - 6f), y)
+        if (overlay == background) {
+            LnbPhone.LOGGER.error("Smooth canvas lost a 4% overlay: {} on bg {}", Integer.toHexString(overlay), Integer.toHexString(background))
+        } else {
+            LnbPhone.LOGGER.info("Smooth canvas drew a 4% overlay: {} on bg {}", Integer.toHexString(overlay), Integer.toHexString(background))
+        }
+    }
+
+    private fun readPixel(x: Int, y: Int): Int {
+        val out = IntArray(1)
+        GL11.glReadPixels(x, y, 1, 1, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, out)
+        return out[0] and 0xFFFFFF
     }
 
     /** A post card per art direction 9.3; returns the y of the next cell. */
@@ -194,15 +260,16 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         c.playerFace(SampleSkins.ALEX, 434f, r2 + 8f, 32f)
         c.playerFace(minecraft!!.skinManager.getInsecureSkin(minecraft!!.gameProfile).texture(), 474f, r2, 48f)
         // Icons: the 2x sprite filtered down (art direction 8.1) next to the export made for this density, drawn 1:1.
+        // Above GUI scale 4 no export matches: the 2x one is filtered up.
         val density = when (c.grid.guiScale) {
             2 -> "1x"
             3 -> "1_5x"
             else -> "2x"
         }
         c.icon(HEART_2X, 532f, r2 + 16f, 16f, TEXT_1)
-        c.image(spike("heart_$density"), 556f, r2 + 16f, 16f, 16f, 0f, 0f, 1f, 1f, TEXT_1, linear = false)
+        c.image(spike("heart_$density"), 556f, r2 + 16f, 16f, 16f, 0f, 0f, 1f, 1f, TEXT_1, linear = c.grid.guiScale > 4)
         c.icon(BACK_2X, 584f, r2 + 14f, 20f, TEXT_1)
-        c.image(spike("back_$density"), 612f, r2 + 14f, 20f, 20f, 0f, 0f, 1f, 1f, TEXT_1, linear = false)
+        c.image(spike("back_$density"), 612f, r2 + 14f, 20f, 20f, 0f, 0f, 1f, 1f, TEXT_1, linear = c.grid.guiScale > 4)
 
         // Row 3: native masks (left of each pair) against the 2 px per dp sprites of art direction 16.2 (right).
         val r3 = 394f
@@ -273,6 +340,9 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
     private companion object {
         const val SAMPLE_X = 364f
         const val VARIANTS_Y = 166f
+        const val FAINT_X = 12f
+        const val FAINT_Y = 456f
+        val FAINT_OVERLAYS = intArrayOf(0x0AFFFFFF, 0x14FFFFFF, 0x0FFFFFFF)
 
         val TEXT_VARIANTS = listOf(
             Triple("none · 1 px", SmoothFont.Hinting.NONE, 1),
@@ -286,6 +356,9 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
 
         val HEART_2X = spike("heart_2x")
         val BACK_2X = spike("back_2x")
+
+        /** Textures the sheet draws with a filter of its choosing; each must keep its own filter afterwards. */
+        val BORROWED_TEXTURES = listOf(HEART_2X, BACK_2X, spike("shape_pill"), spike("shape_r10"), spike("heart_1_5x"))
 
         // Art direction 8.3, as ARGB.
         val BG = 0xFF12151B.toInt()

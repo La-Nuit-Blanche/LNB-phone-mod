@@ -1,3 +1,7 @@
 {
-  "fml.menu.mods.info.description.lnbphone": "Un téléphone pour le serveur Minecraft de LNB, auquel d'autres mods ajoutent des applications."
+  "fml.menu.mods.info.description.lnbphone": "Un téléphone pour le serveur Minecraft de LNB, auquel d'autres mods ajoutent des applications.",
+  "key.categories.lnbphone": "LNB Phone",
+  "key.lnbphone.open": "Ouvrir le téléphone",
+  "gui.lnbphone.title": "LNB Phone",
+  "gui.lnbphone.scale": "Échelle GUI\u00a0: 2+"
 }

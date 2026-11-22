@@ -66,16 +66,13 @@ class AppViewport {
      * leaves pushed (clips, offsets, opacity) is undone.
      */
     fun render(graphics: GuiGraphics, draw: (AppCanvas) -> Unit) {
-        smooth.begin(graphics, left, top, WIDTH_GUI, HEIGHT_GUI)
-        canvas.reset()
-        try {
-            draw(canvas)
-        } finally {
-            // end() restores the scissor and the render state: it must run even if tidying up after the app throws.
+        // draw { } ends the smooth canvas (scissor, render state) even when the app or the tidying up throws.
+        smooth.draw(graphics, left, top, WIDTH_GUI, HEIGHT_GUI) {
+            canvas.reset()
             try {
-                canvas.finish()
+                draw(canvas)
             } finally {
-                smooth.end()
+                canvas.finish()
             }
         }
     }

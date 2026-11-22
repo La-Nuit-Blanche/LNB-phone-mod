@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.Screenshot
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen
+import net.minecraft.client.tutorial.TutorialSteps
 import net.minecraft.core.registries.Registries
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.Difficulty
@@ -62,6 +63,8 @@ class CaptureRunner private constructor(private val scenario: String, private va
     private fun prepareOptions(mc: Minecraft) {
         mc.options.pauseOnLostFocus = false
         mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(0.0)
+        // The movement tutorial's toast would sit over the top-right corner of every in-world shot.
+        mc.options.tutorialStep = TutorialSteps.NONE
     }
 
     internal fun shoot(name: String) {

@@ -42,7 +42,8 @@ fun contactSheet(shell: List<Sprite>, smooth: List<Sprite>, format: SmoothFormat
             Entry(it.path.removePrefix(prefix), onBackground(it.image, APP_BG, 0xEEF1F5))
         }
     }
-    for (density in format.iconDensities) {
+    // The low densities enlarged, where single pixels decide how an icon reads; above 2x they are plain to see.
+    for (density in format.iconDensities.filter { it.pxPerDp <= 2.0 }) {
         val prefix = "$SMOOTH_DIR/${density.folder}/"
         // Every density enlarged to 6 screen px per dp, nearest-neighbour, so their pixels compare side by side.
         val factor = (6 / density.pxPerDp).toInt()
