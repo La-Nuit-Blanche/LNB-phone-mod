@@ -19,9 +19,10 @@ import kotlin.math.max
  * column at the real viewport width (header, two post cards, a clipping test) and, on the right, the type ramp, text
  * rendering variants, shapes, avatars, icons, and native masks next to the art direction's 2x sprites.
  */
-class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
+class SmoothTestScreen(private val abandonOnce: Boolean = false) : Screen(Component.literal("Smooth layer test")) {
     private val canvas = SmoothCanvas()
     private var frames = 0
+    private var firstFrameStart: GlStateSnapshot? = null
 
     override fun isPauseScreen() = false
 
@@ -31,6 +32,7 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
     }
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        if (abandonOnce) checkAbandonedCanvas(graphics)
         renderBackground(graphics, mouseX, mouseY, partialTick)
         // Inside a scissor of the caller's, with an odd shader colour, to check the canvas puts both back.
         graphics.enableScissor(0, 0, width, height)
@@ -51,7 +53,33 @@ class SmoothTestScreen : Screen(Component.literal("Smooth layer test")) {
         if (frames == 0 && before == after) LnbPhone.LOGGER.info("Smooth canvas left the render state as it found it")
         if (frames == 0) checkFaintOverlay()
         minecraftTtfRow(graphics)
+        if (abandonOnce && frames == 0) abandonCanvas(graphics)
         logCost()
+    }
+
+    /** An app failing mid-draw, caught above the canvas without reaching end(): its scissor is left on. */
+    private fun abandonCanvas(graphics: GuiGraphics) {
+        try {
+            SmoothCanvas().begin(graphics, 8, 8, 40, 40)
+            throw IllegalStateException("app failure")
+        } catch (_: IllegalStateException) {
+        }
+    }
+
+    /** On the next frame, before anything is drawn, the state must be back as it was at the start of the first. */
+    private fun checkAbandonedCanvas(graphics: GuiGraphics) {
+        val now = GlStateSnapshot.take(graphics)
+        val first = firstFrameStart
+        if (first == null) {
+            firstFrameStart = now
+        } else if (frames == 1) {
+            val recovered = now.scissor == first.scissor && now.blend == first.blend && now.depthTest == first.depthTest
+            if (recovered) {
+                LnbPhone.LOGGER.info("Abandoned smooth canvas was ended at the end of the frame")
+            } else {
+                LnbPhone.LOGGER.error("Abandoned smooth canvas still clips the next frame: {} -> {}", first, now)
+            }
+        }
     }
 
     // ---- Feed column, x 0..256 ----

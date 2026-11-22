@@ -26,6 +26,9 @@ object CaptureScenarios {
             waitTicks(20)
             shot("smooth_gui$scale")
         }
+        // A canvas left drawing by a caught exception must not clip the frames after it.
+        screen { SmoothTestScreen(abandonOnce = true) }
+        waitTicks(5)
         guiScale(3)
         reloadResources()
         screen { SmoothTestScreen() }

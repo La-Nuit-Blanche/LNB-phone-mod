@@ -66,6 +66,14 @@ internal class QuadBatch : AutoCloseable {
         drawCalls++
     }
 
+    /** Drops the quads queued since the last flush, without drawing them. */
+    fun discard() {
+        val b = builder ?: return
+        builder = null
+        texture = null
+        b.build()?.close()
+    }
+
     fun resetStats() {
         drawCalls = 0
     }

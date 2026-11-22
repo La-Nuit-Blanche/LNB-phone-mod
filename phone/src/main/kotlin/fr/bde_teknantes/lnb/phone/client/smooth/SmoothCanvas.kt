@@ -75,14 +75,31 @@ class SmoothCanvas {
     private var savedDepthTest = true
 
     /**
+     * Draws [block] into the rectangle at ([left], [top]), [widthGui] x [heightGui] GUI px: [begin], then [block],
+     * then [end] even when [block] throws. The recommended way in; see [begin] for the rules.
+     */
+    inline fun draw(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int, block: SmoothCanvas.() -> Unit) {
+        begin(graphics, left, top, widthGui, heightGui)
+        try {
+            block()
+        } finally {
+            end()
+        }
+    }
+
+    /**
      * Starts drawing into the rectangle at ([left], [top]), [widthGui] x [heightGui] GUI px, in the current pose.
      * The pose may translate (even by fractions, as during a slide), but must not scale: the origin is snapped to a
      * whole pixel and drawing happens in real pixels from there. Everything drawn is clipped to the rectangle.
+     *
+     * Every [begin] needs its [end], in a `finally` block; [draw] does both. A canvas left drawing (an exception
+     * caught above it) is ended at the next [begin] or at the end of the frame, whichever comes first, with a warning.
+     *
+     * The shader colour is set to opaque white while drawing, so a fade applied with `RenderSystem.setShaderColor`
+     * around the canvas does not reach the smooth layer: fade with the alpha of the colours passed to it instead.
      */
     fun begin(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int) {
-        check(active == null) { "begin() while a smooth canvas is already drawing" }
-        active = this
-        drawing = true
+        active?.let { abandoned(it) }
         frameStart = System.nanoTime()
         batch.resetStats()
         // What the GUI batched before us must be drawn under us. flush() switches the depth test on whatever it was
@@ -90,7 +107,18 @@ class SmoothCanvas {
         savedDepthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST)
         graphics.flush()
         setDepthTest(savedDepthTest)
+        saveState()
+        active = this
+        drawing = true
+        try {
+            setUp(graphics, left, top, widthGui, heightGui)
+        } catch (e: Throwable) {
+            finish(discard = true)
+            throw e
+        }
+    }
 
+    private fun setUp(graphics: GuiGraphics, left: Int, top: Int, widthGui: Int, heightGui: Int) {
         val window = Minecraft.getInstance().window
         val scale = window.guiScale.roundToInt().coerceAtLeast(1)
         if (scale != grid.guiScale) grid = PixelGrid(scale)
@@ -105,7 +133,6 @@ class SmoothCanvas {
         originY = (vector.y * scale).roundToInt()
         batch.matrix = Matrix4f().translation(0f, 0f, pose.m32()).scale(1f / scale, 1f / scale, 1f)
 
-        saveState()
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
         RenderSystem.enableBlend()
         RenderSystem.defaultBlendFunc()
@@ -122,17 +149,31 @@ class SmoothCanvas {
         applyScissor(viewport)
     }
 
-    /** Draws what is still queued and restores the state [begin] found. */
+    /** Draws what is still queued and restores the state [begin] found, even if drawing fails. */
     fun end() {
         check(drawing) { "end() without begin()" }
-        batch.flush()
-        SmoothResources.beforeAtlasClear = null
-        restoreState()
-        clips.clear()
-        drawing = false
-        active = null
+        var drawn = false
+        try {
+            batch.flush()
+            drawn = true
+        } finally {
+            finish(discard = !drawn)
+        }
         lastFrameDrawCalls = batch.drawCalls
         lastFrameNanos = System.nanoTime() - frameStart
+    }
+
+    /** Puts the render state back as [begin] found it and frees the shared batch; [discard] drops unsent quads. */
+    private fun finish(discard: Boolean) {
+        try {
+            if (discard) batch.discard()
+        } finally {
+            SmoothResources.beforeAtlasClear = null
+            clips.clear()
+            drawing = false
+            active = null
+            restoreState()
+        }
     }
 
     // ---- Shapes ----
@@ -356,14 +397,34 @@ class SmoothCanvas {
         if (enabled) RenderSystem.enableDepthTest() else RenderSystem.disableDepthTest()
     }
 
-    private companion object {
+    companion object {
         // One vertex buffer for every canvas: its memory is native and canvases come and go with screens. Canvases
         // draw one after the other (app, then banner), never inside each other, so sharing it is safe.
-        val batch by lazy { QuadBatch() }
-        var active: SmoothCanvas? = null
-        var warnedScaledPose = false
+        private val batch by lazy { QuadBatch() }
+        private var active: SmoothCanvas? = null
+        private var warnedScaledPose = false
+        private var warnedAbandoned = false
 
-        fun warnScaledPose() {
+        /**
+         * Ends a canvas still drawing at the end of a frame (its [end] skipped by an exception), so its scissor does
+         * not clip the next frame's world and HUD to the phone's viewport. Called by the phone after every frame.
+         */
+        internal fun endAbandoned() {
+            active?.let { abandoned(it) }
+        }
+
+        private fun abandoned(canvas: SmoothCanvas) {
+            if (!warnedAbandoned) {
+                warnedAbandoned = true
+                LnbPhone.LOGGER.warn(
+                    "A SmoothCanvas was left drawing without end(), probably after an exception; its render state was " +
+                        "restored. Draw with canvas.draw { } or call end() in a finally block.",
+                )
+            }
+            canvas.finish(discard = true)
+        }
+
+        private fun warnScaledPose() {
             if (warnedScaledPose) return
             warnedScaledPose = true
             LnbPhone.LOGGER.warn("SmoothCanvas drawn under a scaled pose; the smooth layer ignores the scale")
