@@ -5,9 +5,12 @@ import fr.bde_teknantes.lnb.phone.client.smooth.GposFontBuilder.Lookup
 import fr.bde_teknantes.lnb.phone.client.smooth.GposFontBuilder.Pairs
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.ByteBuffer
+import java.time.Duration
+import kotlin.random.Random
 
 /** Expected values computed independently with fontTools from the same Inter 4.1 files. */
 class GposKerningTest {
@@ -162,5 +165,128 @@ class GposKerningTest {
         buffer.position(bytes.size / 2)
         assertEquals(-50, GposKerning(buffer).kerning(3, 5))
         assertEquals(bytes.size / 2, buffer.position(), "the caller's buffer is left as it was")
+    }
+
+    // ---- Broken data: a resource pack can replace the font, so the parser must never crash, hang or read outside ----
+
+    private val sample = GposFontBuilder.font(
+        Lookup(listOf(Pairs(mapOf(3 to listOf(5 to -50, 7 to 20))))),
+        Lookup(listOf(Classes(listOf(10, 11), mapOf(10 to 1), mapOf(20 to 1), arrayOf(intArrayOf(0, -3), intArrayOf(0, -30))))),
+        Lookup(listOf(Pairs(mapOf(4 to listOf(6 to -9)))), extension = true),
+    )
+
+    private fun assertSurvives(bytes: ByteArray, context: String) {
+        val k = try {
+            GposKerning(ByteBuffer.wrap(bytes))
+        } catch (e: Throwable) {
+            throw AssertionError("constructor threw on $context", e)
+        }
+        for (left in listOf(0, 3, 4, 10, 11, 411, 65535)) {
+            for (right in listOf(0, 5, 6, 7, 20, 790, 65535)) {
+                try {
+                    k.kerning(left, right)
+                } catch (e: Throwable) {
+                    throw AssertionError("kerning($left, $right) threw on $context", e)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `survives an empty or tiny file`() {
+        for (size in 0..12) assertSurvives(ByteArray(size), "$size zero bytes")
+        assertTrue(kerning(ByteArray(0)).isEmpty)
+    }
+
+    @Test
+    fun `survives every truncation of a hand-made font`() {
+        for (length in 0 until sample.size) assertSurvives(sample.copyOf(length), "the sample cut to $length bytes")
+    }
+
+    @Test
+    fun `survives random corruption of a hand-made font`() {
+        val random = Random(1234)
+        assertTimeoutPreemptively(Duration.ofSeconds(30)) {
+            repeat(3000) { round ->
+                val bytes = sample.copyOf()
+                repeat(1 + random.nextInt(4)) { bytes[random.nextInt(bytes.size)] = random.nextInt(256).toByte() }
+                assertSurvives(bytes, "corruption round $round")
+            }
+        }
+    }
+
+    @Test
+    fun `survives offsets and counts set to their extremes`() {
+        // Every 16-bit field of the GPOS part, one at a time, set to 0xFFFF and to 0x8000.
+        for (at in 28 until sample.size - 1) {
+            for (value in intArrayOf(0xFFFF, 0x8000, 0x0000)) {
+                val bytes = sample.copyOf()
+                bytes[at] = (value ushr 8).toByte()
+                bytes[at + 1] = value.toByte()
+                assertSurvives(bytes, "u16 at $at set to $value")
+            }
+        }
+    }
+
+    @Test
+    fun `survives a coverage table listing more glyphs than there are pair sets`() {
+        val bytes = GposFontBuilder.font(Lookup(listOf(Pairs(mapOf(3 to listOf(5 to -50), 9 to listOf(5 to -60))))))
+        val pairPos = 66
+        assertEquals(1, bytes[pairPos + 1].toInt(), "the pair subtable starts where expected")
+        assertEquals(-60, kerning(bytes).kerning(9, 5))
+        bytes[pairPos + 9] = 1 // pairSetCount 2 -> 1; the coverage still lists glyphs 3 and 9
+        val k = kerning(bytes)
+        assertEquals(-50, k.kerning(3, 5))
+        assertEquals(0, k.kerning(9, 5))
+    }
+
+    @Test
+    fun `survives class counts that would ask for gigabytes`() {
+        val bytes = GposFontBuilder.font(Lookup(listOf(Classes(listOf(10), mapOf(10 to 1), mapOf(20 to 1), arrayOf(intArrayOf(0, -3), intArrayOf(0, -30))))))
+        // File header 12 + 16, GPOS header 10, script list 2, feature list 14, lookup list 4, lookup 8.
+        val pairPos = 66
+        assertEquals(2, bytes[pairPos + 1].toInt(), "the class subtable starts where expected")
+        assertEquals(-30, kerning(bytes).kerning(10, 20))
+        for (count in intArrayOf(0x7FFF, 0xFFFF)) {
+            for (field in intArrayOf(pairPos + 12, pairPos + 14)) {
+                bytes[field] = (count ushr 8).toByte()
+                bytes[field + 1] = count.toByte()
+            }
+            assertSurvives(bytes, "class counts of $count x $count")
+        }
+    }
+
+    @Test
+    fun `survives truncation and corruption of the real Inter`() {
+        val bytes = InterMetrics.bytes("inter_regular.ttf")
+        val gpos = gposRange(bytes)
+        assertTimeoutPreemptively(Duration.ofSeconds(60)) {
+            for (i in 0..40) {
+                val length = gpos.first + (gpos.last - gpos.first) * i / 40
+                assertSurvives(bytes.copyOf(length), "Inter cut to $length bytes")
+            }
+            val random = Random(99)
+            repeat(150) { round ->
+                val copy = bytes.copyOf()
+                repeat(1 + random.nextInt(8)) {
+                    // Mostly the table's head, where the offsets and counts are.
+                    val span = if (random.nextBoolean()) 64 else gpos.last - gpos.first
+                    copy[gpos.first + random.nextInt(span)] = random.nextInt(256).toByte()
+                }
+                assertSurvives(copy, "Inter corruption round $round")
+            }
+        }
+    }
+
+    private fun gposRange(bytes: ByteArray): IntRange {
+        val b = ByteBuffer.wrap(bytes)
+        for (i in 0 until (b.getShort(4).toInt() and 0xFFFF)) {
+            val record = 12 + 16 * i
+            if (String(bytes, record, 4, Charsets.US_ASCII) == "GPOS") {
+                val offset = b.getInt(record + 8)
+                return offset until offset + b.getInt(record + 12)
+            }
+        }
+        error("No GPOS")
     }
 }

@@ -18,7 +18,13 @@ class GposKerning(font: ByteBuffer) {
 
     init {
         val buf = font.duplicate().order(ByteOrder.BIG_ENDIAN)
-        subtables = findTable(buf, "GPOS")?.let { readKernSubtables(buf, it) } ?: emptyList()
+        // A resource pack can replace the font: a broken table must cost the kerning, never the game. Every read is
+        // bounds-checked by the buffer, so a bad offset or count ends up here.
+        subtables = try {
+            findTable(buf, "GPOS")?.let { readKernSubtables(buf, it) } ?: emptyList()
+        } catch (e: IndexOutOfBoundsException) {
+            emptyList()
+        }
     }
 
     val isEmpty: Boolean get() = subtables.isEmpty()
@@ -50,7 +56,8 @@ class GposKerning(font: ByteBuffer) {
     private class PairSets(lookup: Int, val coverage: Coverage, val pairs: Array<IntArray>, val values: Array<IntArray>) : Subtable(lookup) {
         override fun adjust(left: Int, right: Int): Int? {
             val index = coverage.indexOf(left)
-            if (index < 0) return null
+            // A broken coverage table can list more glyphs than there are pair sets.
+            if (index !in pairs.indices) return null
             val seconds = pairs[index]
             val found = seconds.binarySearch(right)
             return if (found >= 0) values[index][found] else null
@@ -187,8 +194,13 @@ class GposKerning(font: ByteBuffer) {
                     val class1Count = u16(b, at + 12)
                     val class2Count = u16(b, at + 14)
                     val stride = size1 + size2
-                    val values = IntArray(class1Count * class2Count) {
-                        if (xAdvance < 0) 0 else s16(b, at + 16 + stride * it + xAdvance)
+                    // Checked before allocating: two broken counts would otherwise ask for gigabytes.
+                    if (at + 16L + stride.toLong() * class1Count * class2Count > b.limit()) {
+                        throw IndexOutOfBoundsException("Class pair records run past the end of the font")
+                    }
+                    // Without an X advance every pair kerns by 0 (and getOrElse gives 0).
+                    val values = if (xAdvance < 0) IntArray(0) else IntArray(class1Count * class2Count) {
+                        s16(b, at + 16 + stride * it + xAdvance)
                     }
                     ClassPairs(lookup, coverage, first, second, class2Count, values)
                 }
