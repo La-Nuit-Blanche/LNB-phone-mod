@@ -8,7 +8,6 @@ import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
 import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
-import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
@@ -57,7 +56,6 @@ object LnbPhoneClient {
             // resource packs change.
             it.registerReloadListener(SmoothResources)
             it.registerReloadListener(AppIconTextures)
-            it.registerReloadListener(AppIcons)
         }
         modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
         modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->

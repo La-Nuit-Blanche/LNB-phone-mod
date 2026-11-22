@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.client.shell
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
+import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphics
@@ -114,7 +115,7 @@ internal object ShellRenderer {
         for (index in onPage) {
             val slot = index - onPage.first
             val sink = if (index == pressed) 1 else 0
-            AppIcons.draw(graphics, apps[index].icon, vx + HomeGrid.iconX(slot), vy + HomeGrid.iconY(slot) + sink)
+            AppIconTextures.draw(graphics, apps[index].icon, vx + HomeGrid.iconX(slot), vy + HomeGrid.iconY(slot) + sink)
         }
         if (ringed != null) {
             val slot = ringed - onPage.first

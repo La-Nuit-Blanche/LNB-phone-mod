@@ -4,15 +4,16 @@ import com.mojang.blaze3d.platform.NativeImage
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.AppIcon
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 
 /**
- * App icons composed once ([IconComposer]) into small 20 x 20 textures, one per tile and glyph, to draw anywhere with
- * nearest filtering: on the notification banner (inside the smooth layer) as on the home screen. For an
- * [AppIcon.Item], the texture is the bare tile and the caller draws the item over it.
+ * App icons composed once ([IconComposer]) into small 20 x 20 textures, frame included, one per tile and glyph, to draw
+ * anywhere with nearest filtering: on the home screen ([draw]) as on the notification banner (inside the smooth layer,
+ * with [texture]). For an [AppIcon.Item], the texture is the bare tile and the item goes over it.
  *
  * Dropped on resource reload, since a resource pack may change the glyphs. Render thread only.
  */
@@ -20,6 +21,16 @@ object AppIconTextures : ResourceManagerReloadListener {
     private val textures = HashMap<Any, ResourceLocation>()
     private val warned = HashSet<ResourceLocation>()
     private var next = 0
+
+    /** Draws [icon] at 20 x 20 GUI px with its top-left pixel at ([x], [y]), in the current pose (art direction 7). */
+    fun draw(graphics: GuiGraphics, icon: AppIcon, x: Int, y: Int) {
+        graphics.blit(texture(icon), x, y, 0f, 0f, IconComposer.SIZE, IconComposer.SIZE, IconComposer.SIZE, IconComposer.SIZE)
+        // The item in place of a glyph, 16 x 16 at (2, 2). Item rendering draws 150 above the pose: callers putting
+        // something over icons (badges) go higher.
+        if (icon is AppIcon.Item) graphics.renderFakeItem(icon.stack, x + ITEM_AT, y + ITEM_AT)
+    }
+
+    private const val ITEM_AT = 2
 
     /** The composed texture of [icon], 20 x 20 texels. */
     fun texture(icon: AppIcon): ResourceLocation {
