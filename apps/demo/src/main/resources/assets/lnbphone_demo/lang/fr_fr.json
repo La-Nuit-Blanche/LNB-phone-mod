@@ -1,3 +1,7 @@
 {
-  "app.lnbphone_demo.hello": "Bonjour"
+  "app.lnbphone_demo.hello": "Bonjour",
+  "notif.lnbphone_demo.test.title": "Notification de test",
+  "notif.lnbphone_demo.test.text": "%1$s : voici la notification de test n° %2$s de l'app de démo.",
+  "commands.phonedemo.notify.done": "Notification de test envoyée à %s joueur(s)",
+  "commands.phonedemo.clear.done": "Notifications de l'app de démo effacées pour %s joueur(s)"
 }

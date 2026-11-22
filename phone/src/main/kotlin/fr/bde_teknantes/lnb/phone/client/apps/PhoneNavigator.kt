@@ -242,6 +242,13 @@ internal class PhoneNavigator(
      */
     val hasTextFocus: Boolean get() = dispatch("hasTextFocus") { it.hasTextFocus }
 
+    /**
+     * Whether the shown screen says it already shows [target] ([AppScreen.showsTarget]), for a notification of the
+     * [currentApp]. False at home and with the phone put away; the caller checks that the notification is for the
+     * current app.
+     */
+    fun showsTarget(target: String): Boolean = dispatch("showsTarget") { it.showsTarget(target) }
+
     private inline fun dispatch(what: String, action: (AppScreen) -> Boolean): Boolean {
         val screen = shown ?: return false
         return guard(screen, what, false) { action(screen) }
