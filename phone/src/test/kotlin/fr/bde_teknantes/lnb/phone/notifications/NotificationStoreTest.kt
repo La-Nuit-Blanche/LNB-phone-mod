@@ -54,7 +54,7 @@ class NotificationStoreTest {
         store.clearApp(bob, mail)
         assertTrue(store.markDelivered(alice))
 
-        val loaded = NotificationStore.load(store.save(ops), ops)
+        val loaded = NotificationStore.load(store.save(ops), ops, now = 1000L)
         assertEquals(store.of(alice), loaded.of(alice))
         assertEquals(emptyList<PhoneNotification>(), loaded.of(bob))
         assertEquals(store.nextId, loaded.nextId)

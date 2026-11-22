@@ -33,7 +33,7 @@ internal object ServerNotifications {
     /** Stores a notification for [player] and, if they are connected, sends it to them. Arguments already limited. */
     fun send(server: MinecraftServer, player: UUID, appId: ResourceLocation, title: Component, text: Component, target: String?) {
         checkThread(server)
-        val data = NotificationSavedData.get(server)
+        val data = NotificationSavedData.getOrNull(server) ?: return
         val online = server.playerList.getPlayer(player)
         val notification = data.store.add(player, appId, title, text, target, System.currentTimeMillis(), delivered = online != null)
         data.setDirty()
@@ -43,7 +43,7 @@ internal object ServerNotifications {
     /** Removes [player]'s notifications from [appId] (only those leading to [target], if given), on their client too. */
     fun clear(server: MinecraftServer, player: UUID, appId: ResourceLocation, target: String?) {
         checkThread(server)
-        val data = NotificationSavedData.get(server)
+        val data = NotificationSavedData.getOrNull(server) ?: return
         val removed = if (target == null) data.store.clearApp(player, appId) else data.store.clearTarget(player, appId, target)
         if (removed.isEmpty()) return
         data.setDirty()
@@ -52,7 +52,8 @@ internal object ServerNotifications {
 
     private fun onLoggedIn(event: PlayerEvent.PlayerLoggedInEvent) {
         val player = event.entity as? ServerPlayer ?: return
-        val data = NotificationSavedData.get(player.server)
+        val data = NotificationSavedData.getOrNull(player.server) ?: return
+        if (data.store.expire(System.currentTimeMillis(), player.uuid) > 0) data.setDirty()
         // Sent with their delivered flags as they were, so the client can tell what came in while the player was away.
         PacketDistributor.sendToPlayer(player, NotificationsSyncPayload(data.store.of(player.uuid)))
         if (data.store.markDelivered(player.uuid)) data.setDirty()
@@ -68,14 +69,14 @@ internal object ServerNotifications {
     fun handleClearApp(payload: ClearAppNotificationsPayload, context: IPayloadContext) {
         val player = context.player() as? ServerPlayer ?: return
         if (!clientRequests.tryAcquire(player.uuid)) return
-        val data = NotificationSavedData.get(player.server)
+        val data = NotificationSavedData.getOrNull(player.server) ?: return
         if (data.store.clearApp(player.uuid, payload.appId, payload.upToId).isNotEmpty()) data.setDirty()
     }
 
     fun handleDismiss(payload: DismissNotificationPayload, context: IPayloadContext) {
         val player = context.player() as? ServerPlayer ?: return
         if (!clientRequests.tryAcquire(player.uuid)) return
-        val data = NotificationSavedData.get(player.server)
+        val data = NotificationSavedData.getOrNull(player.server) ?: return
         if (data.store.remove(player.uuid, payload.id) != null) data.setDirty()
     }
 

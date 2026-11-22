@@ -12,8 +12,8 @@ import net.minecraft.nbt.NbtOps
 import net.minecraft.nbt.StringTag
 import net.minecraft.nbt.Tag
 import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.ComponentSerialization
 import net.minecraft.network.chat.Style
-import net.minecraft.network.chat.TextColor
 import net.minecraft.resources.ResourceLocation
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -25,6 +25,9 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.util.UUID
 import kotlin.random.Random
+
+/** When the tests' notifications are loaded: their own time, so none has expired. */
+private const val NOW = 1000L
 
 /** The store as written with the world and read back, including files it didn't write cleanly. */
 class NotificationStoreSaveTest {
@@ -39,7 +42,7 @@ class NotificationStoreSaveTest {
         add(player, app, Component.literal("t"), Component.literal("x"), target, 1000L, delivered)
 
     private fun load(tag: CompoundTag, errors: MutableList<String> = mutableListOf()) =
-        NotificationStore.load(tag, ops) { errors += it }
+        NotificationStore.load(tag, ops, now = NOW) { errors += it }
 
     /** The saved player entries, by UUID, for a test to damage. */
     private fun CompoundTag.entry(player: UUID): CompoundTag {
@@ -62,11 +65,13 @@ class NotificationStoreSaveTest {
     @Test
     fun `every field survives a save and a load`() {
         val store = NotificationStore()
-        val title = Component.translatable("notif.test.title").withStyle(Style.EMPTY.withColor(TextColor.fromRgb(0xE5483C)).withBold(true))
-        // A component argument with a style (a plain one is saved as a string, and comes back as one: same text).
-        val post = Component.literal("Je l'ai vu près du moulin, côté est !").withStyle { it.withItalic(true) }
-        val text = Component.translatable("notif.test.text", "Mika Laurent", post, 3, 2.5)
-            .append(Component.keybind("key.jump"))
+        // As the API stores them: through the limits, so without styles. A component argument that is more than plain
+        // text (a plain one is saved as a string, and comes back as one: same text).
+        val title = NotificationLimits.title(Component.translatable("notif.test.title"))
+        val post = Component.translatable("notif.test.post", "Je l'ai vu près du moulin, côté est !")
+        val text = NotificationLimits.text(
+            Component.translatable("notif.test.text", "Mika Laurent", post, 3, 2.5).append(Component.keybind("key.jump")),
+        )
         val n = store.add(alice, mail, title, text, "thread:8/reply:4", 1_763_800_000_000L, delivered = true)
         val empty = store.add(alice, feed, Component.empty(), Component.empty(), null, 0L, delivered = false)
         val loaded = load(store.save(ops))
@@ -318,5 +323,89 @@ class NotificationStoreSaveTest {
             if (random.nextBoolean()) target.remove(key) else target.put(key, junk.random(random)())
             load(tag) // must not throw
         }
+    }
+
+    // ---- Checked again on load ----
+
+    @Test
+    fun `what a hand edit or an older build saved is made valid again or dropped`() {
+        val store = threePlayers()
+        val tag = store.save(ops)
+        val notifications = tag.notifications(alice)
+        // An app id too long for the network: dropped, reported.
+        notifications.getCompound(0).putString("app", "test:" + "p".repeat(NotificationLimits.MAX_APP_ID_LENGTH))
+        // A text far over its limit, with a style, and an empty target: cut, unstyled, no target.
+        val long = Component.literal("x".repeat(5000)).withStyle { it.withBold(true) }
+        notifications.getCompound(1).put("text", ComponentSerialization.CODEC.encodeStart(ops, long).getOrThrow())
+        notifications.getCompound(1).putString("target", "")
+        val errors = mutableListOf<String>()
+        val loaded = load(tag, errors)
+        assertEquals(1, errors.size)
+        val kept = loaded.of(alice).single()
+        assertEquals(store.of(alice)[1].id, kept.id)
+        assertEquals(NotificationLimits.MAX_TEXT_LENGTH, kept.text.string.length)
+        assertEquals(Style.EMPTY, kept.text.style)
+        assertEquals(null, kept.target)
+        // The dropped one's id still counts.
+        assertEquals(store.nextId, loaded.nextId)
+    }
+
+    @Test
+    fun `two entries for one player are merged`() {
+        val tag = threePlayers().save(ops)
+        val players = tag.getList("players", Tag.TAG_COMPOUND.toInt())
+        val again = NotificationStore().apply { repeat(7) { add(bob) } }.save(ops).entry(bob)
+        // Ids 1 to 7 again: one of them (3) is Bob's own notification, and loads once.
+        players.add(again)
+        val loaded = load(tag)
+        assertEquals((1L..7L).toList(), loaded.of(bob).map { it.id })
+    }
+
+    @Test
+    fun `a notification that can't be written is left out and reported`() {
+        val store = NotificationStore()
+        store.add(alice, target = "ok")
+        store.add(alice, target = "t".repeat(300))
+        val errors = mutableListOf<String>()
+        val tag = store.save(ops) { errors += it }
+        assertEquals(1, errors.size)
+        assertEquals(listOf("ok"), load(tag).of(alice).map { it.target })
+    }
+
+    @Test
+    fun `the saved tag is a copy, and a change is saved next time`() {
+        val store = threePlayers()
+        val first = store.save(ops)
+        first.notifications(alice).clear()
+        assertEquals(store.of(alice), load(store.save(ops)).of(alice))
+        store.add(alice)
+        assertEquals(3, load(store.save(ops)).of(alice).size)
+        store.clearApp(alice, feed)
+        assertEquals(listOf(mail), load(store.save(ops)).of(alice).map { it.appId })
+        store.markDelivered(bob)
+        assertTrue(load(store.save(ops)).of(bob).all { it.delivered })
+    }
+
+    // ---- Expiry ----
+
+    @Test
+    fun `notifications older than 30 days are dropped, on load and on demand`() {
+        val day = 24 * 60 * 60 * 1000L
+        val store = NotificationStore()
+        store.add(alice, feed, Component.literal("t"), Component.literal("old"), null, 0L, false)
+        store.add(alice, feed, Component.literal("t"), Component.literal("new"), null, 10 * day, false)
+        store.add(bob, feed, Component.literal("t"), Component.literal("old"), null, 0L, false)
+        val loaded = NotificationStore.load(store.save(ops), ops, now = 31 * day)
+        assertEquals(listOf("new"), loaded.of(alice).map { it.text.string })
+        assertEquals(setOf(alice), loaded.playersWithNotifications)
+
+        // On demand, one player or all; exactly 30 days old is kept; a clock set back keeps everything.
+        assertEquals(0, store.expire(-5 * day))
+        assertEquals(1, store.expire(30 * day + 1, alice))
+        assertEquals(listOf("new"), store.of(alice).map { it.text.string })
+        assertEquals(1, store.of(bob).size)
+        assertEquals(0, store.expire(30 * day))
+        assertEquals(2, store.expire(40 * day + 1))
+        assertEquals(emptySet<UUID>(), store.playersWithNotifications)
     }
 }
