@@ -41,6 +41,16 @@ Both load the phone and the demo app. The game runs in `apps/demo/run/`; the ser
 `apps/demo/run/eula.txt`.
 The server listens on 25565; `-Pserver_port=25566` picks another port, for servers from several checkouts at once.
 
+## Screenshots
+
+```
+./gradlew :apps:demo:runCapture -Pcapture=smooth [-PcaptureDir=<absolute directory>]
+```
+
+Starts a client that plays a capture scenario by itself (GUI scale changes, screens, a throwaway world) and quits.
+Shots go to `captureDir`, or `apps/demo/run/captures/<scenario>/`. Scenarios are in the demo's
+`client/capture/CaptureScenarios.kt`.
+
 ## License
 
 AGPL-3.0-or-later.

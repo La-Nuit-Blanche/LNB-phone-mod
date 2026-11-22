@@ -8,8 +8,11 @@ import net.neoforged.fml.loading.FMLEnvironment
 @Mod(DemoApp.ID)
 class DemoApp(modBus: IEventBus) {
     init {
-        // Referenced by its full name, behind the check, so a dedicated server never loads a client class.
-        if (FMLEnvironment.dist.isClient) fr.bde_teknantes.lnb.phone.demo.client.DemoAppClient.init(modBus)
+        // Referenced by their full names, behind the check, so a dedicated server never loads a client class.
+        if (FMLEnvironment.dist.isClient) {
+            fr.bde_teknantes.lnb.phone.demo.client.DemoAppClient.init(modBus)
+            fr.bde_teknantes.lnb.phone.demo.client.DemoClient.init()
+        }
     }
 
     companion object {
