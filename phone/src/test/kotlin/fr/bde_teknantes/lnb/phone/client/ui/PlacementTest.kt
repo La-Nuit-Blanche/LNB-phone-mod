@@ -31,6 +31,28 @@ class PlacementTest {
     }
 
     @Test
+    fun `menus of one to four items never leave the viewport, from any button position`() {
+        for (items in 1..4) {
+            var y = 0f
+            while (y <= 342f) {
+                var x = 0f
+                while (x <= 228f) {
+                    val box = Placement.menu(Box(x, y, 28f, 28f), items)
+                    assertTrue(inside(box), "$items items from a button at ($x, $y): $box")
+                    x += 19f
+                }
+                y += 1f
+            }
+        }
+    }
+
+    @Test
+    fun `a menu taller than the viewport keeps its top on screen`() {
+        val box = Placement.menu(Box(100f, 200f, 28f, 28f), 10)
+        assertEquals(0f, box.y)
+    }
+
+    @Test
     fun `a tooltip sits centred 6 dp above its element`() {
         assertEquals(Box(98f, 70f, 60f, 24f), Placement.tooltip(Box(118f, 100f, 20f, 20f), 60f, 24f))
     }

@@ -29,12 +29,12 @@ internal object Placement {
     /**
      * The menu's box for one opened by a button at [anchor]: its top-right corner 4 dp under the button's bottom-right
      * corner, or its bottom-right corner 4 dp above the button's top-right when it would pass y 362. Kept inside the
-     * viewport horizontally.
+     * viewport: a menu that fits neither below nor above its button covers it rather than leave the screen.
      */
     fun menu(anchor: Box, items: Int): Box {
         val h = menuHeight(items)
         val below = anchor.bottom + MENU_GAP
-        val y = if (below + h > MENU_FLOOR) anchor.y - MENU_GAP - h else below
+        val y = (if (below + h > MENU_FLOOR) anchor.y - MENU_GAP - h else below).coerceAtMost(VIEWPORT_H - h).coerceAtLeast(0f)
         val x = (anchor.right - MENU_WIDTH).coerceIn(0f, VIEWPORT_W - MENU_WIDTH)
         return Box(x, y, MENU_WIDTH, h)
     }
