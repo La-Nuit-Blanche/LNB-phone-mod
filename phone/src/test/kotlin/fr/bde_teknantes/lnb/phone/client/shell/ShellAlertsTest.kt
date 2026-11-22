@@ -193,6 +193,26 @@ internal class ShellAlertsTest : ShellTestBase() {
     }
 
     @Test
+    fun `the smooth layer is prepared on arrival in a world and on a GUI scale change, not before a peek`() {
+        registerFeed()
+        tick()
+        assertEquals(1, host.prewarms)
+        tick(10)
+        notify()
+        tick(5)
+        assertEquals(1, host.prewarms)
+        host.guiScale = 3.0
+        tick()
+        assertEquals(2, host.prewarms)
+        // Not at GUI scale 1, where nothing smooth is drawn; again when back at 2.
+        host.guiScale = 1.0
+        tick()
+        host.guiScale = 2.0
+        tick()
+        assertEquals(3, host.prewarms)
+    }
+
+    @Test
     fun `at GUI scale 1 there is neither banner nor peek, only the chime`() {
         registerFeed()
         host.guiScale = 1.0

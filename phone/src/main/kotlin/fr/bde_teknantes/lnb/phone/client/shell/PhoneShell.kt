@@ -203,6 +203,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         clearSlide()
         clearPointer()
         alerts.reset()
+        warmedScale = 0.0
     }
 
     private fun startClosing() {
@@ -280,6 +281,21 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         finishAnimations(now())
         alerts.tick()
         if (navigator.isOpen && appsSupported()) navigator.tick()
+        warmUp()
+    }
+
+    // The GUI scale the smooth layer was last prepared for, 0 for none since the last world.
+    private var warmedScale = 0.0
+
+    /**
+     * Prepares the smooth layer when the player arrives in a world and when the GUI scale changes: moments where the
+     * tens of milliseconds it costs go unnoticed (the world just loaded, the window is being resized), rather than on
+     * the first peek, which comes in the middle of play.
+     */
+    private fun warmUp() {
+        if (!host.inWorld || !appsSupported() || host.guiScale == warmedScale) return
+        warmedScale = host.guiScale
+        host.prewarm()
     }
 
     /** At the start of each frame: a slide that has just ended opens the phone's screen at once, not a tick later. */
