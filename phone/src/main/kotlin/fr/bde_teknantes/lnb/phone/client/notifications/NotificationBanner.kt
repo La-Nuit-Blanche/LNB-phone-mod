@@ -68,16 +68,15 @@ class NotificationBanner {
         val shadowAlpha = (BannerLayout.shadowOpacity(progress) * 255f).roundToInt()
         if (shadowAlpha > 0) shadow(canvas, x - m, y - m, BannerLayout.WIDTH + 2 * m, BannerLayout.HEIGHT + 2 * m, (shadowAlpha shl 24) or 0xFFFFFF)
 
-        // The pressed overlay and the edge are faint white over an opaque fill, so they are blended here into opaque
-        // colours: the same pixels, and the canvas's shader on this branch drops fragments under 10 % alpha. The edge
-        // goes back to real alpha once the banner is drawn with the fixed canvas.
+        // The pressed overlay covers the whole card: blended into its fill, the same pixels in one shape. The edge is
+        // the real translucent `banner-edge` over the fill and the anti-aliased corners.
         val fill = when (look) {
             BannerLook.NORMAL -> SURFACE_2
             BannerLook.HOVER -> SURFACE_3
             BannerLook.PRESSED -> over(OVERLAY_PRESSED, SURFACE_3)
         }
         canvas.fillRoundRect(x, y, BannerLayout.WIDTH, BannerLayout.HEIGHT, BannerLayout.RADIUS, fill)
-        canvas.strokeRoundRect(x, y, BannerLayout.WIDTH, BannerLayout.HEIGHT, BannerLayout.RADIUS, BannerLayout.EDGE, over(BANNER_EDGE, fill))
+        canvas.strokeRoundRect(x, y, BannerLayout.WIDTH, BannerLayout.HEIGHT, BannerLayout.RADIUS, BannerLayout.EDGE, BANNER_EDGE)
 
         // Pixel art: nearest filtering, one texel per GUI px (2 dp).
         canvas.image(

@@ -10,7 +10,9 @@ import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
 import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
 import fr.bde_teknantes.lnb.phone.client.settings.SettingsApp
-import fr.bde_teknantes.lnb.phone.client.shell.AppIcons
+import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneInventoryButton
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
@@ -20,6 +22,7 @@ import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
 import fr.bde_teknantes.lnb.phone.client.ui.SmoothTextures
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothShader
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.IEventBus
@@ -63,15 +66,24 @@ object LnbPhoneClient {
             // resource packs change.
             it.registerReloadListener(SmoothResources)
             it.registerReloadListener(AppIconTextures)
-            it.registerReloadListener(AppIcons)
             // Which densities of the kit's icons exist may change with resource packs.
             it.registerReloadListener(SmoothTextures)
         }
         modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
         modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->
+            // NeoForge hides only vanilla's layers with the HUD (F1): the phone's own check hideGui themselves.
             // The phone while it slides, over the whole HUD; once it stands open, its screen draws it.
             event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "phone")) { graphics, _ ->
-                if (Minecraft.getInstance().screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
+                val mc = Minecraft.getInstance()
+                if (!mc.options.hideGui && mc.screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
+            }
+            // The peek of the closed phone, under the hotbar, hearts and food (art direction 10.2)...
+            event.registerBelow(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek")) { graphics, _ ->
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekDevice(graphics)
+            }
+            // ...and its banner above the chat, which would cover it; it never reaches the hotbar or the food row.
+            event.registerAbove(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek_banner")) { graphics, _ ->
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekBanner(graphics)
             }
         }
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {
@@ -90,7 +102,17 @@ object LnbPhoneClient {
             if (event.name == VanillaGuiLayers.CROSSHAIR && Minecraft.getInstance().screen is PhoneScreen) event.isCanceled = true
         }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onInit)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onRender)
         navigator.addListener(ClientNotificationHandler)
+        // The notifications drive the home badges, the LED and the inventory button, and what arrives while the player
+        // plays shows as a banner or a peek.
+        PhoneBadges.source = BadgeSource(notifications::unreadCount)
+        notifications.addListener(object : ClientNotifications.Listener {
+            override fun onArrived(notification: PhoneNotification) = PhoneShell.notificationArrived(notification)
+
+            override fun onChanged() = PhoneShell.notificationsChanged()
+        })
         PhoneShell.init()
     }
 

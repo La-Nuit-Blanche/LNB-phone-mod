@@ -4,8 +4,10 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
 import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
@@ -35,6 +37,15 @@ internal interface ShellHost {
     /** Shows [screen] (null: back to the game), calling `removed()` on the one it replaces, as Minecraft does. */
     fun setScreen(screen: Screen?)
 
+    /**
+     * Closes the open screen as its own close does (Esc): a container screen tells the server, which puts the crafting
+     * grid and the item on the cursor back. Back to the game afterwards, whatever the screen did.
+     */
+    fun closeScreen()
+
+    /** The unread notifications of the apps this client has, oldest first. */
+    val unread: List<PhoneNotification>
+
     fun createPhoneScreen(): Screen
 
     fun isPhoneScreen(screen: Screen?): Boolean
@@ -55,11 +66,14 @@ internal interface ShellHost {
 
     fun play(sound: ShellSound)
 
+    /** [notification] was read in place, its target on screen: removed here and on the server. */
+    fun dismissNotification(notification: PhoneNotification)
+
     /** Prepares the smooth layer (fonts, glyphs, shapes) for the current GUI scale, so opening doesn't hitch. */
     fun prewarm() {}
 }
 
-internal enum class ShellSound { OPEN, CLOSE, TAP }
+internal enum class ShellSound { OPEN, CLOSE, TAP, NOTIFICATION }
 
 /** The shell's host in the game. Client only. */
 internal object MinecraftShellHost : ShellHost {
@@ -76,6 +90,15 @@ internal object MinecraftShellHost : ShellHost {
     override val screen: Screen? get() = mc.screen
 
     override fun setScreen(screen: Screen?) = mc.setScreen(screen)
+
+    override fun closeScreen() {
+        val open = mc.screen ?: return
+        open.onClose()
+        if (mc.screen != null) mc.setScreen(null)
+    }
+
+    override val unread: List<PhoneNotification>
+        get() = LnbPhoneClient.notifications.all.filter { LnbPhoneClient.apps[it.appId] != null }
 
     override fun createPhoneScreen(): Screen = PhoneScreen()
 
@@ -99,5 +122,8 @@ internal object MinecraftShellHost : ShellHost {
         ShellSound.OPEN -> PhoneSounds.open()
         ShellSound.CLOSE -> PhoneSounds.close()
         ShellSound.TAP -> PhoneSounds.tap()
+        ShellSound.NOTIFICATION -> PhoneSounds.notification()
     }
+
+    override fun dismissNotification(notification: PhoneNotification) = ClientNotificationHandler.dismiss(notification)
 }

@@ -1,10 +1,12 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
+import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.client.apps.NavigationListener
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.apps.Transition
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettings
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.resources.ResourceLocation
@@ -22,6 +24,35 @@ internal object PhoneShell : PhoneShellCore(MinecraftShellHost) {
         val now = now()
         val pose = currentPose(now) ?: return
         ShellRenderer.render(graphics, pose, now, if (interactive && state == PhoneShellCore.State.OPEN) Pointer(mouseX, mouseY) else null)
+    }
+
+    /** Draws the peeking device (art direction 10.2), if a peek shows: the HUD layer under the hotbar. */
+    fun renderPeekDevice(graphics: GuiGraphics) {
+        val now = now()
+        val pose = alerts.peekPose(now) ?: return
+        guardPeek { ShellRenderer.renderPeekDevice(graphics, pose, now) }
+    }
+
+    /** Draws the peek's banner, if a peek shows: its own HUD layer, above the chat, which would cover it. */
+    fun renderPeekBanner(graphics: GuiGraphics) {
+        val pose = alerts.peekPose() ?: return
+        val notification = alerts.peek?.notification ?: return
+        guardPeek { ShellRenderer.renderPeekBanner(graphics, pose, notification) }
+    }
+
+    private var peekFailed = false
+
+    // The peek draws in the middle of play: an error in it costs the peek, never the game. Logged once.
+    private inline fun guardPeek(draw: () -> Unit) {
+        try {
+            draw()
+        } catch (e: Exception) {
+            alerts.dropPeek()
+            if (!peekFailed) {
+                peekFailed = true
+                LnbPhone.LOGGER.error("The phone's notification peek failed to draw; it is dropped", e)
+            }
+        }
     }
 }
 
@@ -58,8 +89,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     internal var slideOutgoing: AppScreen? = null
         private set
 
-    // The screen to put back when the phone closes (the inventory, when the phone was opened from it).
-    private var returnTo: Screen? = null
+    // Makes the screen to show when the phone closes (a fresh inventory, when the phone was opened from it). A maker
+    // rather than the screen: a container screen put away is closed for good, and must not be shown again.
+    private var returnTo: (() -> Screen?)? = null
 
     /** Home page shown, kept while the phone is put away. */
     internal var page = 0
@@ -97,6 +129,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
      */
     internal var heldProgress: Float? = null
 
+    /** The banner, the peek and the chime of notifications that arrive (art direction 10). */
+    internal val alerts = ShellAlerts(this, host)
+
     fun init() {
         navigator.addListener(this)
         host.settings.addListener(::onSettingsChanged)
@@ -107,10 +142,10 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     val isOut: Boolean get() = state != State.CLOSED
 
     /**
-     * Brings the phone out, on the screen it was put away on. [returnTo] is the screen to show again when the phone
+     * Brings the phone out, on the screen it was put away on. [returnTo] makes the screen to show when the phone
      * closes; any screen open now is closed so that the phone slides up over the game.
      */
-    fun open(returnTo: Screen? = null) {
+    fun open(returnTo: (() -> Screen?)? = null) {
         if (state == State.OPEN || state == State.OPENING) return
         if (!host.inWorld) return
         this.returnTo = returnTo
@@ -118,12 +153,27 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         host.prewarm()
         if (host.screen != null) host.setScreen(null)
         val now = now()
-        val from = if (state == State.CLOSING) currentPose(now) else null
+        // A peeking device rises from where it peeks (14 "Open from a peek").
+        val peeking = alerts.onOpening(now)
+        val from = (if (state == State.CLOSING) currentPose(now) else null) ?: peeking
         val target = restingPose()
         slide = DeviceSlide.open(from ?: DevicePose(target.x, guiHeight(), 0f), now)
         state = State.OPENING
         navigator.open()
+        readInPlace()
         host.play(ShellSound.OPEN)
+    }
+
+    /**
+     * The phone reopens onto an app left open: its badge stays (it clears when the app is opened), but notifications
+     * whose target the shown screen reports as on screen are read in place, as one arriving there would be (10.3).
+     */
+    private fun readInPlace() {
+        val app = navigator.currentApp ?: return
+        for (notification in host.unread) {
+            val target = notification.target ?: continue
+            if (notification.appId == app.id && navigator.showsTarget(target)) host.dismissNotification(notification)
+        }
     }
 
     /** Puts the phone away: it slides down, and the next [open] shows the same screen. */
@@ -140,11 +190,47 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
 
     /**
      * The phone key went down while no screen was open: a real press, never a key repeat (holding the key must not
-     * open and close the phone over and over). The host calls it straight from the input event.
+     * open and close the phone over and over). The host calls it straight from the input event. During a peek it opens
+     * the phone on the notification's target (2.3, P-9).
      */
     fun phoneKeyPressedInGame() {
-        if (host.screen == null && host.inWorld) toggle()
+        if (host.screen != null || !host.inWorld) return
+        val peeked = alerts.peekedNotification()
+        if (peeked == null) return toggle()
+        // The app first, while the phone is put away, so its screens don't slide in: the device rises onto them, from
+        // where the peek is. An app that fails to start leaves the phone where it was, and it opens there all the same.
+        navigator.openApp(peeked.appId, peeked.target)
+        open()
     }
+
+    /**
+     * The inventory's phone button (art direction 11). The inventory is closed as its own close would (the server
+     * hears it: the crafting grid and the cursor's item go back to the inventory), the phone opens over the game, and
+     * [reopen] makes a fresh inventory when it closes.
+     *
+     * With unread notifications (P-5) the phone opens on the home screen, so the badges show where the news is, but
+     * only if it was put away on home or on an app's root screen: leaving a deeper screen would end the app's session
+     * and lose what the player was writing there (2.3 keeps it until disconnection). Then it opens where it was left,
+     * with the newest unread notification as the banner, so the news still shows.
+     */
+    fun openFromInventory(reopen: () -> Screen?) {
+        if (state == State.OPEN || state == State.OPENING || !host.inWorld) return
+        val news = unreadNow() > 0
+        val keepsScreen = news && navigator.canGoBack
+        if (news && !keepsScreen) navigator.home()
+        host.closeScreen()
+        open(returnTo = reopen)
+        if (keepsScreen) host.unread.lastOrNull()?.let(alerts::showUnread)
+    }
+
+    /** Unread notifications of every app, read from the store now rather than from last tick's [counts]. */
+    internal fun unreadNow(): Int = host.apps.apps.sumOf { PhoneBadges.count(it.id) }
+
+    /** A notification arrived while the player is connected (not one of the login sync). */
+    fun notificationArrived(notification: PhoneNotification) = alerts.arrived(notification)
+
+    /** The notification store changed in any way: a banner or peek whose notification is gone goes away. */
+    fun notificationsChanged() = alerts.notificationsChanged()
 
     /** Disconnection: everything forgotten at once, with no animation. */
     fun reset() {
@@ -154,6 +240,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         page = 0
         clearSlide()
         clearPointer()
+        alerts.reset()
+        warmedScale = 0.0
     }
 
     private fun startClosing() {
@@ -163,7 +251,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         // State first: the phone screen's removed() then knows the shell closed it. Closed while still rising, the
         // phone has no screen yet, but the one it was opened from comes back all the same.
         if (host.isPhoneScreen(screen) || (screen == null && back != null)) {
-            host.setScreen(back)
+            host.setScreen(back?.invoke())
             // A mod refused the screen it came from (ScreenEvent.Opening): give the game back rather than leave the
             // phone's screen up with nothing behind it. Going back to the game can't be refused.
             if (host.isPhoneScreen(host.screen)) host.setScreen(null)
@@ -185,6 +273,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         state = State.CLOSING
         returnTo = null
         clearPointer()
+        alerts.onPutAway()
         host.play(ShellSound.CLOSE)
     }
 
@@ -196,6 +285,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         returnTo = null
         clearSlide()
         clearPointer()
+        alerts.onPutAway()
         navigator.close()
     }
 
@@ -227,7 +317,23 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         }
         updateCounts()
         finishAnimations(now())
+        alerts.tick()
         if (navigator.isOpen && appsSupported()) navigator.tick()
+        warmUp()
+    }
+
+    // The GUI scale the smooth layer was last prepared for, 0 for none since the last world.
+    private var warmedScale = 0.0
+
+    /**
+     * Prepares the smooth layer when the player arrives in a world and when the GUI scale changes: moments where the
+     * tens of milliseconds it costs go unnoticed (the world just loaded, the window is being resized), rather than on
+     * the first peek, which comes in the middle of play.
+     */
+    private fun warmUp() {
+        if (!host.inWorld || !appsSupported() || host.guiScale == warmedScale) return
+        warmedScale = host.guiScale
+        host.prewarm()
     }
 
     /** At the start of each frame: a slide that has just ended opens the phone's screen at once, not a tick later. */
@@ -359,7 +465,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
                 homeButtonShown = true
                 homeButtonStart = now
             }
-            Device.inViewport(dx, dy) -> if (navigator.isHome) {
+            Device.inViewport(dx, dy) -> if (alerts.mousePressed(dpX(x, pose), dpY(y, pose), button, now)) {
+                // The notification banner lies over the viewport: the click is its, not the screen's under it.
+            } else if (navigator.isHome) {
                 if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                     val app = HomeGrid.appAt(dx - Device.VIEWPORT_X, dy - Device.VIEWPORT_Y, page(), appCount())
                     if (app != null) {
@@ -381,6 +489,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         val pose = currentPose() ?: return false
         val dx = x - pose.x
         val dy = y - pose.y
+        alerts.mouseReleased(dpX(x, pose), dpY(y, pose), button, now(), Device.inViewport(dx, dy))
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && homeButtonHeld) {
             homeButtonHeld = false
             if (Device.inHomeButton(floor(dx).toInt(), floor(dy).toInt())) {
@@ -397,7 +506,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
                 null
             }
             val app = host.apps.apps.getOrNull(pressed)
-            if (under == pressed && app != null && navigator.isHome) {
+            // Released on the banner, which came down over the icon since: the press is cancelled.
+            val onBanner = alerts.bannerContains(dpX(x, pose), dpY(y, pose), now())
+            if (under == pressed && app != null && navigator.isHome && !onBanner) {
                 host.play(ShellSound.TAP)
                 navigator.openApp(app)
             }
@@ -418,6 +529,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (state != State.OPEN) return false
         val pose = currentPose() ?: return false
         if (!Device.inViewport(x - pose.x, y - pose.y)) return true
+        // Over the banner the wheel is the banner's: the screen under it doesn't scroll.
+        if (alerts.mouseScrolled(dpX(x, pose), dpY(y, pose), now())) return true
         if (navigator.isHome) {
             // One page per whole notch, however finely the wheel or trackpad reports it; turning back starts over.
             homeScroll = if (homeScroll != 0.0 && Math.signum(scrollY) != Math.signum(homeScroll)) scrollY else homeScroll + scrollY

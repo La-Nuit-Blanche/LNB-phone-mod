@@ -135,6 +135,15 @@ class IconComposerTest {
     }
 
     @Test
+    fun `half-way alpha decides what casts a shade`() {
+        val tile = TileColor.AZURE
+        val icon = IconComposer.compose(tile, glyph(0x7FFFFFFF, 3 to 5).also { it[5 * 16 + 8] = 0x80FFFFFF.toInt() })
+        // Alpha 127 casts nothing; alpha 128 does.
+        assertEquals(tile.base, icon.at(2 + 3, 2 + 6))
+        assertEquals(tile.lo, icon.at(2 + 8, 2 + 6))
+    }
+
+    @Test
     fun `an empty glyph gives the bare tile`() {
         for (tile in TileColor.entries) {
             assertEquals(IconComposer.compose(tile, null).toList(), IconComposer.compose(tile, IntArray(256)).toList())
