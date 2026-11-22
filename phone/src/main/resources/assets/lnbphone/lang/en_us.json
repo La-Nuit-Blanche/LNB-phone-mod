@@ -3,5 +3,8 @@
   "key.categories.lnbphone": "LNB Phone",
   "key.lnbphone.open": "Open the phone",
   "gui.lnbphone.title": "LNB Phone",
-  "gui.lnbphone.scale": "GUI scale: 2+"
+  "gui.lnbphone.scale": "GUI scale: 2+",
+  "gui.lnbphone.inventory": "LNB Phone",
+  "gui.lnbphone.inventory.unread.one": "1 new notification",
+  "gui.lnbphone.inventory.unread": "%s new notifications"
 }

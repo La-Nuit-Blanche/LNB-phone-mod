@@ -203,4 +203,27 @@ internal class ShellAlertsTest : ShellTestBase() {
         assertNull(alerts.banner)
         assertEquals(2, host.sounds.count { it == ShellSound.NOTIFICATION })
     }
+
+    @Test
+    fun `the inventory button opens on home when there is news, and the inventory comes back (P-4, P-5)`() {
+        registerFeed()
+        openFully()
+        host.navigator.openApp(appId("mail"))
+        shell.close()
+        closeFully()
+        val inventory = host.openOtherScreen("inventory")
+        val before = PhoneBadges.source
+        try {
+            PhoneBadges.source = BadgeSource { if (it == appId("feed")) 3 else 0 }
+            tick()
+            shell.openFromInventory(inventory)
+            assertTrue(host.navigator.isHome)
+            tick(OPEN_TICKS)
+            assertEquals(State.OPEN, shell.state)
+            host.pressKey(ESC)
+            assertSame(inventory, host.screen)
+        } finally {
+            PhoneBadges.source = before
+        }
+    }
 }

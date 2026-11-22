@@ -159,6 +159,17 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (host.screen == null && host.inWorld && !alerts.phoneKeyDuringPeek()) toggle()
     }
 
+    /**
+     * The inventory's phone button (art direction 11): the phone opens over the game and [inventory] comes back when it
+     * closes. With unread notifications it opens on the home screen, so the badges show where the news is (P-5);
+     * otherwise on the screen it was put away on (P-4).
+     */
+    fun openFromInventory(inventory: Screen) {
+        if (state == State.OPEN || state == State.OPENING || !host.inWorld) return
+        if (counts.values.any { it > 0 }) navigator.home()
+        open(returnTo = inventory)
+    }
+
     /** A notification arrived while the player is connected (not one of the login sync). */
     fun notificationArrived(notification: PhoneNotification) = alerts.arrived(notification)
 

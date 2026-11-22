@@ -10,6 +10,7 @@ import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
 import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneInventoryButton
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
 import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
@@ -87,6 +88,8 @@ object LnbPhoneClient {
             if (event.name == VanillaGuiLayers.CROSSHAIR && Minecraft.getInstance().screen is PhoneScreen) event.isCanceled = true
         }
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onInit)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onRender)
         navigator.addListener(ClientNotificationHandler)
         // The notifications drive the home badges, the LED and the inventory button, and what arrives while the player
         // plays shows as a banner or a peek.
