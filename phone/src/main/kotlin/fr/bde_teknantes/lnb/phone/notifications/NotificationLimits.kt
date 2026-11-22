@@ -92,9 +92,10 @@ object NotificationLimits {
             else -> Component.empty()
         }
 
+        // A boolean is turned into its text: saved or sent, Minecraft writes it as a byte and reads it back as 1 or 0.
         private fun argument(arg: Any?): Any = when (arg) {
             is Component -> if (parts > 0) copy(arg) else Component.empty()
-            is Number, is Boolean -> arg
+            is Number -> arg
             else -> take(arg.toString())
         }
 

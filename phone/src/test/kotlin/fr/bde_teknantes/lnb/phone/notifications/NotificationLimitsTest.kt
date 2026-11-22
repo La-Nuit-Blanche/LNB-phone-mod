@@ -112,6 +112,18 @@ class NotificationLimitsTest {
     }
 
     @Test
+    fun `a boolean argument reads the same once saved or sent`() {
+        // Minecraft writes a boolean argument as a byte and reads back 1: the player would see "1" for "true".
+        val clamped = NotificationLimits.text(Component.translatable("notif.test", true, false))
+        val buf = RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY)
+        ComponentSerialization.STREAM_CODEC.encode(buf, clamped)
+        val sent = (ComponentSerialization.STREAM_CODEC.decode(buf).contents as TranslatableContents).args
+        assertEquals(listOf("true", "false"), sent.map { it.toString() })
+        val saved = ComponentSerialization.CODEC.parse(ops, ComponentSerialization.CODEC.encodeStart(ops, clamped).getOrThrow()).getOrThrow()
+        assertEquals(listOf("true", "false"), (saved.contents as TranslatableContents).args.map { it.toString() })
+    }
+
+    @Test
     fun `component arguments count, and arguments come before the fallback`() {
         val component = Component.translatableWithFallback(
             "notif.test",
