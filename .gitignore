@@ -44,3 +44,6 @@ repo/
 
 ### Third-party mod jars (never committed or redistributed) ###
 libs/
+
+# A reference image of unknown origin, kept locally for the art direction; never committed.
+design/reference/
