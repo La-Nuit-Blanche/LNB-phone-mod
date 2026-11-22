@@ -267,6 +267,60 @@ internal class PhoneInventoryButtonTest : AlertsTestBase() {
     }
 
     @Test
+    fun `the inventory is closed as its own close does, and a fresh one comes back each time`() {
+        registerAll()
+        val first = host.openOtherScreen("inventory")
+        var made = 0
+        shell.openFromInventory { TestScreen("inventory ${++made}") }
+        assertEquals(listOf(first), host.screensClosed)
+        tick(OPEN_TICKS)
+        host.pressKey(ESC)
+        assertEquals("inventory 1", host.screen.toString())
+        assertTrue(host.screen !== first)
+    }
+
+    @Test
+    fun `no inventory comes back once the player is gone`() {
+        registerAll()
+        host.openOtherScreen("inventory")
+        shell.openFromInventory { null }
+        tick(OPEN_TICKS)
+        host.pressKey(ESC)
+        assertNull(host.screen)
+    }
+
+    @Test
+    fun `news counts from the tick it arrives, before the badges refresh`() {
+        registerAll()
+        openFully()
+        host.navigator.openApp(appId("mail"))
+        shell.close()
+        closeFully()
+        badges("feed" to 1)
+        // No tick between the arrival and the click.
+        shell.openFromInventory(host.openOtherScreen("inventory"))
+        assertTrue(host.navigator.isHome)
+    }
+
+    @Test
+    fun `with news, a phone put away deeper than an app's root keeps its screen and shows the newest as the banner`() {
+        registerAll()
+        openFully()
+        host.navigator.openApp(appId("feed"), "thread:3")
+        host.navigator.currentScreen!!.let { (it as TargetScreen).handle.push(TargetScreen("compose")) }
+        shell.close()
+        closeFully()
+        val newest = notification("mail", null)
+        host.newest = newest
+        badges("mail" to 1)
+        shell.openFromInventory(host.openOtherScreen("inventory"))
+        assertEquals("compose", host.navigator.currentScreen.toString())
+        assertSame(newest, alerts.banner?.notification)
+        // The banner is the news already counted: no chime.
+        assertEquals(0, chimes)
+    }
+
+    @Test
     fun `the button opens the phone with its own sound only`() {
         registerAll()
         shell.openFromInventory(host.openOtherScreen("inventory"))

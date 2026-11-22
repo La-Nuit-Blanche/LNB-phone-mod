@@ -37,6 +37,15 @@ internal interface ShellHost {
     /** Shows [screen] (null: back to the game), calling `removed()` on the one it replaces, as Minecraft does. */
     fun setScreen(screen: Screen?)
 
+    /**
+     * Closes the open screen as its own close does (Esc): a container screen tells the server, which puts the crafting
+     * grid and the item on the cursor back. Back to the game afterwards, whatever the screen did.
+     */
+    fun closeScreen()
+
+    /** The newest unread notification of an app this client has, or null. */
+    fun newestUnread(): PhoneNotification?
+
     fun createPhoneScreen(): Screen
 
     fun isPhoneScreen(screen: Screen?): Boolean
@@ -81,6 +90,15 @@ internal object MinecraftShellHost : ShellHost {
     override val screen: Screen? get() = mc.screen
 
     override fun setScreen(screen: Screen?) = mc.setScreen(screen)
+
+    override fun closeScreen() {
+        val open = mc.screen ?: return
+        open.onClose()
+        if (mc.screen != null) mc.setScreen(null)
+    }
+
+    override fun newestUnread(): PhoneNotification? =
+        LnbPhoneClient.notifications.all.lastOrNull { LnbPhoneClient.apps[it.appId] != null }
 
     override fun createPhoneScreen(): Screen = PhoneScreen()
 

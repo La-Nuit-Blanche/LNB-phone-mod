@@ -71,6 +71,20 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         if (next != null && isPhoneScreen(next)) shell.onScreenShown()
     }
 
+    /** Screens closed through [closeScreen] (as their own close would, telling the server for a container). */
+    val screensClosed = ArrayList<Screen>()
+
+    override fun closeScreen() {
+        val open = screen ?: return
+        screensClosed += open
+        setScreen(null)
+    }
+
+    /** What [newestUnread] answers: the newest unread notification of an installed app. */
+    var newest: PhoneNotification? = null
+
+    override fun newestUnread(): PhoneNotification? = newest
+
     override fun createPhoneScreen(): Screen = TestScreen(PHONE)
 
     override fun isPhoneScreen(screen: Screen?) = (screen as? TestScreen)?.name == PHONE

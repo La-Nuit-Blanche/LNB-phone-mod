@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.AbstractButton
 import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.client.gui.narration.NarrationElementOutput
+import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
 import net.minecraft.client.sounds.SoundManager
 import net.minecraft.network.chat.Component
@@ -39,28 +40,35 @@ internal object PhoneInventoryButton {
     /** `accent`, the colour of the tooltip's unread line. */
     private const val UNREAD_TEXT = 0x3A8DF0
 
-    // The button of the inventory screen shown now; the old one is dropped with its screen.
-    private var current: PhoneButton? = null
+    // No reference to the button or its screen is kept here: it would hold the player, and through them the level,
+    // after a disconnection or a change of dimension. The screen holds its button; each frame finds it there.
 
     fun onInit(event: ScreenEvent.Init.Post) {
         val screen = event.screen as? InventoryScreen ?: return
         val button = PhoneButton(screen)
         button.place()
         event.addListener(button)
-        current = button
     }
 
     fun onRender(event: ScreenEvent.Render.Pre) {
         val screen = event.screen as? InventoryScreen ?: return
-        current?.takeIf { it.screen === screen }?.place()
+        for (child in screen.children()) if (child is PhoneButton) child.place()
     }
 
-    /** What the tooltip says for [unread] notifications: the phone's name, and how many are new. */
-    private fun tooltip(unread: Int): Component {
+    /**
+     * The tooltip for [unread] notifications: the phone's name, and how many are new. The narrator reads the name as
+     * the button's own; the tooltip adds only the unread line, so the name isn't said twice.
+     */
+    private fun tooltip(unread: Int): Tooltip {
         val name = Component.translatable(InventoryButtonLayout.NAME_KEY)
-        val key = InventoryButtonLayout.unreadKey(unread) ?: return name
-        return name.copy().append("\n").append(Component.translatable(key, unread).withColor(UNREAD_TEXT))
+        val key = InventoryButtonLayout.unreadKey(unread) ?: return Tooltip.create(name, null)
+        val line = Component.translatable(key, unread).withColor(UNREAD_TEXT)
+        return Tooltip.create(name.copy().append("\n").append(line), line)
     }
+
+    // What the inventory turns into when the phone closes: a fresh one for the player as they are then, as the
+    // inventory key would open (the creative inventory for a player now in creative). None once the player is gone.
+    private fun freshInventory(): Screen? = Minecraft.getInstance().player?.let(::InventoryScreen)
 
     private class PhoneButton(val screen: InventoryScreen) : AbstractButton(
         0, 0, InventoryButtonLayout.WIDTH, InventoryButtonLayout.HEIGHT, Component.translatable(InventoryButtonLayout.NAME_KEY),
@@ -76,14 +84,14 @@ internal object PhoneInventoryButton {
             val unread = unread()
             if (unread != tooltipCount) {
                 tooltipCount = unread
-                setTooltip(Tooltip.create(tooltip(unread)))
+                setTooltip(tooltip(unread))
             }
         }
 
-        // Every app's badge, as the home screen shows them.
-        private fun unread(): Int = PhoneShell.counts.values.sum()
+        // Every app's badge, read from the store now: in the tick a notification arrives, a click must see it.
+        private fun unread(): Int = PhoneShell.unreadNow()
 
-        override fun onPress() = PhoneShell.openFromInventory(screen)
+        override fun onPress() = PhoneShell.openFromInventory(::freshInventory)
 
         // No vanilla click: the phone plays its own opening sound, which the Sounds setting mutes.
         override fun playDownSound(handler: SoundManager) {}

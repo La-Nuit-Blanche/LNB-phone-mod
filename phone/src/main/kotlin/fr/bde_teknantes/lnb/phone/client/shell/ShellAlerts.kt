@@ -76,6 +76,14 @@ internal class ShellAlerts(private val shell: PhoneShellCore, private val host: 
         }
     }
 
+    /**
+     * Shows [notification], already waiting as a badge, as the banner over the phone that is opening: no chime, it
+     * isn't news that just arrived. For the inventory button when the phone opens on a screen it keeps (P-5).
+     */
+    fun showUnread(notification: PhoneNotification) {
+        if (shell.appsSupported()) showBanner(notification)
+    }
+
     private fun showBanner(notification: PhoneNotification) {
         val now = nowMs()
         val current = banner

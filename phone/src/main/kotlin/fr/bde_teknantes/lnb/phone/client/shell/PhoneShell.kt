@@ -67,8 +67,9 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     internal var slideOutgoing: AppScreen? = null
         private set
 
-    // The screen to put back when the phone closes (the inventory, when the phone was opened from it).
-    private var returnTo: Screen? = null
+    // Makes the screen to show when the phone closes (a fresh inventory, when the phone was opened from it). A maker
+    // rather than the screen: a container screen put away is closed for good, and must not be shown again.
+    private var returnTo: (() -> Screen?)? = null
 
     /** Home page shown, kept while the phone is put away. */
     internal var page = 0
@@ -119,10 +120,10 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     val isOut: Boolean get() = state != State.CLOSED
 
     /**
-     * Brings the phone out, on the screen it was put away on. [returnTo] is the screen to show again when the phone
+     * Brings the phone out, on the screen it was put away on. [returnTo] makes the screen to show when the phone
      * closes; any screen open now is closed so that the phone slides up over the game.
      */
-    fun open(returnTo: Screen? = null) {
+    fun open(returnTo: (() -> Screen?)? = null) {
         if (state == State.OPEN || state == State.OPENING) return
         if (!host.inWorld) return
         this.returnTo = returnTo
@@ -162,15 +163,27 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
     }
 
     /**
-     * The inventory's phone button (art direction 11): the phone opens over the game and [inventory] comes back when it
-     * closes. With unread notifications it opens on the home screen, so the badges show where the news is (P-5);
-     * otherwise on the screen it was put away on (P-4).
+     * The inventory's phone button (art direction 11). The inventory is closed as its own close would (the server
+     * hears it: the crafting grid and the cursor's item go back to the inventory), the phone opens over the game, and
+     * [reopen] makes a fresh inventory when it closes.
+     *
+     * With unread notifications (P-5) the phone opens on the home screen, so the badges show where the news is, but
+     * only if it was put away on home or on an app's root screen: leaving a deeper screen would end the app's session
+     * and lose what the player was writing there (2.3 keeps it until disconnection). Then it opens where it was left,
+     * with the newest unread notification as the banner, so the news still shows.
      */
-    fun openFromInventory(inventory: Screen) {
+    fun openFromInventory(reopen: () -> Screen?) {
         if (state == State.OPEN || state == State.OPENING || !host.inWorld) return
-        if (counts.values.any { it > 0 }) navigator.home()
-        open(returnTo = inventory)
+        val news = unreadNow() > 0
+        val keepsScreen = news && navigator.canGoBack
+        if (news && !keepsScreen) navigator.home()
+        host.closeScreen()
+        open(returnTo = reopen)
+        if (keepsScreen) host.newestUnread()?.let(alerts::showUnread)
     }
+
+    /** Unread notifications of every app, read from the store now rather than from last tick's [counts]. */
+    internal fun unreadNow(): Int = host.apps.apps.sumOf { PhoneBadges.count(it.id) }
 
     /** A notification arrived while the player is connected (not one of the login sync). */
     fun notificationArrived(notification: PhoneNotification) = alerts.arrived(notification)
@@ -193,7 +206,7 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         // State first: the phone screen's removed() then knows the shell closed it. Closed while still rising, the
         // phone has no screen yet, but the one it was opened from comes back all the same.
         if (host.isPhoneScreen(screen) || (screen == null && back != null)) {
-            host.setScreen(back)
+            host.setScreen(back?.invoke())
             // A mod refused the screen it came from (ScreenEvent.Opening): give the game back rather than leave the
             // phone's screen up with nothing behind it. Going back to the game can't be refused.
             if (host.isPhoneScreen(host.screen)) host.setScreen(null)
