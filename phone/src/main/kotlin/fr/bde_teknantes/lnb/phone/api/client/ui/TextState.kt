@@ -37,6 +37,10 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
 
     internal constructor(initial: String, multiline: Boolean) : this(initial, multiline, DEFAULT_MAX_LENGTH)
     private var content = ""
+
+    /** Grapheme boundaries of [content], found on first use after each change: stepping over a long run of emoji by
+     *  asking [Graphemes] for each boundary again would walk the text from its start every time. */
+    private var boundaryMask: BooleanArray? = null
     private val listeners = ArrayList<(TextState) -> Unit>()
 
     /** Where the caret is. */
@@ -188,6 +192,7 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
     private fun replaceAll(newText: String, newCaret: Int) {
         val changed = newText != content
         content = newText
+        boundaryMask = null
         // Forward: what was just typed may have joined the grapheme before it (a skin tone, a ZWJ and the next emoji),
         // and the caret goes after it rather than back before the whole sequence.
         caret = Graphemes.ceil(newText, newCaret.coerceIn(0, newText.length))
@@ -221,12 +226,31 @@ class TextState internal constructor(initial: String, val multiline: Boolean, va
         return out.substring(0, Graphemes.floor(out.toString(), out.offsetByCodePoints(0, room)))
     }
 
-    private fun previous(index: Int): Int = Graphemes.previous(content, index)
+    private fun mask(): BooleanArray = boundaryMask ?: Graphemes.boundaries(content).also { boundaryMask = it }
 
-    private fun next(index: Int): Int = if (index >= content.length) content.length else Graphemes.next(content, index)
+    /** The boundary before [index]: the start of the grapheme that ends at it, or that it is inside. 0 at the start. */
+    private fun previous(index: Int): Int {
+        val mask = mask()
+        var i = minOf(index, content.length) - 1
+        while (i > 0 && !mask[i]) i--
+        return maxOf(i, 0)
+    }
+
+    /** The boundary after [index], where the grapheme that starts at it ends. */
+    private fun next(index: Int): Int {
+        val mask = mask()
+        var i = maxOf(index, -1) + 1
+        while (i < content.length && !mask[i]) i++
+        return minOf(i, content.length)
+    }
 
     /** [index], moved back to the start of the grapheme it is inside. */
-    private fun boundary(index: Int): Int = Graphemes.floor(content, index)
+    private fun boundary(index: Int): Int {
+        val mask = mask()
+        var i = index.coerceIn(0, content.length)
+        while (i > 0 && !mask[i]) i--
+        return i
+    }
 
     /** 0: space, 1: word character, 2: anything else (punctuation). */
     private fun kindAt(index: Int): Int {
