@@ -13,8 +13,21 @@ object SampleSkins {
     private val ALEX_GRID = listOf("OOOOOOOO", "OOOOOOOO", "OSSSSOOO", "SSSSSSSO", "SWGSSGWO", "SSSSSSSO", "SSSMMSSS", "SSSSSSSS")
     private val ALEX_COLORS = mapOf('O' to 0xD9772B, 'S' to 0xF2C8A0, 'W' to 0xFFFFFF, 'G' to 0x4E8A3A, 'M' to 0xC88E6F)
 
+    private val MIKA_GRID = listOf("KKKKKKKK", "KKKKKKKK", "KKSSSSKK", "KSSSSSSK", "SWESSEWS", "SSSSSSSS", "SSSMMSSS", "SSSSSSSS")
+    private val MIKA_COLORS = mapOf('K' to 0x1C1C22, 'S' to 0xC68E6A, 'W' to 0xFFFFFF, 'E' to 0x2B6E4F, 'M' to 0x8A5038)
+    private val LUNE_GRID = listOf("PPPPPPPP", "PPPPPPPP", "PPSSSSPP", "PSSSSSSP", "PWESSEWP", "PSSSSSSP", "PSSMMSSP", "PSSSSSSP")
+    private val LUNE_COLORS = mapOf('P' to 0x7A5CE6, 'S' to 0xE8BFA0, 'W' to 0xFFFFFF, 'E' to 0x3A8DF0, 'M' to 0xB07A60)
+
     val STEVE: ResourceLocation by lazy { register("steve", STEVE_GRID, STEVE_COLORS) }
     val ALEX: ResourceLocation by lazy { register("alex", ALEX_GRID, ALEX_COLORS) }
+    val MIKA: ResourceLocation by lazy { register("mika", MIKA_GRID, MIKA_COLORS) }
+    val LUNE: ResourceLocation by lazy { register("lune", LUNE_GRID, LUNE_COLORS) }
+
+    /** Kael: Mika's grid with brown hair. */
+    val KAEL: ResourceLocation by lazy { register("kael", MIKA_GRID, MIKA_COLORS + ('K' to 0x6B3A1E)) }
+
+    /** Camille: Alex's grid with dark hair. */
+    val CAMILLE: ResourceLocation by lazy { register("camille", ALEX_GRID, ALEX_COLORS + ('O' to 0x2F1F0F)) }
 
     private fun register(name: String, grid: List<String>, colors: Map<Char, Int>): ResourceLocation {
         val image = NativeImage(64, 64, true)

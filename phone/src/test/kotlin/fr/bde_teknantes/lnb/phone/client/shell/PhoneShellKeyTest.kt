@@ -163,6 +163,21 @@ internal class PhoneShellKeyTest : ShellTestBase() {
         assertEquals(emptyList<String>(), log)
     }
 
+    @Test
+    fun `while a field has the focus, no key goes on to the game, even one the app doesn't use`() {
+        openOn(Where.ROOT)
+        root.focus = true
+        assertTrue(shell.keyPressed(GLFW.GLFW_KEY_A, 0, 0))
+        root.focus = false
+        assertFalse(shell.keyPressed(GLFW.GLFW_KEY_A, 0, 0))
+    }
+
+    @Test
+    fun `opening the phone prepares the smooth layer first`() {
+        openOn(Where.ROOT)
+        assertTrue(host.prewarms >= 1)
+    }
+
     @ParameterizedTest
     @ValueSource(ints = [GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_KEY_UP])
     fun `at GUI scale 1 the app hears no keys, and Esc and the phone key still put the phone away (P-15)`(key: Int) {

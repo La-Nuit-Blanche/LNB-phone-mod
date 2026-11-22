@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.demo.client.capture
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.KeyboardHandler
 import net.minecraft.client.MouseHandler
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.world.level.GameType
@@ -133,6 +134,30 @@ class CaptureScript {
     }
 
     /**
+     * Types [text] as a keyboard does, one character per tick: for a letter, digit or space, its key goes down (and
+     * comes up on the same tick), then the character arrives through Minecraft's character callback, which is how
+     * accented letters from dead keys arrive too.
+     */
+    fun type(text: String) = apply {
+        for (c in text) {
+            steps += Step {
+                val mc = Minecraft.getInstance()
+                val key = when {
+                    c in 'a'..'z' -> GLFW.GLFW_KEY_A + (c - 'a')
+                    c in 'A'..'Z' -> GLFW.GLFW_KEY_A + (c - 'A')
+                    c in '0'..'9' -> GLFW.GLFW_KEY_0 + (c - '0')
+                    c == ' ' -> GLFW.GLFW_KEY_SPACE
+                    else -> -1
+                }
+                if (key >= 0) mc.keyboardHandler.keyPress(mc.window.window, key, GLFW.glfwGetKeyScancode(key), GLFW.GLFW_PRESS, 0)
+                ON_CHAR.invoke(mc.keyboardHandler, mc.window.window, c.code, 0)
+                if (key >= 0) mc.keyboardHandler.keyPress(mc.window.window, key, GLFW.glfwGetKeyScancode(key), GLFW.GLFW_RELEASE, 0)
+                true
+            }
+        }
+    }
+
+    /**
      * Moves the pointer to the middle of the GUI pixel [position] gives, window GUI px, computed when the step runs
      * (the phone may have moved since the script was built).
      */
@@ -174,6 +199,9 @@ class CaptureScript {
         ).apply { isAccessible = true }
         val ON_PRESS: Method = MouseHandler::class.java.getDeclaredMethod(
             "onPress", Long::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+        ).apply { isAccessible = true }
+        val ON_CHAR: Method = KeyboardHandler::class.java.getDeclaredMethod(
+            "charTyped", Long::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
         ).apply { isAccessible = true }
         val ON_SCROLL: Method = MouseHandler::class.java.getDeclaredMethod(
             "onScroll", Long::class.javaPrimitiveType, Double::class.javaPrimitiveType, Double::class.javaPrimitiveType,

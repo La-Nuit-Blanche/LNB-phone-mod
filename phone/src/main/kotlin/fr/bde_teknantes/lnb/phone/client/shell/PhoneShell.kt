@@ -114,6 +114,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
         if (state == State.OPEN || state == State.OPENING) return
         if (!host.inWorld) return
         this.returnTo = returnTo
+        // Fonts and masks for this GUI scale, before the slide's first frames rather than during them.
+        host.prewarm()
         if (host.screen != null) host.setScreen(null)
         val now = now()
         val from = if (state == State.CLOSING) currentPose(now) else null
@@ -458,7 +460,8 @@ internal open class PhoneShellCore(private val host: ShellHost) : NavigationList
             // While a text field has the focus, the phone key and Backspace belong to it.
             phoneKey -> if (!used && !textFocus && !repeat) close()
             keyCode == GLFW.GLFW_KEY_BACKSPACE -> if (!used && !textFocus && !repeat) back()
-            else -> return used
+            // While the player types, no key goes on to the game or to other mods' key handlers.
+            else -> return used || textFocus
         }
         // Always true for the phone's own keys, so the game doesn't act on them as well (pause on Esc, the key mapping).
         return true

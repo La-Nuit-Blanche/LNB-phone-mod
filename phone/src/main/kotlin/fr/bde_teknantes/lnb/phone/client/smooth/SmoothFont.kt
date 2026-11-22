@@ -56,6 +56,8 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
     /** A rasterised glyph: coverage rows and the bitmap's offset from the pen position on the baseline. */
     class Bitmap(val width: Int, val height: Int, val left: Int, val top: Int, val coverage: ByteArray)
 
+    override fun hasGlyph(codePoint: Int): Boolean = glyphId(codePoint) != 0
+
     fun glyphId(codePoint: Int): Int {
         val cached = glyphIds.get(codePoint)
         if (cached >= 0) return cached

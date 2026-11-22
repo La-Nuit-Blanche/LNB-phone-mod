@@ -1,9 +1,11 @@
 package fr.bde_teknantes.lnb.phone.client.shell
 
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
 import fr.bde_teknantes.lnb.phone.client.LnbPhoneClient
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
@@ -52,6 +54,9 @@ internal interface ShellHost {
     fun isPhoneKeyDown(): Boolean
 
     fun play(sound: ShellSound)
+
+    /** Prepares the smooth layer (fonts, glyphs, shapes) for the current GUI scale, so opening doesn't hitch. */
+    fun prewarm() {}
 }
 
 internal enum class ShellSound { OPEN, CLOSE, TAP }
@@ -85,6 +90,10 @@ internal object MinecraftShellHost : ShellHost {
     override fun isPhoneMouseButton(button: Int) = PhoneKeys.OPEN.matchesMouse(button) && PhoneKeys.modifierHeld()
 
     override fun isPhoneKeyDown(): Boolean = PhoneKeys.isPhysicallyDown()
+
+    override fun prewarm() {
+        SmoothCanvas.prewarm()
+    }
 
     override fun play(sound: ShellSound) = when (sound) {
         ShellSound.OPEN -> PhoneSounds.open()

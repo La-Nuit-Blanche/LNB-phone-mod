@@ -5,6 +5,9 @@ import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
 import fr.bde_teknantes.lnb.phone.api.client.TileColor
 import fr.bde_teknantes.lnb.phone.demo.DemoApp
+import fr.bde_teknantes.lnb.phone.demo.client.kit.FeedScreen
+import fr.bde_teknantes.lnb.phone.demo.client.kit.FeedSession
+import fr.bde_teknantes.lnb.phone.demo.client.kit.KitIndexScreen
 import fr.bde_teknantes.lnb.phone.demo.DemoCommands
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
@@ -48,6 +51,22 @@ object DemoAppClient {
             val tile = TileColor.entries[n % TileColor.entries.size]
             event.register(app("sample_$n", Component.translatable("app.lnbphone_demo.sample.filler", n), glyphIcon(tile, glyph)))
         }
+        // The UI kit's gallery and the composed Feed screens (task 5).
+        event.register(
+            PhoneApp(
+                id = ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "kit"),
+                name = Component.translatable("app.lnbphone_demo.kit"),
+                icon = AppIcon.Glyph(TileColor.VIOLET, ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "textures/gui/hello.png")),
+            ) { KitIndexScreen() },
+        )
+        // Feed's two tabs and Compose, rebuilt from the kit with sample data, to click, type and scroll in the game.
+        event.register(
+            PhoneApp(
+                id = ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "feed_sample"),
+                name = Component.translatable("app.lnbphone_demo.feed_sample"),
+                icon = AppIcon.Glyph(TileColor.AZURE, ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/feed.png")),
+            ) { FeedScreen(FEED_SESSION) },
+        )
     }
 
     private fun app(path: String, name: Component, icon: AppIcon) =
@@ -56,6 +75,9 @@ object DemoAppClient {
     // The phone's own example glyphs, read as plain textures.
     private fun glyphIcon(tile: TileColor, glyph: String) =
         AppIcon.Glyph(tile, ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/$glyph.png"))
+
+    /** The sample Feed's tab, scroll positions and draft, kept for the game session as Feed would keep them. */
+    val FEED_SESSION = FeedSession()
 
     private val EXAMPLES = listOf(
         "feed" to TileColor.AZURE,
