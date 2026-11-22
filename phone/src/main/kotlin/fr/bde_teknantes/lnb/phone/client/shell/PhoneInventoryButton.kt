@@ -26,7 +26,9 @@ import net.neoforged.neoforge.client.event.ScreenEvent
  * Client thread only.
  */
 internal object PhoneInventoryButton {
-    private const val Z_BADGE = 200f
+    // Over the tab and the quest button's bracket, under the recipe book (drawn 100 up), which covers the button as it
+    // covers the quest button when it is open.
+    private const val Z_BADGE = 50f
 
     private fun sprite(path: String) = ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, path)
 
@@ -52,7 +54,7 @@ internal object PhoneInventoryButton {
 
     fun onRender(event: ScreenEvent.Render.Pre) {
         val screen = event.screen as? InventoryScreen ?: return
-        for (child in screen.children()) if (child is PhoneButton) child.place()
+        for (child in screen.children()) if (child is PhoneButton) child.place(event.mouseX, event.mouseY)
     }
 
     /**
@@ -77,10 +79,24 @@ internal object PhoneInventoryButton {
         private var tooltipCount = -1
         private val pulse = BadgePulse()
 
-        fun place() {
+        // The open recipe book's area this frame, null when it is closed, and the pointer: the part of the button the
+        // book covers neither lights up nor takes a click that the book itself doesn't use.
+        private var book: InventoryButtonLayout.Area? = null
+        private var mouseX = 0
+        private var mouseY = 0
+
+        fun place(mouseX: Int = Int.MIN_VALUE, mouseY: Int = Int.MIN_VALUE) {
             val at = InventoryButtonLayout.position(screen.guiLeft, screen.guiTop)
             x = at.x
             y = at.y
+            this.mouseX = mouseX
+            this.mouseY = mouseY
+            val recipes = screen.recipeBookComponent
+            book = if (recipes.isVisible) {
+                InventoryButtonLayout.recipeBookArea(screen.width, screen.height)
+            } else {
+                null
+            }
             val unread = unread()
             if (unread != tooltipCount) {
                 tooltipCount = unread
@@ -92,6 +108,11 @@ internal object PhoneInventoryButton {
         private fun unread(): Int = PhoneShell.unreadNow()
 
         override fun onPress() = PhoneShell.openFromInventory(::freshInventory)
+
+        override fun isHovered(): Boolean = super.isHovered() && book?.contains(mouseX, mouseY) != true
+
+        override fun clicked(mouseX: Double, mouseY: Double): Boolean =
+            super.clicked(mouseX, mouseY) && book?.contains(mouseX.toInt(), mouseY.toInt()) != true
 
         // No vanilla click: the phone plays its own opening sound, which the Sounds setting mutes.
         override fun playDownSound(handler: SoundManager) {}
@@ -140,6 +161,18 @@ internal object InventoryButtonLayout {
     const val UNREAD_KEY = "gui.lnbphone.inventory.unread"
 
     enum class Look { NORMAL, HOVER, NEW, NEW_HOVER }
+
+    /** A rectangle in window GUI px. */
+    data class Area(val x: Int, val y: Int, val width: Int, val height: Int) {
+        fun contains(px: Int, py: Int) = px >= x && px < x + width && py >= y && py < y + height
+    }
+
+    /**
+     * Where vanilla draws the open recipe book (147 x 166) in a screen of [width] x [height] GUI px: 86 px left of
+     * centre, next to the inventory; centred over it in a window under 379 px, too narrow for both.
+     */
+    fun recipeBookArea(width: Int, height: Int) =
+        Area((width - 147) / 2 - (if (width >= 379) 86 else 0), (height - 166) / 2, 147, 166)
 
     /** The button's top-left for an inventory whose top-left is ([guiLeft], [guiTop]), window GUI px. */
     fun position(guiLeft: Int, guiTop: Int) = Point(guiLeft + LEFT, guiTop + TOP)

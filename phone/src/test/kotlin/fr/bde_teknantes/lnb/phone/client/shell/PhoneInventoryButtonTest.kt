@@ -36,6 +36,19 @@ internal class PhoneInventoryButtonTest : AlertsTestBase() {
     }
 
     @Test
+    fun `the open recipe book covers the button's left part where vanilla draws it`() {
+        // 480 x 270: the book at x 80 to 226 next to the inventory moved to guiLeft 229, the button at x 207.
+        val book = InventoryButtonLayout.recipeBookArea(480, 270)
+        assertEquals(InventoryButtonLayout.Area(80, 52, 147, 166), book)
+        val button = InventoryButtonLayout.position(229, 52)
+        assertTrue(book.contains(button.x, button.y + 10))
+        assertTrue(book.contains(226, button.y + 10))
+        assertFalse(book.contains(227, button.y + 10))
+        // Under 379 px the book is centred over the inventory.
+        assertEquals(InventoryButtonLayout.Area(86, 37, 147, 166), InventoryButtonLayout.recipeBookArea(320, 240))
+    }
+
+    @Test
     fun `the button is 27 x 28 and its badge sits 3 px up and left of it, at (127, 95) in P-5_1`() {
         assertEquals(27, InventoryButtonLayout.WIDTH)
         assertEquals(28, InventoryButtonLayout.HEIGHT)
