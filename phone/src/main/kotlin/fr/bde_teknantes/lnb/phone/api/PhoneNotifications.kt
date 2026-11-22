@@ -42,6 +42,9 @@ import java.util.UUID
  * characters of plain text and texts [MAX_TEXT_LENGTH] (all parts and arguments together), with at most 16
  * arguments per translation: longer ones are cut, so you can pass a post's whole text.
  *
+ * **Overloads.** Each `send` comes with and without a `target`, rather than with a default value: a default compiles
+ * into your mod as a call to a generated method, which a later version of the phone adding a parameter would remove.
+ *
  * **Threads.** Every function here may be called from any thread: the server thread, a network or HTTP callback, a
  * scheduler. Arguments are checked at once, in your thread (so a bad target throws where you made it); the change is
  * then made on the server thread, at once if you are on it, otherwise shortly after the call returns. Calls made one
@@ -80,14 +83,20 @@ object PhoneNotifications {
      * longer than 128.
      */
     @JvmStatic
-    @JvmOverloads
-    fun send(player: UUID, appId: ResourceLocation, title: Component, text: Component, target: String? = null) =
+    fun send(player: UUID, appId: ResourceLocation, title: Component, text: Component, target: String?) =
         send(listOf(player), appId, title, text, target)
+
+    /** Notifies [player] by UUID, leading to your app's first screen. See the [send] by UUID with a target. */
+    @JvmStatic
+    fun send(player: UUID, appId: ResourceLocation, title: Component, text: Component) = send(player, appId, title, text, null)
+
+    /** Notifies a connected [player], leading to your app's first screen. See the [send] by UUID for the parameters. */
+    @JvmStatic
+    fun send(player: ServerPlayer, appId: ResourceLocation, title: Component, text: Component) = send(player, appId, title, text, null)
 
     /** Notifies a connected [player]. See the [send] by UUID for the parameters. */
     @JvmStatic
-    @JvmOverloads
-    fun send(player: ServerPlayer, appId: ResourceLocation, title: Component, text: Component, target: String? = null) {
+    fun send(player: ServerPlayer, appId: ResourceLocation, title: Component, text: Component, target: String?) {
         // By UUID on the server thread: the player may have left by then, and still gets it at their next login.
         val request = Request(appId, title, text, target)
         val players = listOf(player.uuid)
@@ -99,12 +108,15 @@ object PhoneNotifications {
      * that several follow). The collection is read during the call. See the [send] by UUID for the other parameters.
      */
     @JvmStatic
-    @JvmOverloads
-    fun send(players: Collection<UUID>, appId: ResourceLocation, title: Component, text: Component, target: String? = null) {
+    fun send(players: Collection<UUID>, appId: ResourceLocation, title: Component, text: Component, target: String?) {
         val request = Request(appId, title, text, target)
         val copy = players.toList()
         onServerThread(currentServer("send a notification") ?: return) { server -> ServerNotifications.service.send(server, copy, request) }
     }
+
+    /** Notifies each of [players], leading to your app's first screen. See the [send] by UUID for the parameters. */
+    @JvmStatic
+    fun send(players: Collection<UUID>, appId: ResourceLocation, title: Component, text: Component) = send(players, appId, title, text, null)
 
     /**
      * Notifies every player who has played on this world, connected or not (a new announcement): those with a save in
@@ -112,14 +124,17 @@ object PhoneNotifications {
      * afterwards doesn't get it. See the [send] by UUID for the parameters.
      */
     @JvmStatic
-    @JvmOverloads
-    fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, target: String? = null) {
+    fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, target: String?) {
         val request = Request(appId, title, text, target)
         onServerThread(currentServer("send a notification") ?: return) { server ->
             val host = ServerNotifications.host(server)
             ServerNotifications.service.sendToEveryone(host, request.appId, request.title, request.text, request.target)
         }
     }
+
+    /** Notifies every player who has played on this world, leading to your app's first screen. See the other [sendToEveryone]. */
+    @JvmStatic
+    fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component) = sendToEveryone(appId, title, text, null)
 
     /** Removes all of [player]'s notifications from [appId], connected or not: the badge goes and no banner comes back. */
     @JvmStatic

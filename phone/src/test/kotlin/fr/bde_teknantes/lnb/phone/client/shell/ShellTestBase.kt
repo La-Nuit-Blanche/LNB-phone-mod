@@ -5,11 +5,21 @@ import fr.bde_teknantes.lnb.phone.api.client.AppScreen
 import fr.bde_teknantes.lnb.phone.api.client.Phone
 import fr.bde_teknantes.lnb.phone.api.client.PhoneApp
 import fr.bde_teknantes.lnb.phone.client.apps.testApp
+import net.minecraft.client.gui.screens.Screen
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.io.TempDir
 import org.lwjgl.glfw.GLFW
 import java.nio.file.Path
+
+/**
+ * The phone opened from the inventory, giving [inventory] itself back when it closes: in the game a fresh inventory is
+ * made then; a test checks which screen comes back by instance.
+ */
+internal fun PhoneShellCore.openFromInventory(inventory: Screen) = openFromInventory { inventory }
+
+/** The phone opened with [returnTo] to show when it closes. */
+internal fun PhoneShellCore.open(returnTo: Screen) = open { returnTo }
 
 /**
  * A phone shell on a [FakeShellHost]: a 480 x 270 GUI px window (1920 x 1080 at GUI scale 4, the flows' W frames),

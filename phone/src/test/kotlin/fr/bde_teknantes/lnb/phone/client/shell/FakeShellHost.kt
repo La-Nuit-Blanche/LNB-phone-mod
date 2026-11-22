@@ -3,6 +3,7 @@ package fr.bde_teknantes.lnb.phone.client.shell
 import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
 import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
 import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import org.lwjgl.glfw.GLFW
@@ -70,6 +71,20 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
         if (next != null && isPhoneScreen(next)) shell.onScreenShown()
     }
 
+    /** Screens closed through [closeScreen] (as their own close would, telling the server for a container). */
+    val screensClosed = ArrayList<Screen>()
+
+    override fun closeScreen() {
+        val open = screen ?: return
+        screensClosed += open
+        setScreen(null)
+    }
+
+    /** The store's unread notifications, oldest first; those dismissed since are left out of [unread]. */
+    var unreadList: List<PhoneNotification> = emptyList()
+
+    override val unread: List<PhoneNotification> get() = unreadList.filter { it !in dismissed }
+
     override fun createPhoneScreen(): Screen = TestScreen(PHONE)
 
     override fun isPhoneScreen(screen: Screen?) = (screen as? TestScreen)?.name == PHONE
@@ -90,6 +105,17 @@ internal class FakeShellHost(settingsFile: Path) : ShellHost {
 
     override fun play(sound: ShellSound) {
         sounds += sound
+    }
+
+    /** Notifications read in place, in order. */
+    val dismissed = ArrayList<PhoneNotification>()
+
+    /** What reading in place does besides being recorded (a test wires the client's notification store here). */
+    var onDismiss: (PhoneNotification) -> Unit = {}
+
+    override fun dismissNotification(notification: PhoneNotification) {
+        dismissed += notification
+        onDismiss(notification)
     }
 
     /** Runs the tasks queued with [later], as the client does between frames. */

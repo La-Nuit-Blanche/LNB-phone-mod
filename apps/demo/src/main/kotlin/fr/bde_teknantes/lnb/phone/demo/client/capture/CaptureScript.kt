@@ -3,7 +3,10 @@ package fr.bde_teknantes.lnb.phone.demo.client.capture
 import net.minecraft.client.Minecraft
 import net.minecraft.client.KeyboardHandler
 import net.minecraft.client.MouseHandler
+import net.minecraft.client.gui.screens.GenericMessageScreen
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.network.chat.Component
 import net.minecraft.world.level.GameType
 import org.lwjgl.glfw.GLFW
 import java.lang.reflect.Method
@@ -95,6 +98,35 @@ class CaptureScript {
                 runner.createWorld(name, gameType)
             }
             val mc = Minecraft.getInstance()
+            mc.level != null && mc.player != null && mc.screen == null
+        }
+    }
+
+    /** Leaves the world for the title screen, saving it, as the pause menu's button does. */
+    fun leaveWorld() = apply {
+        var started = false
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            if (!started) {
+                started = true
+                val local = mc.isLocalServer
+                mc.level?.disconnect()
+                if (local) mc.disconnect(GenericMessageScreen(Component.translatable("menu.savingLevel"))) else mc.disconnect()
+                mc.setScreen(TitleScreen())
+            }
+            mc.level == null && mc.screen is TitleScreen
+        }
+    }
+
+    /** Opens the saved world [name] again and waits until the player stands in it with the loading screen gone. */
+    fun openWorld(name: String) = apply {
+        var started = false
+        steps += Step {
+            val mc = Minecraft.getInstance()
+            if (!started) {
+                started = true
+                mc.createWorldOpenFlows().openWorld(name) { mc.setScreen(TitleScreen()) }
+            }
             mc.level != null && mc.player != null && mc.screen == null
         }
     }

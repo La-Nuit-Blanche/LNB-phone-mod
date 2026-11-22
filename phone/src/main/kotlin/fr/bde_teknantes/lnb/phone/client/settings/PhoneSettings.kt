@@ -6,9 +6,11 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import fr.bde_teknantes.lnb.phone.client.shell.Placement
-import java.nio.file.Files
+import java.io.IOException
+import java.nio.charset.CharacterCodingException
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
+import java.util.EnumSet
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -29,18 +31,34 @@ internal data class PhoneSettings(
  * settings are per player and client-side (art direction 2.4 and 12). Changes apply at once: [update] saves the file
  * and tells the listeners, which is how the open phone glides to its new placement.
  *
- * The file is read once, on first use. Each change reads it again just before writing and touches only what changed
- * in the current player's entry: two games sharing one game folder don't undo each other's changes, and what a newer
- * version of the phone wrote (its version number, fields this one doesn't know) is kept. A file that can't be read is
- * moved aside before it is replaced, so nobody's settings are lost to a stray edit.
+ * The file is read once, on first use. Each change reads it again just before writing and writes only the fields this
+ * game changed, leaving the rest as found: two games sharing one game folder don't undo each other's changes, even on
+ * the same account, and what a newer version of the phone wrote (its version number, fields this one doesn't know) is
+ * kept.
+ *
+ * A change the player made stays in effect for the session until it reaches the disk, and reaches it at the next save
+ * that succeeds: a file that can't be written or read for a moment (a sync client holding it, a read-only copy, a full
+ * disk) is left exactly as it is meanwhile. (If it can't be read on first use, the defaults show until the next change
+ * reads it.) A file that can be read but not understood is moved aside before it is replaced, so nobody's settings
+ * are lost to a stray edit.
  *
  * The one place the shell, the notification banner and the Settings app read and write settings. Client thread only.
  *
  * @param file where the settings live.
+ * @param disk how the file is read and written; tests make it refuse.
  * @param player the account whose settings [current] shows (its id as a string).
  */
-internal class PhoneSettingsStore(private val file: Path, private val player: () -> String) {
+internal class PhoneSettingsStore(
+    private val file: Path,
+    private val disk: SettingsDisk = SettingsDisk.Real,
+    private val player: () -> String,
+) {
+    // What this game holds, by account: the file as last read, with this session's changes on top.
     private var players: Map<String, PhoneSettings>? = null
+
+    // The fields changed this session that the file doesn't hold yet, by account. Cleared only by a write that worked.
+    private val unsaved = HashMap<String, MutableSet<Field>>()
+
     private val listeners = CopyOnWriteArrayList<(old: PhoneSettings, new: PhoneSettings) -> Unit>()
 
     /** The current player's settings. */
@@ -48,10 +66,14 @@ internal class PhoneSettingsStore(private val file: Path, private val player: ()
 
     /** Changes the current player's settings, saves them and tells the listeners if anything changed. */
     fun update(change: (PhoneSettings) -> PhoneSettings) {
+        val id = player()
         val old = current
         val wanted = change(old)
         if (wanted == old) return
-        val new = save(player(), old, wanted)
+        unsaved.getOrPut(id) { EnumSet.noneOf(Field::class.java) } += Field.entries.filter { it.differs(old, wanted) }
+        players = loaded() + (id to wanted)
+        save()
+        val new = current
         if (new == old) return
         for (listener in listeners) {
             try {
@@ -70,14 +92,15 @@ internal class PhoneSettingsStore(private val file: Path, private val player: ()
     private fun loaded(): Map<String, PhoneSettings> = players ?: parse((read() as? Read.Found)?.root).also { players = it }
 
     /**
-     * Writes the fields that differ between [old] and [wanted] into [id]'s entry of the file as it is now, and returns
-     * that player's settings as they then stand. The store keeps the result even when the file can't be written, so
-     * the change holds for the session.
+     * Writes every unsaved field into the file as it is now and takes the result as what this game holds: the file's
+     * other entries and fields, which another game may have changed, with this session's changes on top. When the file
+     * can't be read right now, nothing is written and the changes wait for the next save.
      */
-    private fun save(id: String, old: PhoneSettings, wanted: PhoneSettings): PhoneSettings {
+    private fun save() {
         val root = when (val found = read()) {
             is Read.Found -> found.root
             Read.Missing -> JsonObject()
+            Read.Unavailable -> return
             Read.Broken -> {
                 moveAside()
                 JsonObject()
@@ -85,34 +108,51 @@ internal class PhoneSettingsStore(private val file: Path, private val player: ()
         }
         if (!root.has(VERSION)) root.addProperty(VERSION, 1)
         val entries = root.get(PLAYERS)?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject().also { root.add(PLAYERS, it) }
-        val entry = entries.get(id)?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject().also { entries.add(id, it) }
-        // What this change is about, and what the entry lacks; the rest stays as found: another game may have changed
-        // it since this one read the file.
-        if (wanted.placement != old.placement || !entry.has(PLACEMENT)) entry.addProperty(PLACEMENT, wanted.placement.name.lowercase())
-        if (wanted.sounds != old.sounds || !entry.has(SOUNDS)) entry.addProperty(SOUNDS, wanted.sounds)
-        if (wanted.preview != old.preview || !entry.has(PREVIEW)) entry.addProperty(PREVIEW, wanted.preview)
-        write(root)
-        val all = parse(root)
-        players = all
-        return all[id] ?: PhoneSettings()
+        val session = loaded()
+        for ((id, fields) in unsaved) {
+            val wanted = session[id] ?: continue
+            val entry = entries.get(id)?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject().also { entries.add(id, it) }
+            // What changed and isn't saved yet, and what the entry lacks; the rest stays as found.
+            for (field in Field.entries) {
+                if (field in fields || !entry.has(field.key)) field.write(entry, wanted)
+            }
+        }
+        players = parse(root)
+        if (write(root)) unsaved.clear()
     }
 
     private sealed interface Read {
         class Found(val root: JsonObject) : Read
 
+        /** No file yet. */
         data object Missing : Read
 
+        /** The file is there but couldn't be read just now: leave it alone. */
+        data object Unavailable : Read
+
+        /** The file was read but isn't settings: it may be set aside and replaced. */
         data object Broken : Read
     }
 
     // A missing or broken file costs the settings, never the game: the defaults stand in.
     private fun read(): Read {
-        if (!Files.exists(file)) return Read.Missing
+        val text = try {
+            disk.read(file)
+        } catch (e: NoSuchFileException) {
+            return Read.Missing
+        } catch (e: CharacterCodingException) {
+            // Read in full, but not text: that is the content's fault, not the disk's.
+            LnbPhone.LOGGER.warn("The phone settings in {} aren't UTF-8 text; using the defaults", file, e)
+            return Read.Broken
+        } catch (e: IOException) {
+            LnbPhone.LOGGER.warn("Couldn't read the phone settings in {} just now; leaving the file as it is", file, e)
+            return Read.Unavailable
+        }
         return try {
-            val root = Files.newBufferedReader(file).use { JsonParser.parseReader(it) }
+            val root = JsonParser.parseString(text)
             if (root.isJsonObject) Read.Found(root.asJsonObject) else Read.Broken
         } catch (e: Exception) {
-            LnbPhone.LOGGER.warn("Couldn't read the phone settings in {}; using the defaults", file, e)
+            LnbPhone.LOGGER.warn("Couldn't understand the phone settings in {}; using the defaults", file, e)
             Read.Broken
         }
     }
@@ -120,37 +160,44 @@ internal class PhoneSettingsStore(private val file: Path, private val player: ()
     private fun moveAside() {
         val aside = file.resolveSibling("${file.fileName}.broken-${System.currentTimeMillis()}")
         try {
-            Files.move(file, aside)
+            disk.move(file, aside)
             LnbPhone.LOGGER.warn("The unreadable phone settings file was moved to {}", aside)
         } catch (e: Exception) {
             LnbPhone.LOGGER.error("Couldn't move the unreadable phone settings file {} aside", file, e)
         }
     }
 
-    private fun write(root: JsonObject) {
-        try {
-            val folder = file.toAbsolutePath().parent
-            Files.createDirectories(folder)
-            // A temporary file of its own, then moved over the settings: a crash mid-write leaves the old settings,
-            // and two games writing at once never share a half-written file.
-            val temp = Files.createTempFile(folder, file.fileName.toString(), ".tmp")
-            try {
-                Files.writeString(temp, GSON.toJson(root))
-                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } finally {
-                Files.deleteIfExists(temp)
-            }
-        } catch (e: Exception) {
-            LnbPhone.LOGGER.error("Couldn't save the phone settings to {}", file, e)
+    /** Whether [root] reached the disk. */
+    private fun write(root: JsonObject): Boolean = try {
+        disk.write(file, GSON.toJson(root))
+        true
+    } catch (e: Exception) {
+        LnbPhone.LOGGER.error("Couldn't save the phone settings to {}; they hold for this session and will be saved with the next change", file, e)
+        false
+    }
+
+    private enum class Field(val key: String) {
+        PLACEMENT("placement"),
+        SOUNDS("sounds"),
+        PREVIEW("preview"),
+        ;
+
+        fun differs(a: PhoneSettings, b: PhoneSettings): Boolean = when (this) {
+            PLACEMENT -> a.placement != b.placement
+            SOUNDS -> a.sounds != b.sounds
+            PREVIEW -> a.preview != b.preview
+        }
+
+        fun write(entry: JsonObject, settings: PhoneSettings) = when (this) {
+            PLACEMENT -> entry.addProperty(key, settings.placement.name.lowercase())
+            SOUNDS -> entry.addProperty(key, settings.sounds)
+            PREVIEW -> entry.addProperty(key, settings.preview)
         }
     }
 
     private companion object {
         const val VERSION = "version"
         const val PLAYERS = "players"
-        const val PLACEMENT = "placement"
-        const val SOUNDS = "sounds"
-        const val PREVIEW = "preview"
         val GSON = GsonBuilder().setPrettyPrinting().create()
 
         fun parse(root: JsonObject?): Map<String, PhoneSettings> {
@@ -165,14 +212,14 @@ internal class PhoneSettingsStore(private val file: Path, private val player: ()
         // Field by field, each falling back to its default: a value from a newer or hand-edited file can't break the rest.
         fun fromJson(json: JsonObject): PhoneSettings {
             val defaults = PhoneSettings()
-            fun bool(name: String, default: Boolean) =
-                json.get(name)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: default
-            val placement = json.get(PLACEMENT)?.takeIf(JsonElement::isJsonPrimitive)?.asString
+            fun bool(field: Field, default: Boolean) =
+                json.get(field.key)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: default
+            val placement = json.get(Field.PLACEMENT.key)?.takeIf(JsonElement::isJsonPrimitive)?.asString
                 ?.let { name -> Placement.entries.firstOrNull { it.name.equals(name, ignoreCase = true) } }
             return PhoneSettings(
                 placement = placement ?: defaults.placement,
-                sounds = bool(SOUNDS, defaults.sounds),
-                preview = bool(PREVIEW, defaults.preview),
+                sounds = bool(Field.SOUNDS, defaults.sounds),
+                preview = bool(Field.PREVIEW, defaults.preview),
             )
         }
     }

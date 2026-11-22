@@ -40,7 +40,7 @@ object IconComposer {
         for ((x, y) in listOf(1 to 1, 18 to 1, 1 to 18, 18 to 18)) out[y * SIZE + x] = OUTLINE
         if (glyph == null) return out
 
-        // 4. Auto-shade: each opaque glyph pixel casts tile lo one pixel down, where the glyph itself is clear.
+        // 4. Auto-shade: each opaque glyph pixel casts tile lo one pixel down, where the glyph itself isn't opaque.
         for (gy in 0 until GLYPH_SIZE) for (gx in 0 until GLYPH_SIZE) {
             if (!opaque(glyph, gx, gy) || (gy + 1 < GLYPH_SIZE && opaque(glyph, gx, gy + 1))) continue
             out[(GLYPH_AT + gy + 1) * SIZE + GLYPH_AT + gx] = tile.lo
@@ -53,7 +53,9 @@ object IconComposer {
         return out
     }
 
-    private fun opaque(glyph: IntArray, x: Int, y: Int) = (glyph[y * GLYPH_SIZE + x] ushr 24) != 0
+    // Glyphs should have hard pixels only; for one that doesn't, the half-way mark decides what casts a shade, so a
+    // faint fringe left by an export doesn't drag a shade line under the whole shape.
+    private fun opaque(glyph: IntArray, x: Int, y: Int) = (glyph[y * GLYPH_SIZE + x] ushr 24) >= 128
 
     /** [top] over the opaque [bottom] (glyphs should be hard pixels; a soft one is blended rather than dropped). */
     private fun over(top: Int, bottom: Int): Int {
