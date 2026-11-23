@@ -331,6 +331,7 @@ class FeedRequestsTest {
         assertEquals(ResultPayload(5, Outcome.RATE_LIMITED, retryAfter = 1), answer(camille, 5))
         assertEquals(4, backend.calls("page").size)
         assertEquals(2, backend.calls("player").size, "the open past the limit asked nothing (only the join's read)")
+        assertEquals(StatePayload(Availability.UNAVAILABLE, service.rights.state(camille)), host.received<StatePayload>(camille).last(), "and is answered")
         assertTrue(backend.calls("markFeedSeen").isEmpty())
 
         // Another player isn't held up.
@@ -407,9 +408,14 @@ class FeedRequestsTest {
     }
 
     @Test
-    fun `opens past the reads' burst are dropped without an answer`() {
+    fun `opens past the reads' burst ask the site nothing, and answer unavailable with the last state`() {
         for (i in 1..25) service.handleOpen(camille)
         assertEquals(1 + 19, backend.calls("player").count { it.arg<UUID>(0) == camille }, "the join's read and 19 opens: 20 reads")
+        val states = host.received<StatePayload>(camille)
+        val refused = states.filter { it.available == Availability.UNAVAILABLE }
+        assertEquals(6, refused.size, "each open past the limit is answered, so the client's retry takes over")
+        assertTrue(refused.all { it.state == service.rights.state(camille) && it.state != null }, "with the last state known")
+        assertTrue(service.isWatcher(camille))
     }
 
     @Test

@@ -100,9 +100,11 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
 
     /** `open`: the sender becomes a watcher and gets their state again (which also carries the tab dots). */
     fun handleOpen(player: UUID) {
-        // Over the limit, nothing is answered: `state` has no outcome to say so, and only a modified client gets there.
-        if (!limits.tryStart(player, PlayerLimits.Kind.READ)) return
         watchers += player
+        // Past a limit (the player's own, or the whole server's when many open Feed at once, from the same
+        // notification say), the site isn't asked: the player gets "unavailable" with the last state known, and the
+        // client's retry, about every 15 seconds, takes over.
+        if (!limits.tryStart(player, PlayerLimits.Kind.READ)) return host.send(player, StatePayload(Availability.UNAVAILABLE, rights.state(player)))
         rights.refresh(player).thenAccept { result ->
             limits.finish(player)
             // On success the state went to the player as a watcher; otherwise they keep the last one, with the reason.

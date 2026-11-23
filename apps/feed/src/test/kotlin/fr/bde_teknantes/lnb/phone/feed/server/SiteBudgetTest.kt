@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.feed.server
 
+import fr.bde_teknantes.lnb.phone.feed.model.Availability
 import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.model.Outcome
 import fr.bde_teknantes.lnb.phone.feed.network.CreatePostPayload
@@ -8,6 +9,7 @@ import fr.bde_teknantes.lnb.phone.feed.network.LoadFeedPayload
 import fr.bde_teknantes.lnb.phone.feed.network.LoadThreadPayload
 import fr.bde_teknantes.lnb.phone.feed.network.PagePayload
 import fr.bde_teknantes.lnb.phone.feed.network.ResultPayload
+import fr.bde_teknantes.lnb.phone.feed.network.StatePayload
 import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
 import fr.bde_teknantes.lnb.phone.feed.server.backend.BackendResult
 import fr.bde_teknantes.lnb.phone.feed.server.backend.FeedPage
@@ -134,5 +136,34 @@ class SiteBudgetTest {
             host.received<ThreadPayload>(camille).count { it.outcome != Outcome.OK } +
             host.received<ResultPayload>(camille).count { it.outcome != Outcome.OK }
         assertEquals(0, refused)
+    }
+
+    @Test
+    fun `when the whole server's budget is spent, every request is answered so the client can recover`() {
+        val players = (1..150).map { UUID(1, it.toLong()) }
+        host.online += players
+        // 150 players tap the same notification at once: more opens than the server's burst of 100.
+        for (player in players) service.handleOpen(player)
+        for (player in players) {
+            val states = host.received<StatePayload>(player)
+            assertEquals(1, states.size, "every open is answered")
+        }
+        val turnedAway = players.filter { host.received<StatePayload>(it).single().available == Availability.UNAVAILABLE }
+        assertTrue(turnedAway.size >= 50, "${turnedAway.size} told to retry")
+
+        // The other kinds answer RATE_LIMITED with the seconds to wait; only seen marks may go unanswered.
+        val late = turnedAway.first()
+        var id = 0
+        val requests = listOf(
+            LoadFeedPayload(id++, FeedKind.GLOBAL, null), LoadThreadPayload(id++, post, null), LikePayload(id++, post, true),
+            CreatePostPayload(id++, UUID(5, 5), FeedKind.GLOBAL, "x", false),
+        )
+        for (request in requests) service.handleRequest(late, request)
+        val answers = host.received<PagePayload>(late).map { it.outcome to null } +
+            host.received<ThreadPayload>(late).map { it.outcome to null } +
+            host.received<ResultPayload>(late).map { it.outcome to it.retryAfter }
+        assertEquals(requests.size, answers.size)
+        assertTrue(answers.all { it.first == Outcome.RATE_LIMITED })
+        assertTrue(host.received<ResultPayload>(late).all { it.retryAfter == 1 })
     }
 }
