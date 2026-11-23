@@ -48,6 +48,16 @@ class GeneratorTest {
     }
 
     /** Fails when the generator was changed without re-running it, or a generated folder was edited by hand. */
+    /** Feed's own copy of its home icon must be the glyph of the phone's sample, pixel for pixel. */
+    @Test
+    fun `Feed's committed icon is the glyph the generator draws`() {
+        val root = File(System.getProperty("lnbphone.feedTextures"))
+        val icon = File(root, "feed.png")
+        assertTrue(icon.exists(), "Feed's feed.png is missing: run ./gradlew :tools:sprites:generateSprites")
+        assertTrue(samePixels(ImageIO.read(icon), feedSprites().single().image), "Feed's feed.png is stale: run generateSprites")
+        assertEquals(listOf("feed.png"), root.walkTopDown().filter { it.isFile }.map { it.relativeTo(root).invariantSeparatorsPath }.toList())
+    }
+
     @Test
     fun `the committed sprites are exactly what the generator draws`() {
         val root = File(System.getProperty("lnbphone.guiTextures"))

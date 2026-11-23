@@ -32,8 +32,11 @@ object FeedClient {
     private const val CAPTURE_PROPERTY = "lnbphone_feed.capture"
     private const val CAPTURE_CLASS = "fr.bde_teknantes.lnb.phone.feed.capture.FeedCapture"
 
-    /** The home icon: the phone's Feed glyph (art direction 7.4) on an azure tile. */
-    private val ICON = ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/feed.png")
+    /**
+     * The home icon: Feed's own glyph (art direction 7.4) on an azure tile. The PNG is drawn by `tools/sprites`
+     * (`generateSprites`), not by hand.
+     */
+    private val ICON = ResourceLocation.fromNamespaceAndPath(Feed.MOD_ID, "textures/gui/feed.png")
 
     /** Feed's state on this client, for the server joined; cleared when the player leaves it. */
     val session: FeedSession by lazy { FeedSession(send = { PacketDistributor.sendToServer(it) }, clock = clock()) }
