@@ -15,6 +15,7 @@ Version 6. Feed, the first app, now has its real backing: its data lives on the 
 - **Five inconsistencies fixed.** (a) A new post that would not be fully visible once inserted, such as an announcement under the pinned group, waits behind the pill, and a click scrolls it into view; own posts scroll into view too (9.5, 9.8, F-4 now 7 steps, F-14.8). (b) The reply banner of P-9, P-10 and F-20.2 is drawn as 10.1 cuts it to two lines, as in 9.10. (c) P-8.3 no longer points at P-9, the reply peek, but at step 7. (d) F-14.8: every other player gets the notification, not the author. (e) 9.3: the own-post private line wins over the moderator's.
 - **Section 19** records the user's decisions of 2026-11-23 that concern the phone app, and what version 6 chose without asking (guest and unavailable states, the key rename, the landing rule).
 - **After the user validated version 6 (same day).** (a) Announcements can be anonymous: the rule against it is gone (9.3, 9.8), the anonymous row stays usable in Annonces, an anonymous announcement shows `Anonyme` with no handle and no badge, its notification reads `Anonyme : …` (9.10), the private lines apply, and 9.4's "every post carries the badge" now has its exceptions; new sample post 12, F-14 now posts it, F-17 gains a step (5 steps), index total 208. (b) The site role is named `feed-announcer`, and any moderator can give or take it (9.2). (c) The reply count of a reply is the replies that answer it directly; on a main post, its thread (9.3, R2 now counts 1). (d) Threads are paged, 50 replies at a time, with the spinner row and the retry row at the end (9.7). (e) The announcer badge follows the author's current role (9.2, 9.4). (f) Banned players, and everyone while writing is switched off, get the guest look with their own words; strings `snackbar.banned`, `snackbar.writing_off`, `snackbar.too_fast` (9.11, 13.2, 13.3). (g) The pill has no arrow when the first new post is below the visible area, and keeps `arrow_up` when it is above (9.5, F-4.6). (h) Section 19 moves the accepted items into the confirmed lists.
+- **As built: the thread's composer (9.7).** Two departures of the built app, recorded: the collapsed reply field shows the start of the thread's draft when there is one, and the placeholder otherwise; and the replies run under the docked composer instead of the list resizing with it, ending with a spacer that follows the composer's height.
 - **Flows.** F-22 to F-25 are new (switched off, connection lost, a list cannot load more, a guest reads); the flow index now counts 208 steps (17.2, 17.3).
 
 ## History
@@ -969,7 +970,7 @@ y 306  ------------------------------------------------   composer (collapsed)
 | Replies loading | a 48 dp spinner row under the main post; if the replies cannot be loaded, a 48 dp row with the text button `Réessayer` centred, and a click shows the spinner again (9.12) |
 | Reply to a reply | the composer targets that reply; the posted reply joins the same thread and shows a reply-to line `En réponse à Mika L.` (`post.reply_to`, `caption` `text-2`, at `x 56`) as its first optional line. Replying to the main post adds no reply-to line. An anonymous target is named `Anonyme` |
 | No replies | 48 dp row under the main post, `Aucune réponse pour l'instant` (`thread.no_replies`) in `caption` `text-2`, centred |
-| Bottom spacer | the composer's height + 12 dp after the last reply |
+| Bottom spacer | the replies run under the docked composer, which covers the bottom of the list; after the last reply, a spacer of the composer's height + 12 dp, which follows that height while the composer expands and collapses, so the last reply can always be scrolled clear of it |
 | Opening | from a card click (composer collapsed, scrolled to the top), from a reply action (composer expanded and focused), from a notification (scrolled so the notified reply is fully visible, with the post highlight) |
 | Post deleted while open | back to the feed (back transition), snackbar `Ce post a été supprimé` (`thread.deleted`) |
 
@@ -977,14 +978,14 @@ y 306  ------------------------------------------------   composer (collapsed)
 
 | State | Layout (app-local, dp) |
 |---|---|
-| Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre M.…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. Hover: field hover state. Click: expands |
+| Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre M.…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. When the thread has a draft, the field shows its start instead: its first line that is not blank, in `body` `text-1`, truncated the same way. Hover: field hover state. Click: expands |
 | Expanded, 200 dp (`y 170..369`) | `En réponse à Alexandre M.` (`post.reply_to`) in `caption` `text-2`, line box at `(12, 182)`; text area 232 x 112 at `(12, 202)` with the `n/280` counter (4 text lines visible, then it scrolls); at `y 326`: toggle at `(12, 332)` with label `Anonyme` (`reply.anonymous`) in `body-strong` at `x 56`, line box `y 333`; primary button `Répondre` (`reply.send`, 96 dp wide) right-aligned to `x 244`, `y 326` |
 | Répondre button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Sending | button in its loading state, text area in its sending state, toggle disabled |
 | Back while expanded | collapses the composer and keeps the draft (one draft per thread) |
 | Success | collapses, clears the draft and the toggle, the new reply appears at the end with the post highlight and is scrolled into view, snackbar `Réponse envoyée` (`reply.sent`) |
 | Failure | stays expanded with the draft intact, button enabled again, error snackbar `Échec de l'envoi` (`snackbar.send_failed`) with the action `Réessayer` |
-| Expand / collapse | 150 ms, ease-out / ease-in, the thread list area resizes with it |
+| Expand / collapse | 150 ms, ease-out / ease-in; the list keeps its size, and the part of it that shows above the composer shrinks and grows with it (the bottom spacer follows) |
 
 ### 9.8 Compose
 
