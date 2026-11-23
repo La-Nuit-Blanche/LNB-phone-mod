@@ -13,7 +13,7 @@ import org.lwjgl.glfw.GLFW
 import java.util.UUID
 
 /**
- * The capture scenarios of the thread, Compose, deleting and pinning (task M3), as Camille R. (`Cam_Roux`), against the
+ * The capture scenarios of the thread, Compose, deleting and pinning, as Camille R. (`Cam_Roux`), against the
  * sample content. What a scenario needs beyond the sample (a reply arriving, Camille made an announcer) it makes
  * itself. Cards are found where the session says they are, measured with the game's font as the cards measure
  * themselves, so a click lands on the right card whatever the text.
