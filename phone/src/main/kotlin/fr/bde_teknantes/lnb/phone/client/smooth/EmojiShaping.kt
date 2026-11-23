@@ -35,7 +35,7 @@ interface EmojiMetrics {
  * - its first character is emoji by default (Unicode's `Emoji_Presentation`: 😀, 🎉, a flag's letters);
  * - Inter lacks its first character (☺, ✔).
  *
- * Otherwise Inter draws it. So text-style symbols Inter has (© ® ™, arrows, ★, ♥, ❤ without a selector) stay Inter's
+ * Otherwise Inter draws it. So text-style symbols Inter has (© ® ™, ♥, ❤, ↔ without a selector) stay Inter's
  * in running text, and become emoji only when the selector asks (❤️, as emoji keyboards send it). Digits, `#` and `*`
  * are keycap bases: they go to the emoji face only with the keycap mark (1️⃣), never with the selector alone. A text
  * selector (15) after the first character keeps Inter's glyph when Inter has one.

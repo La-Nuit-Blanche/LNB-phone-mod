@@ -598,14 +598,14 @@ Text is left-aligned, sentence case. Every fixed-width slot is sized for the lon
 
 Which font draws a character is decided per grapheme (what a reader sees as one character), never per code point:
 - emoji that are emoji by default (😀, 🎉, flags) and anything Inter lacks that the emoji font has (☺, ✔) are emoji;
-- symbols Inter has (`©` `®` `™`, arrows, `★`, `♥`, `❤`) stay Inter's in running text and become emoji only with the emoji variation selector (`❤️`, as emoji keyboards send it); with the text selector they stay Inter's;
+- symbols both fonts have (`©` `®` `™`, `♥`, `❤`, `☀`, `⚠`, `‼`, the emoji arrows `↔` `↕` `↖` `↩` `⬆`) stay Inter's in running text and become emoji only with the emoji variation selector (`❤️`, as emoji keyboards send it); with the text selector they stay Inter's. Symbols the emoji font lacks (`★`, the plain arrows `←` `↑` `→` `↓`) stay Inter's even with the selector;
 - digits, `#` and `*` stay Inter's, even with the selector: they become emoji only as a keycap (`1️⃣`).
 
 Sequences are composed when the font has them, and otherwise degrade, never to a row of boxes:
 
 | Sequence | Composed | Otherwise |
 |---|---|---|
-| Skin tone (👍🏽) | the emoji; a single-colour font has no skin colours, so it is the base emoji | the tone is dropped, no swatch |
+| Skin tone (👍🏽) | the emoji; a single-colour font has no skin colours, so it is the base emoji | the tone is dropped, no swatch. A tone with nothing to modify, at the start of a text or of a line, shows as its swatch, as Unicode intends; after a letter or a space, which it joins, it draws nothing |
 | Joined with ZWJ (👨‍👩‍👧, ❤️‍🔥, 🏳️‍🌈) | one glyph | its emoji side by side (👨👩👧); a part the font lacks is left out |
 | Flag (🇫🇷), subdivision flag (🏴󠁧󠁢󠁥󠁮󠁧󠁿) | one glyph | an unknown pair shows its two letters; unknown tags leave the black flag |
 | Keycap (1️⃣) | one glyph | |

@@ -66,6 +66,10 @@ class EmojiLayoutTest {
     fun `what can't be composed degrades to the base or its parts`() {
         // A skin tone on an emoji that takes none: dropped, no swatch.
         assertEquals(listOf(emoji(0x1F600)), drawn("😀🏽"))
+        // With nothing to modify, at the start of a text or a line, its swatch; after a letter or a space, nothing.
+        assertEquals(listOf(emoji(0x1F3FD)), drawn("🏽"))
+        assertEquals(listOf('a'.code), drawn("a🏽"))
+        assertEquals(listOf(' '.code), drawn(" 🏽"))
         // Two letters that make no flag: the two letters.
         assertEquals(listOf(emoji(0x1F1FD), emoji(0x1F1FD)), drawn("🇽🇽"))
         // A ZWJ sequence the font doesn't have: its emoji side by side.
