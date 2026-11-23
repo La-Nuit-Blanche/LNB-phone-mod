@@ -26,8 +26,15 @@ import java.util.concurrent.TimeUnit
  * The listener hears [FeedEventListener.onConnected] after each successful connection, and
  * [FeedEventListener.onDisconnected] once when a connection is lost or refused, not again for each failed retry. It is
  * called on this thread and hops to the server thread itself. Unknown event types are ignored.
+ *
+ * @param clock wall-clock milliseconds, for the silence watchdog; tests pass their own.
+ * @param sleep waits between connections; tests pass their own, so that retries take no real time.
  */
-class FeedEvents(private val connection: () -> Pair<String, String>?) {
+class FeedEvents(
+    private val connection: () -> Pair<String, String>?,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val sleep: (Long) -> Unit = { Thread.sleep(it) },
+) {
     @Volatile
     private var running = false
     private var thread: Thread? = null
@@ -59,8 +66,13 @@ class FeedEvents(private val connection: () -> Pair<String, String>?) {
         }
         // The read below blocks: a connection the site stopped pinging is closed from here, so the thread reconnects.
         watchdog = Executors.newSingleThreadScheduledExecutor { Thread(it, "LNB Feed events watchdog").apply { isDaemon = true } }.apply {
-            scheduleWithFixedDelay({ if (connected && System.currentTimeMillis() - lastDataAt > SILENCE_MS) closeStream() }, 5, 5, TimeUnit.SECONDS)
+            scheduleWithFixedDelay(::checkSilence, 5, 5, TimeUnit.SECONDS)
         }
+    }
+
+    /** Closes a connection silent for more than [SILENCE_MS], so the thread reconnects. Run every 5 seconds. */
+    internal fun checkSilence() {
+        if (connected && clock() - lastDataAt > SILENCE_MS) closeStream()
     }
 
     fun stop() {
@@ -102,7 +114,7 @@ class FeedEvents(private val connection: () -> Pair<String, String>?) {
             if (reason != lastReason) LOGGER.warn("LNB's Feed event stream is disconnected ({}), reconnecting", reason)
             lastReason = reason
             try {
-                Thread.sleep(if (disabled) DISABLED_RETRY_MS else backoffMs)
+                sleep(if (disabled) DISABLED_RETRY_MS else backoffMs)
             } catch (e: InterruptedException) {
                 break
             }
@@ -126,7 +138,7 @@ class FeedEvents(private val connection: () -> Pair<String, String>?) {
             throw IOException("HTTP ${response.statusCode()}")
         }
         stream = response.body()
-        lastDataAt = System.currentTimeMillis()
+        lastDataAt = clock()
         connected = true
         backoffMs = MIN_BACKOFF_MS
         reported = null
@@ -143,7 +155,7 @@ class FeedEvents(private val connection: () -> Pair<String, String>?) {
         val data = StringBuilder()
         while (running) {
             val line = reader.readLine() ?: break
-            lastDataAt = System.currentTimeMillis()
+            lastDataAt = clock()
             when {
                 line.isEmpty() -> {
                     if (id != null) lastEventId = id

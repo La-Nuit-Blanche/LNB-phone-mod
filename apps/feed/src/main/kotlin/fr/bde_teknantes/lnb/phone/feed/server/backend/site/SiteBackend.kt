@@ -39,9 +39,11 @@ import java.util.concurrent.CompletableFuture
  * `data.problem` and Feed needs `data.oldest` and `Retry-After` too. Every outcome is told to Warden's `ApiHealth`, so
  * operators hear of an outage once.
  *
+ * @param timeout how long a call may wait for its answer; tests pass a shorter one.
  * @param connection the site's base URL and the server's token, read at each call (null when either is blank).
  */
 class SiteBackend(
+    private val timeout: Duration = TIMEOUT,
     private val connection: () -> Pair<String, String>? = {
         if (ServerConfig.isApiConfigured) ServerConfig.API_URL.get() to ServerConfig.API_TOKEN.get() else null
     },
@@ -162,7 +164,7 @@ class SiteBackend(
             // JsonObject.toString writes null members, which the site wants present (replyTo).
             val publisher = if (body == null) HttpRequest.BodyPublishers.noBody() else HttpRequest.BodyPublishers.ofString(body.toString())
             ApiClient.request(url, BASE + path, token)
-                .timeout(TIMEOUT)
+                .timeout(timeout)
                 .apply { if (body != null) header("Content-Type", "application/json") }
                 .method(method, publisher)
                 .build()
