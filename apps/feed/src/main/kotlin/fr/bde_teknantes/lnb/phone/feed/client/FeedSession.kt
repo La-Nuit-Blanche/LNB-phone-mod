@@ -153,7 +153,21 @@ class FeedSession(
     var connectionSnackbar: SnackbarHandle? = null
 
     private var landing: UUID? = null
-    private var notice: FeedNotice? = null
+    // What the screen shown should say, in order, with the tick each came: two in one tick are both told, and one too
+    // old to mean anything (it came while no screen could tell it) is dropped.
+    private val notices = ArrayDeque<Pair<FeedNotice, Int>>()
+
+    /** Queues a notice (null clears them all). */
+    private var notice: FeedNotice?
+        get() = notices.lastOrNull()?.first
+        set(value) {
+            if (value == null) {
+                notices.clear()
+                return
+            }
+            notices.addLast(value to ticks)
+            while (notices.size > MAX_NOTICES) notices.removeFirst()
+        }
 
     /** The feed on screen, set by the feed screen while it shows one; null otherwise. */
     var viewing: FeedKind? = null
@@ -237,8 +251,14 @@ class FeedSession(
         return draft
     }
 
-    /** What the screen shown should say, once. */
-    fun takeNotice(): FeedNotice? = notice.also { notice = null }
+    /** What the screen shown should say next, once each, oldest first; null when nothing (recent) is left. */
+    fun takeNotice(): FeedNotice? {
+        while (notices.isNotEmpty()) {
+            val (notice, at) = notices.removeFirst()
+            if (ticks - at <= NOTICE_MAX_AGE_TICKS) return notice
+        }
+        return null
+    }
 
     /** Whether [id] should get the post highlight now (once). */
     fun takeHighlight(id: UUID): Boolean = highlights.remove(id)
@@ -265,6 +285,8 @@ class FeedSession(
     /** [owner] left the phone for good. */
     fun appClosed(owner: Any) {
         openApps -= owner
+        // Nothing is left to tell them on: they would show stale at the next opening.
+        if (openApps.isEmpty()) notices.clear()
     }
 
     /** Whether Feed is open on the phone (shown or not): its timers run. */
@@ -754,7 +776,8 @@ class FeedSession(
             thread.stale = true
             thread.reloadNotBefore = 0
         }
-        if (hasLoadedContent && availability != FeedAvailability.OK) notice = FeedNotice.ConnectionBack
+        val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED
+        if (hasLoadedContent && lost) notice = FeedNotice.ConnectionBack
         changed()
     }
 
@@ -1382,6 +1405,11 @@ class FeedSession(
 
         /** How long a draft refused as `DISABLED` waits for the state that says whether writing is off. */
         const val WRITING_STATE_TICKS = 240
+
+        /** A notice not told within this long (5 seconds) is dropped: it would no longer mean anything. */
+        const val NOTICE_MAX_AGE_TICKS = 100
+
+        private const val MAX_NOTICES = 8
 
         /** Seen marks that may go at once before the 2-second pace. */
         const val SEEN_BURST = 3

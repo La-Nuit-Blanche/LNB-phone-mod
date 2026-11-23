@@ -98,7 +98,8 @@ class FeedScreen(
     override fun onTick() {
         session.loadIfNeeded(tab)
         if (session.feed(tab).loaded) session.markViewed(tab)
-        session.takeNotice()?.let(::report)
+        // Every notice waiting, in order: a later one may undo an earlier (Feed back after Connexion perdue).
+        while (true) report(session.takeNotice() ?: break)
     }
 
     /**

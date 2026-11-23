@@ -533,4 +533,29 @@ class FeedSessionStateTest {
         assertEquals(listOf(main.id), global.posts)
         assertFalse(session.post(main.id)!!.liked)
     }
+
+    @Test
+    fun `two notices in one tick are both told, in order`() {
+        r.state()
+        r.firstPage(FeedKind.GLOBAL, listOf(post()))
+        r.state(available = Availability.UNAVAILABLE)
+        r.state()
+        assertEquals(FeedNotice.ConnectionLost, session.takeNotice())
+        assertEquals(FeedNotice.ConnectionBack, session.takeNotice())
+        assertNull(session.takeNotice())
+    }
+
+    @Test
+    fun `a notice nobody told within 5 seconds is dropped, and all go when Feed closes`() {
+        r.state()
+        r.firstPage(FeedKind.GLOBAL, listOf(post()))
+        r.state(available = Availability.UNAVAILABLE)
+        repeat(FeedSession.NOTICE_MAX_AGE_TICKS + 1) { session.tick() }
+        assertNull(session.takeNotice())
+        val owner = Any()
+        session.appOpened(owner)
+        r.state()
+        session.appClosed(owner)
+        assertNull(session.takeNotice())
+    }
 }
