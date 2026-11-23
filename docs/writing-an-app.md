@@ -334,8 +334,9 @@ What the list screen shows:
   list is where the player left it.
 - **Draw it yourself.** When the kit has no widget for something, extend `Widget` (or `Clickable` for something that
   reacts to clicks) and draw in `render` with the `AppCanvas` methods. The kit's gallery in the demo (the "UI kit"
-  app, `client/kit/Gallery.kt`) shows every widget; the sample Feed (`client/kit/FeedScreens.kt` and `PostCard.kt`)
-  composes them into real screens, with a custom widget.
+  app, `client/kit/Gallery.kt`) shows every widget; the demo's "Post sample" (`client/kit/FeedScreens.kt` and `PostCard.kt`)
+  composes them into feed screens with made-up posts, with a custom widget. For a whole app built on the kit, with a
+  server side, payloads, state and tests, read Feed (below).
 
 ### 5. A second screen and navigation
 
@@ -849,7 +850,14 @@ is a safety net, not error handling: the player loses what they were doing.
 - The phone's own Settings app, a second and smaller example: one screen with a segmented control and toggles,
   registered like any app (`phone/.../client/settings/SettingsApp.kt` and `SettingsScreen.kt`; its classes are
   internal to the phone, but it uses only the public kit).
-- The demo's other apps: the kit's gallery ("UI kit") and the sample Feed ("Feed (sample)"), described in
-  `apps/demo/README.md`.
+- Feed, a second and much larger example (`apps/feed`, mod `lnbphone_feed`, described in `apps/feed/README.md` and
+  designed in `docs/feed-app.md`): an app with a server side that talks to a website through two interchangeable
+  backends, its own payloads, a client session that screens are rebuilt from, notifications that land on a
+  thread, rights, drafts, live updates, and its tests (screens played with `PhoneTester`, a fake site, a harness
+  that takes screenshots). It is written with the same pieces as Ping; start with Ping, then read how Feed
+  scales them: `client/FeedSession.kt` for state kept across screens, `client/screens/FeedTargetScreens.kt` for a
+  notification's target, `server/FeedServer.kt` for the server side.
+- The demo's other apps: the kit's gallery ("UI kit") and "Post sample", a feed of made-up posts that shows the kit
+  (it is not the Feed app), described in `apps/demo/README.md`.
 - `design/art-direction.md` for the look of the phone and of the Feed app (section 9), if you need a value the kit
   doesn't give.

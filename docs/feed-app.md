@@ -1,5 +1,8 @@
 # Feed: the app's design
 
+Status: built. This page is Feed's design, kept true to the code; `apps/feed/README.md` is the guide to installing,
+configuring, running and releasing it.
+
 The design of Feed, the first real app of the LNB Phone: a mod of its own, `apps/feed` (mod id `lnbphone_feed`), built with the `lnbphone.app` plugin, depending on the phone (`lnbphone`) and on LNB Warden (`lnbwarden`). This page says how the mod is cut, what crosses the network between the player's client and the Minecraft server, what the server does with the website, and how each screen of the art direction's section 9 is fed.
 
 It sits on two documents of the LNB website repository, which are the contract and win if this page disagrees with them:
@@ -29,6 +32,8 @@ apps/feed/
   build.gradle.kts                 plugins { id("lnbphone.app") }, and the Warden jar (below)
   gradle.properties                mod_id=lnbphone_feed, mod_name=LNB Feed, lnbwarden_version_range
   libs/lnbwarden-<version>.jar     not committed: built from lnb-warden with ./gradlew jar
+  example-config/                  the memory backend's lnbphone_feed-server.toml and Warden's lnbwarden-server.toml,
+                                   copied into a run folder by prepareMemoryRun and by the capture run
   src/main/templates/META-INF/neoforge.mods.toml
   src/main/kotlin/fr/bde_teknantes/lnb/phone/feed/
     FeedMod.kt          @Mod("lnbphone_feed"): config, payloads, server events; the client behind the dist check
@@ -39,7 +44,10 @@ apps/feed/
     rules/FeedText.kt   the site's text rule (clean, NFC, trim, fold, count), pure Kotlin
     network/            the payloads and FeedNetwork.register
     server/             the logical server: a dedicated server, or a single-player game's integrated one
-      FeedServer.kt     payload handlers, watchers, per-player limits
+      FeedServer.kt     wires the game's events and the payloads to the running server's FeedService; chooses the backend
+      FeedService.kt    watchers, the clients' requests, the relay and the notifier, over a backend and a FeedHost
+      FeedHost.kt       what the service needs from the running server (a fake in tests)
+      PlayerLimits.kt   per-player and whole-server limits; ThrottledLog.kt the log's own rate limit
       FeedConfig.kt     lnbphone_feed-server.toml
       RightsCache.kt    online players' state, 5 minutes at most
       Relay.kt          stream events to the watchers' clients
@@ -54,12 +62,13 @@ apps/feed/
       FeedClient.kt     registers the app, the payload handlers, clearing at disconnection
       FeedSession.kt    the client's state (section 8)
       FeedRequests.kt   request IDs and what each waits for
-      screens/          FeedScreen, ThreadScreen, ComposeScreen
-      widgets/          PostCard, ReplyComposer, NewPostsPill, PrivateLine
+      screens/          FeedScreen, ThreadScreen, ComposeScreen, FeedTargetScreens, PostActions
+      widgets/          PostCard (and its layout), ReplyComposer, NewPostsPill, ActionButton, RetryRow
   src/main/resources/assets/lnbphone_feed/
     lang/en_us.json, fr_fr.json
-    textures/gui/feed.png             the home icon (art direction 7.4)
-  src/test/kotlin/...                 section 11
+    textures/gui/feed.png             the home icon (art direction 7.4), drawn by tools/sprites: never edited by hand
+  src/capture/kotlin/...              the screenshot harness (section 12.4): a source set the jar never holds
+  src/test/kotlin/...                 section 12.3
 ```
 
 - `settings.gradle.kts` gets `include(":apps:feed")`.
@@ -422,20 +431,66 @@ Checked against the art direction as of commit `e8ced9b` (version 6 with the use
 
 ### 12.1 Without a site
 
-`./gradlew :apps:feed:runClient` with `backend.kind = "memory"` in `apps/feed/run/config/lnbphone_feed-server.toml` (and `memory.seed = "sample"` for content). Make yourself an operator (single player with cheats, or `/op`) to be a moderator; `/feed announcer add <name>` for an announcer; list a name under `memory.guests` to try reading as a guest; `/feed dev offline on` for the unavailable screens. The screenshot harness runs this way, with the sample seed and a fixed clock.
+```
+./gradlew :apps:feed:prepareMemoryRun
+./gradlew :apps:feed:runClient
+```
+
+`prepareMemoryRun` copies `apps/feed/example-config/` into `apps/feed/run/config` (keeping a file that is already there,
+unless `-Poverwrite=true`): `backend.kind = "memory"` with `memory.seed = "sample"` for content, and Warden's `auth.mode`
+at `off` so that the development account may join. `runServer` (with `-Pserver_port=<port>`, and `eula=true` in
+`apps/feed/run/eula.txt`) starts a dedicated server the same way; joining it with `runClient` makes two players. Make
+yourself an operator (single player with cheats, or `/op`) to be a moderator; `/feed announcer add <name>` for an
+announcer; list a name under `memory.guests` to try reading as a guest; `/feed dev offline on`, `disabled on` and
+`writing off` for the unavailable, switched-off and writing-paused screens. The screenshot harness runs this way, with
+the sample seed and a fixed clock.
 
 ### 12.2 Against a local site
 
-As `feed-mod.md` section 14 says: the site on `http://localhost:3000` with `feed` on, Warden's `lnbwarden-server.toml` pointing at it with the secret, `backend.kind = "site"`, and the dev account linked through Warden's device flow on the local `/link`.
+As `feed-mod.md` section 14 says: the site on `http://localhost:3000` with `feed` on, Warden's `lnbwarden-server.toml`
+pointing at it with the secret, `backend.kind = "site"`, and the dev account linked through Warden's device flow on the
+local `/link`. The memory setup of 12.1 must not be left in `run/config`: edit its files.
 
 ### 12.3 Tests
 
-- `FeedTextTest`: the text vectors of `feed-mod.md` 13.1, against `FeedText` and `TextLimits.canSend` (whatever the client allows, the rule accepts).
-- `MemoryBackendTest`: the vectors 13.2 to 13.6 (idempotency, anonymity by viewer with the anonymous announcement, pagination, pins, unread and markers).
-- In `phone/`, the tests of 6.5 for `sendToEveryone` with `except`.
-- `FeedTargetTest`: format, parse, unknown and malformed targets.
-- `PayloadCodecTest`: every payload round-trips, and one past each bound fails to decode.
-- `RelayTest` and `FeedNotifierTest` with the memory backend: a post reaches each watcher as their own view; an announcement, anonymous or not, leaves its author out, and an anonymous one reads "Anonymous: …"; a deletion takes its notifications back; a reconnection drains, refreshes and resets.
-- `FeedSessionTest`: live posts at the top or in the pill, no doubles, counts and pins applied once, `removed` in an open thread, drafts and keys across failures, `reset`.
-- Screens with `PhoneTester`, fed from `FeedSession`: the art direction's states (empty, unavailable, pinned group, anonymous lines, compose for a player and for an announcer, the pin-limit dialog, the delete dialog).
-- A dedicated server start, which must not mention a client class.
+`./gradlew :apps:feed:test` (about 600 tests; `./gradlew build` runs them with everything else). They run with the game
+loaded, in packages that follow the code:
+
+- `rules/FeedTextTest`: the text vectors of `feed-mod.md` 13.1, against `FeedText` and `TextLimits.canSend` (whatever the
+  client allows, the rule accepts).
+- `server/backend/memory/`: `MemoryBackendTest` and `MemoryBackendRulesTest`, the vectors 13.2 to 13.6 (idempotency,
+  anonymity by viewer with the anonymous announcement, pagination, pins, unread and markers).
+- `server/backend/site/`: `SiteBackendTest`, `SiteBackendHttpTest`, `SiteJsonBoundsTest` and `StalledSiteTest` against a
+  fake site (`FakeSite`: every route, every error, a body that stalls), and `FeedEventsTest` for the stream and its
+  reconnections.
+- `server/`: `FeedServiceTest` and `FeedRequestsTest` (requests, limits), `RightsCacheTest`, `RelayTest` (a post reaches
+  each watcher as their own view; a deletion; a reconnection resets), `FeedNotifierTest` (an announcement, anonymous or
+  not, leaves its author out and reads "Anonymous: ..."; a deletion takes its notifications back; the drain),
+  `FeedCommandTest` and `FeedCommandActorTest` (who may run `/feed announcer`, and as whom), `BackendChoiceTest`,
+  `SiteBudgetTest`.
+- `network/`: `PayloadCodecTest` (every payload round-trips, and one past each bound fails to decode) and
+  `HostilePayloadTest`. `FeedTargetTest`: format, parse, unknown and malformed targets. `FeedIconTest`: the icon ships.
+- `client/`: `FeedSession*Test` (live posts at the top or in the pill, no doubles, counts and pins applied once, `removed`
+  in an open thread, drafts and keys across failures, `reset`), `FeedWritingTest`, `ThreadRulesTest`, `ThreadSeenTest`,
+  and `client/screens/` plays the screens with `PhoneTester`, fed from `FeedSession`: the art direction's states (empty,
+  unavailable, pinned group, anonymous lines, compose for a player and for an announcer, the pin-limit dialog, the
+  delete dialog, the guest look, landing from a notification).
+- In `phone/`, the tests of 6.5 for `sendToEveryone` with `except` (`NotificationServiceTest`). In `tools/sprites`, the
+  test that Feed's icon is what the generator draws.
+- A dedicated server start (`./gradlew :apps:feed:runServer`), which must not mention a client class: `TESTING.md` says
+  how, and what the log must show.
+
+### 12.4 The screenshot harness
+
+`./gradlew :apps:feed:runCapture -Pcapture=root|guest|thread|compose -PcaptureDir=<absolute directory>`, with
+`-PcaptureLang`, `-PcaptureScale`, `-PcaptureSize` and `-PcaptureUser` as options. It runs in a game folder of its own,
+`apps/feed/build/capture-run`, written by `prepareCapture` from `example-config/`, and plays the scenarios of
+`src/capture/` against the memory backend with the sample seed and a fixed clock, one step per client tick, as the
+art direction's flows F-1 to F-25 describe. `TESTING.md` lists what each shows, and what the harness refuses to shoot
+(a window too small for the GUI scale, a minimised window).
+
+### 12.5 Releasing
+
+A tag `v<version>` makes CI build the phone and Feed as that version and publish both jars. Feed's range on the phone
+is `[<version>, next minor)` (the plugin writes it), and its range on Warden is `lnbwarden_version_range`, fixed in
+`apps/feed/gradle.properties`.
