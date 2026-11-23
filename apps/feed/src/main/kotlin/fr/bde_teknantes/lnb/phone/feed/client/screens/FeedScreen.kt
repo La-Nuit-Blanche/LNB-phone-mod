@@ -24,6 +24,7 @@ import fr.bde_teknantes.lnb.phone.feed.client.FeedStrings
 import fr.bde_teknantes.lnb.phone.feed.client.LikeAttempt
 import fr.bde_teknantes.lnb.phone.feed.client.NewPosts
 import fr.bde_teknantes.lnb.phone.feed.client.Place
+import fr.bde_teknantes.lnb.phone.feed.client.Rows
 import fr.bde_teknantes.lnb.phone.feed.client.WriteBlock
 import fr.bde_teknantes.lnb.phone.feed.client.widgets.CardLook
 import fr.bde_teknantes.lnb.phone.feed.client.widgets.NewPostsPill
@@ -69,6 +70,9 @@ class FeedScreen(
 
     private var opened = false
 
+    /** The more menu, the delete and pin dialogs and their snackbars, shared with the thread. */
+    private val actions = PostActions(this, session, strings)
+
     init {
         // The app is open from now until this root screen closes: the session's timers run all that time.
         session.appOpened(this)
@@ -98,6 +102,7 @@ class FeedScreen(
     override fun onTick() {
         session.loadIfNeeded(tab)
         if (session.feed(tab).loaded) session.markViewed(tab)
+        actions.tick()
         // Every notice waiting, in order: a later one may undo an earlier (Feed back after Connexion perdue).
         while (true) report(session.takeNotice() ?: break)
     }
@@ -153,32 +158,31 @@ class FeedScreen(
 
     /**
      * Opens the thread of [post] (art direction 9.7): from the card with the composer collapsed, from its reply button
-     * with the composer expanded and focused ([compose]; never for a guest). The thread screen is the next task's
-     * (M3): until it exists, nothing opens.
+     * with the composer expanded and focused ([compose]; never for a guest).
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun openThread(post: PostView, compose: Boolean) {}
+    fun openThread(post: PostView, compose: Boolean) {
+        phone.push(ThreadScreen(session, strings, post.id, expand = compose, zone = zone))
+    }
 
     /**
      * Opens Compose with [destination] selected (art direction 9.8), from the compose button or the empty Global's
-     * button. Compose is the next task's (M3): until it exists, nothing opens.
+     * button. Published, the feed shows the post's tab.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun compose(destination: FeedKind) {}
+    fun compose(destination: FeedKind) {
+        phone.push(ComposeScreen(session, strings, destination) { showTab(it) })
+    }
 
-    /**
-     * The pin button of [post] (art direction 9.4): `FeedSession.togglePin` is ready, the dialog for a fourth pin is
-     * the next task's (M3). Until then, nothing happens.
-     */
-    @Suppress("UNUSED_PARAMETER")
-    fun pinClicked(post: PostView) {}
+    /** Shows [kind]'s tab as a click on it would: where a post published from Compose goes (9.8). */
+    fun showTab(kind: FeedKind) {
+        tabs.selected = kind.ordinal
+        switchTo(kind)
+    }
 
-    /**
-     * The more button of [post] (art direction 9.9): its menu, the delete dialog and `FeedSession.delete` are the
-     * next task's (M3). Until then, nothing opens.
-     */
-    @Suppress("UNUSED_PARAMETER")
-    fun moreClicked(post: PostView, anchor: Widget) {}
+    /** The pin button of [post] (art direction 9.4): pinned or unpinned at once, the dialog first for a fourth pin. */
+    fun pinClicked(post: PostView) = actions.pin(post)
+
+    /** The more button of [post] (art direction 9.9): its menu, then the delete dialog. */
+    fun moreClicked(post: PostView, anchor: Widget) = actions.more(post, anchor)
 
     // ---- Snackbars ----
 
@@ -194,8 +198,7 @@ class FeedScreen(
             FeedNotice.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             is FeedNotice.TooFast -> showErrorSnackbar(strings.get("snackbar.too_fast", notice.seconds))
             is FeedNotice.Refused -> showErrorSnackbar(blockText(notice.block))
-            // Pins and deletes are started by the next task's screens (M3), which report these.
-            is FeedNotice.PinDone, is FeedNotice.PinLimit, is FeedNotice.Deleted -> {}
+            is FeedNotice.PinDone, is FeedNotice.PinLimit, is FeedNotice.Deleted -> actions.report(notice)
         }
     }
 
@@ -242,7 +245,7 @@ class FeedScreen(
 
         /** Before each frame of the tab shown: catch up with the session, then the rules that need the layout. */
         override fun update() {
-            if (session.revision != synced) sync(anchor = true)
+            if (session.revision != synced || cards.values.any { it.isCollapsed }) sync(anchor = true)
             tabs.setUnread(FeedKind.ANNOUNCEMENTS.ordinal, session.isUnread(FeedKind.ANNOUNCEMENTS))
             tabs.setUnread(FeedKind.GLOBAL.ordinal, session.isUnread(FeedKind.GLOBAL))
             fab.visible = session.canCompose(kind)
@@ -389,7 +392,9 @@ class FeedScreen(
             if (mode != Mode.LIST) return
             val ids = feed.pinned + feed.posts
             val shown = ids.toHashSet()
-            for (id in cards.keys.toList()) if (id !in shown) cards.remove(id)
+            // Cards the player deleted here fold away where they stood; the others leave with the rows below.
+            val folding = foldAway(shown)
+            for (id in cards.keys.toList()) if (id !in shown && cards[id] !in folding) cards.remove(id)
             val desired = ArrayList<Widget>(ids.size + 2)
             for (id in ids) {
                 val card = cards.getOrPut(id) { newCard(id) }
@@ -406,8 +411,9 @@ class FeedScreen(
             // anything leaves, as the list closes up at once.
             val kept = if (anchor) list.children.firstOrNull { it.y + it.height > list.offset && it in desired } else null
             val keptAt = kept?.let { it.y - list.offset }
-            for (row in list.children.toList()) if (row !in desired) list.remove(row)
-            desired.forEachIndexed { i, row ->
+            val rows = Rows.keepInPlace(desired, list.children, folding)
+            for (row in list.children.toList()) if (row !in rows) list.remove(row)
+            rows.forEachIndexed { i, row ->
                 if (list.children.getOrNull(i) !== row) {
                     if (row.parent === list) list.remove(row)
                     list.add(i, row)
@@ -416,6 +422,23 @@ class FeedScreen(
             list.layoutRows()
             // Only when the rows above really moved: scrolling would stop the pill's scroll under way and flash the bar.
             if (kept != null && keptAt != null && kept.parent === list && abs(kept.y - keptAt - list.offset) > 0.01f) list.scrollTo(kept.y - keptAt)
+        }
+
+        /**
+         * The cards of posts the player deleted here and that just left the session: they fold away where they stood
+         * (150 ms, art direction 9.9) instead of vanishing. Returns them while they fold; once folded they go.
+         */
+        private fun foldAway(shown: Set<UUID>): Set<PostCard> {
+            val folding = HashSet<PostCard>()
+            for ((id, card) in cards) if (id !in shown) {
+                if (actions.foldsAway(id) && !card.isCollapsed) {
+                    card.collapse()
+                    folding += card
+                } else {
+                    actions.forget(id)
+                }
+            }
+            return folding
         }
 
         private fun newCard(id: UUID) = PostCard({ session.post(id) }, strings, this@FeedScreen).apply { time = ::timeOf }

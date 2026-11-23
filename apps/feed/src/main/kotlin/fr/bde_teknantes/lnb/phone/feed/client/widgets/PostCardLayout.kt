@@ -12,8 +12,19 @@ import fr.bde_teknantes.lnb.phone.feed.model.PostView
  * @property pin The pin button: an announcement the viewer can pin, and may write now.
  * @property time The relative time on the name line; false on a thread's main post, which has its full timestamp.
  * @property replyTo The reply-to line (`En réponse à {name}`), in threads; null for none.
+ * @property fullTime The full timestamp under the body (`14:32 · 12 nov.`), on a thread's main post (9.7); null for
+ * none.
+ * @property hover The hover and pressed tints of a card that opens its thread; false on a thread's main post, which
+ * does nothing when clicked (9.7).
  */
-data class CardLook(val more: Boolean, val pin: Boolean, val time: Boolean = true, val replyTo: String? = null)
+data class CardLook(
+    val more: Boolean,
+    val pin: Boolean,
+    val time: Boolean = true,
+    val replyTo: String? = null,
+    val fullTime: String? = null,
+    val hover: Boolean = true,
+)
 
 /**
  * Where everything of a post card goes (art direction 9.3), from the post, its look and the measured text: plain logic,
@@ -48,9 +59,16 @@ class PostCardLayout(val post: PostView, val look: CardLook, val timeText: Strin
     private val optionalLines = (if (replyToY != null) 1 else 0) + (if (privateY != null) 1 else 0)
     val bodyY = afterHeader + LINE * optionalLines + 2f
     val bodyLines: List<String> = measurer.wrap(post.text, TextStyle.BODY, BODY_WIDTH)
-    val actionY = bodyY + bodyLines.size * TextStyle.BODY.lineHeight + 4f
+    private val bodyEnd = bodyY + bodyLines.size * TextStyle.BODY.lineHeight
 
-    /** The cell's full height, its divider included: `10 + 18 + 16 (handle) + 16 x optional + 2 + 18 x lines + 4 + 28 + 4 + 1`. */
+    /** A thread's main post: its full timestamp 8 dp under the body, then 4 dp before the action row (9.7). */
+    val fullTimeY: Float? = look.fullTime?.let { bodyEnd + 8f }
+    val actionY = fullTimeY?.let { it + TextStyle.CAPTION.lineHeight + 4f } ?: (bodyEnd + 4f)
+
+    /**
+     * The cell's full height, its divider included: `10 + 18 + 16 (handle) + 16 x optional + 2 + 18 x lines + 4 + 28 + 4 + 1`;
+     * on a thread's main post, `8 + 16 + 4` in place of the `4` after the body.
+     */
     val height = actionY + ACTION_ROW + 4f + 1f
 
     /** The time ends at x 244, or before the more button (x 214). */

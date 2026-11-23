@@ -167,7 +167,11 @@ object FeedCapture {
         fun openFeed() = run { check(CaptureHooks.openApp(Feed.APP_ID, "capture")) { "The phone refused to open Feed" } }
 
         /** Moves the pointer to the app-local point ([x], [y]) dp. */
-        fun mouseTo(x: Int, y: Int) = run {
+        fun mouseTo(x: Int, y: Int) = mouseToAt { x.toFloat() to y.toFloat() }
+
+        /** Moves the pointer to the app-local point [at] gives when the step runs (a card found where it is then). */
+        fun mouseToAt(at: () -> Pair<Float, Float>) = run {
+            val (x, y) = at()
             val mc = Minecraft.getInstance()
             val device = CaptureHooks.devicePosition() ?: error("The phone is away")
             val viewport = CaptureHooks.viewportOffset
@@ -179,6 +183,13 @@ object FeedCapture {
 
         fun click(x: Int, y: Int) {
             mouseTo(x, y)
+            run { button(GLFW.GLFW_PRESS) }
+            run { button(GLFW.GLFW_RELEASE) }
+        }
+
+        /** Clicks the app-local point [at] gives when the step runs. */
+        fun clickAt(at: () -> Pair<Float, Float>) {
+            mouseToAt(at)
             run { button(GLFW.GLFW_PRESS) }
             run { button(GLFW.GLFW_RELEASE) }
         }

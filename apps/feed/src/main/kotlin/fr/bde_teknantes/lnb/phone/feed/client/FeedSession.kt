@@ -245,6 +245,9 @@ class FeedSession(
     /** Whether [id] is being deleted (the dialog's confirm button loads). */
     fun isDeleting(id: UUID) = id in deleting
 
+    /** Whether the pin or unpin of [id] waits for the server (the "Replace a pin?" dialog's confirm button loads). */
+    fun isPinning(id: UUID) = id in pendingPins
+
     /** The reply draft of [threadId], made if new, kept as the most recently used of the [MAX_REPLY_DRAFTS]. */
     fun replyDraft(threadId: UUID): ReplyDraft {
         replyDrafts[threadId]?.let { return it }
@@ -631,6 +634,8 @@ class FeedSession(
             state = s
             settleAwaitingDrafts(timedOut = false)
             for (kind in FeedKind.entries) unread[kind] = s.unread[kind] && viewing != kind
+            // A thread shown before the player's state was known (opened from a notification) is marked seen now.
+            viewingThread?.let { if (threads[it]?.loaded == true) markThreadSeen(it) }
         }
         val wasLost = before == FeedAvailability.UNAVAILABLE || before == FeedAvailability.DISABLED
         if (availability == FeedAvailability.OK) {
@@ -1052,12 +1057,13 @@ class FeedSession(
 
     private fun markThreadSeen(threadId: UUID) {
         if (threadSeenSent == threadId) return
-        threadSeenSent = threadId
         for ((id, post) in posts.entries.toList()) {
             if ((id == threadId || post.threadId == threadId) && post.unseenReplies != 0) posts[id] = post.copy(unseenReplies = 0)
         }
         // Coalesced: however many replies come while the thread is read, one mark goes every 2 seconds at most.
+        // Remembered only once queued: without the state yet, the state's arrival queues it (onState).
         if (state?.linked == true) {
+            threadSeenSent = threadId
             pendingThreadSeen += threadId
             flushSeen()
         }

@@ -15,6 +15,8 @@ object FeedScenarios {
     fun get(name: String): (FeedCapture.Script.() -> Unit)? = when (name) {
         "root" -> { { root() } }
         "guest" -> { { guest() } }
+        "thread" -> { { with(WriteScenarios) { thread() } } }
+        "compose" -> { { with(WriteScenarios) { compose() } } }
         else -> null
     }
 
@@ -172,6 +174,9 @@ object FeedScenarios {
         click(128, POST_1_HEART_Y)
         waitTicks(5)
         shot("guest_03_like_refused")
+        // F-25 steps 4 and 5: the thread's strip.
+        waitTicks(70)
+        with(WriteScenarios) { guestThread() }
     }
 
     /** Feed opened afresh with nothing held, as after joining the server. */
