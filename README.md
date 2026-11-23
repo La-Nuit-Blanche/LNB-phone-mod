@@ -35,9 +35,9 @@ The phone and Feed are in English, and in French for players whose game is in Fr
 
 ## Install
 
-`lnbphone` is required on the server and on every client, with Kotlin for Forge. An app's mod is required on both
-sides too. The phone depends on nothing else. Each player's settings are in `config/lnbphone-client.json` on their
-computer.
+`lnbphone` is required on the server and on every client, with NeoForge 21.1.264 or newer for Minecraft 1.21.1, and
+Kotlin for Forge 5.12 or newer. An app's mod is required on both sides too. The phone depends on nothing else. Each
+player's settings are in `config/lnbphone-client.json` on their computer.
 
 Feed (`lnbphone_feed`) is installed with the phone, on the server and on every client, and also needs LNB Warden
 (0.5.0 or later, not part of this repository). Warden has no releases: build its jar from

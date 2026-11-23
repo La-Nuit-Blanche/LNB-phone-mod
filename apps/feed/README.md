@@ -13,13 +13,14 @@ website's repository.
 
 ### What to install
 
-Feed is required on the server and on every client, with the same three mods as for the phone, plus LNB Warden:
+Feed is required on the server and on every client, with what the phone needs, plus LNB Warden:
 
 | Mod | Version | Where it comes from |
 | --- | --- | --- |
 | LNB Feed (`lnbphone_feed-<version>.jar`) | the same version as the phone | the GitHub release of this repository |
 | LNB Phone (`lnbphone-<version>.jar`) | 0.2.0 up to, not including, 0.3 (for Feed 0.2.0; the build writes the range) | the same release |
 | LNB Warden (`lnbwarden-<version>.jar`) | 0.5.0 or newer; Feed is built and tested against 0.5.0, commit `5a9dba1` | Warden has no releases: build it (below), or get it from whoever runs the server's mods |
+| NeoForge | 21.1.264 or newer, for Minecraft 1.21.1 | as for the phone |
 | Kotlin for Forge | 5.12 or newer | as for the phone |
 
 A release holds the phone's jar and Feed's jar, built from the same tag so that they load together. A client that lacks
@@ -38,8 +39,8 @@ git checkout 5a9dba1
 The jar is `build/libs/lnbwarden-0.5.0.jar`. `5a9dba1` is the commit Feed is built and tested against, the one this
 repository's CI pins (`ref` in `.github/workflows/build.yml`); a newer Warden is allowed but untested.
 
-Feed shows nothing until the website has its own side switched on: the `feed` flag on the site (it ships switched off),
-and `feed.writing` to let players write.
+Until the website has its own side switched on, Feed shows "Feed is switched off": the `feed` flag on the site ships
+switched off. Players write only while `feed.writing` is on too; while it is off they read.
 
 ### Where the site's address and secret come from
 
@@ -47,7 +48,9 @@ Feed does not have its own address or token. It uses LNB Warden's: `api.url` and
 `config/lnbwarden-server.toml`, the same file and the same secret as for Warden itself, so the secret lives in one place
 and is never sent to players. With either one empty, Feed is unavailable and says so (below). Warden's `auth.mode` decides
 who may join: `required` (every player must be allowed by the site), `optional` (players without an LNB account join as
-guests, who can read Feed but not write) or `off` (no authentication and no API calls: for development only).
+guests, who can read Feed but not write) or `off` (Warden checks nobody and makes no API call of its own: for
+development only). `off` is Warden's alone: Feed with `kind = "site"` still calls the site whenever `api.url` and
+`api.token` are set.
 
 ### Feed's configuration: `config/lnbphone_feed-server.toml`
 
@@ -90,7 +93,8 @@ backend works in any world.
 - **Feed is switched off on the site.** Feed opened with nothing loaded shows "Feed is switched off"; an open one reads
   as a lost connection. The server asks the site again every minute.
 - **Writing is switched off on the site (`feed.writing`).** Players read, with no compose button, and a strip where the
-  reply field was says "Writing is paused".
+  reply field was says "Writing is paused". The site sends no event when the flag changes: a player's Feed learns of it
+  at its next state read, when Feed is opened, or when a post, reply or like is refused for it.
 - **A player has no LNB account (a guest),** or is banned: they read, and a quiet line says why they cannot write.
 - **Notifications** (a new announcement; a reply to a player's post or reply) are the phone's own: they are kept with
   the world for players who are offline, shown as a badge at their next login, and dropped after 30 days. The site
