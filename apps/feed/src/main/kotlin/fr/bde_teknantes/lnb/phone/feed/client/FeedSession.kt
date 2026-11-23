@@ -383,7 +383,10 @@ class FeedSession(
      */
     fun takeLanding(kind: FeedKind): UUID? {
         val id = landing ?: return null
-        if (kind != FeedKind.ANNOUNCEMENTS || !feed(kind).loaded) return null
+        val list = feed(kind)
+        if (kind != FeedKind.ANNOUNCEMENTS || !list.loaded) return null
+        // A list about to reload may bring the post: wait for it, and land then (or drop it if it isn't there).
+        if (!list.holds(id) && (list.stale || list.loadingFirst)) return null
         landing = null
         if (id in feed(kind).waitingIds) releaseWaiting(kind)
         if (feed(kind).holds(id)) highlights += id

@@ -558,4 +558,17 @@ class FeedSessionStateTest {
         session.appClosed(owner)
         assertNull(session.takeNotice())
     }
+
+    @Test
+    fun `a landing on a list about to reload waits for the reload to bring the post`() {
+        r.firstPage(FeedKind.ANNOUNCEMENTS, listOf(post(FeedKind.ANNOUNCEMENTS, minutesAgo = 10)))
+        session.onReset()
+        val fresh = post(FeedKind.ANNOUNCEMENTS, minutesAgo = 0)
+        session.land(fresh.id)
+        assertNull(session.takeLanding(FeedKind.ANNOUNCEMENTS))
+        r.firstPage(FeedKind.ANNOUNCEMENTS, listOf(fresh) + session.feed(FeedKind.ANNOUNCEMENTS).posts.mapNotNull(session::post))
+        assertEquals(fresh.id, session.takeLanding(FeedKind.ANNOUNCEMENTS))
+        assertTrue(session.feed(FeedKind.ANNOUNCEMENTS).posts.contains(fresh.id))
+        assertTrue(session.wantsHighlight(fresh.id))
+    }
 }
