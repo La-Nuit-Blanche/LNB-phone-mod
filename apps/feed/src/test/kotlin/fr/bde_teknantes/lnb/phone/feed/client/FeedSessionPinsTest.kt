@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -87,10 +86,6 @@ class FeedSessionPinsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: togglePin shows the new pin with the client's clock as its pinnedAt and keeps the 3 most recent. With " +
-            "the client's clock behind the site's, a replacing pin is the one dropped: the click shows nothing.",
-    )
     fun `a replacing pin shows first even when the client's clock is behind the site's`() {
         // Pinned on the site a minute ahead of this client's clock.
         val pins = (0..2).map { announcement(minutesAgo = 1000L + it, pinnedAt = NOW.plusSeconds(60L - it)) }
@@ -157,10 +152,6 @@ class FeedSessionPinsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (feed-app.md 5.3, feed-mod.md 12): NOT_FOUND means the post went and 'the post leaves the lists'; " +
-            "pinAnswered treats it as any failure and keeps the post, with 'Action impossible'.",
-    )
     fun `a pin answered NOT_FOUND drops the post`() {
         val a = announcement(10)
         loaded(listOf(a))
@@ -171,10 +162,6 @@ class FeedSessionPinsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: a pin that fails puts back the group as it was at the click, undoing a `pins` event that arrived " +
-            "meanwhile (another announcer's pin), until the next reload.",
-    )
     fun `a pins event while a pin waits survives that pin's failure`() {
         val a = announcement(10)
         val c = announcement(20)
@@ -208,10 +195,6 @@ class FeedSessionPinsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (a broken server only): togglePin checks canPin and that the post isn't a reply, not its feed, so for a " +
-            "Global post whose view says canPin it sends a pin and reloads Announcements, and 'Action impossible' follows.",
-    )
     fun `a Global post is never pinned, whatever its view says`() {
         val g = post(FeedKind.GLOBAL, canPin = true)
         r.state(ANNOUNCER)

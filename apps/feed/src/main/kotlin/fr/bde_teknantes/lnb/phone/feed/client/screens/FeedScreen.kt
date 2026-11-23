@@ -318,7 +318,9 @@ class FeedScreen(
 
         private fun lookOf(post: PostView): CardLook {
             val writes = session.writeBlock() == null
-            return CardLook(more = post.canDelete && writes, pin = post.canPin && writes)
+            // The pin button on an announcement's main post only, whatever the view says (art direction 9.3).
+            val pinnable = post.canPin && post.feed == FeedKind.ANNOUNCEMENTS && !post.isReply
+            return CardLook(more = post.canDelete && writes, pin = pinnable && writes)
         }
 
         private fun timeOf(post: PostView) = FeedFormat.relativeTime(post.createdAt, session.clock(), zone, strings)

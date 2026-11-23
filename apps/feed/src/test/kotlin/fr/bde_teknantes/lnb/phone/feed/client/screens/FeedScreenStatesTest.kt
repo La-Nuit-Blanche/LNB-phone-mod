@@ -174,10 +174,6 @@ class FeedScreenStatesTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (a broken server only): the card's pin button follows `canPin` alone, so a Global post whose view says " +
-            "canPin shows it, and FeedSession.togglePin would send it. Art direction 9.3: Global posts never show it.",
-    )
     fun `a Global post never shows the pin button, whatever its view says`() {
         val t = open(FeedKind.GLOBAL)
         r.state(ANNOUNCER)

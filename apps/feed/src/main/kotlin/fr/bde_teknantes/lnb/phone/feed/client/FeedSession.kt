@@ -128,6 +128,9 @@ class FeedSession(
     private val ids = RequestIds()
     private val pendingLikes = HashMap<UUID, PendingLike>()
     private val pendingPins = HashMap<UUID, List<Pin>>()
+
+    // Pins waiting for their answer since which the server sent its group: on failure, that group stands.
+    private val pinsMovedSince = HashSet<UUID>()
     private val deleting = HashSet<UUID>()
     private val highlights = HashSet<UUID>()
     private val reveals = EnumMap<FeedKind, UUID>(FeedKind::class.java)
@@ -512,12 +515,16 @@ class FeedSession(
     fun togglePin(postId: UUID, replace: Boolean): PinAttempt {
         if (writeBlock() != null) return PinAttempt.BLOCKED
         val post = posts[postId] ?: return PinAttempt.IGNORED
-        if (!post.canPin || post.isReply || postId in pendingPins) return PinAttempt.IGNORED
+        // Only an announcement's main post, whatever the view says (a broken server).
+        if (!post.canPin || post.isReply || post.feed != FeedKind.ANNOUNCEMENTS || postId in pendingPins) return PinAttempt.IGNORED
         val pinning = post.pinnedAt == null
         val group = pinGroup()
         if (pinning && !replace && group.size >= Feed.MAX_PINS) return PinAttempt.NEEDS_REPLACE
         pendingPins[postId] = group
-        val shown = if (pinning) (listOf(Pin(postId, clock())) + group).take(Feed.MAX_PINS) else group.filter { it.id != postId }
+        // Shown first in the group: after the group's latest pin, never by this client's clock, which may be behind the
+        // site's (the site's answer then gives the real time).
+        val at = group.maxOfOrNull { it.pinnedAt }?.plusMillis(1) ?: clock()
+        val shown = if (pinning) (listOf(Pin(postId, at)) + group).take(Feed.MAX_PINS) else group.filter { it.id != postId }
         applyPinGroup(shown)
         if (pinning) highlights += postId
         request(PendingRequest.Pin(postId, pinning)) { PinPayload(it, postId, pinning, replace) }
@@ -718,6 +725,7 @@ class FeedSession(
     }
 
     fun onPins(group: List<Pin>) {
+        pinsMovedSince += pendingPins.keys
         applyPinGroup(group)
         changed()
     }
@@ -752,6 +760,7 @@ class FeedSession(
         requests.clear()
         pendingLikes.clear()
         pendingPins.clear()
+        pinsMovedSince.clear()
         deleting.clear()
         highlights.clear()
         reveals.clear()
@@ -1048,6 +1057,7 @@ class FeedSession(
         if (threads.containsKey(id)) threadGone(id)
         pendingLikes.remove(id)
         pendingPins.remove(id)
+        pinsMovedSince.remove(id)
         highlights.remove(id)
         posts.remove(id)
     }
@@ -1144,12 +1154,20 @@ class FeedSession(
 
     private fun pinAnswered(request: PendingRequest.Pin, payload: ResultPayload) {
         val before = pendingPins.remove(request.postId)
+        val moved = pinsMovedSince.remove(request.postId)
         if (payload.outcome == Outcome.OK) {
             payload.pinned?.let(::applyPinGroup)
             notice = FeedNotice.PinDone(request.pinned)
             return
         }
-        before?.let(::applyPinGroup)
+        if (payload.outcome == Outcome.NOT_FOUND) {
+            // The post went (feed-app.md 5.3): it leaves the lists.
+            removePost(request.postId)
+            collect()
+            return
+        }
+        // Put back as it was at the click, unless the server sent its group since: that one stands.
+        if (!moved) before?.let(::applyPinGroup)
         notice = if (payload.outcome == Outcome.PIN_LIMIT) FeedNotice.PinLimit(request.postId) else actionNotice(payload)
     }
 
