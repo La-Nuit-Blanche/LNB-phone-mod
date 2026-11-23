@@ -5,9 +5,11 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.AnnouncerBadge
 import fr.bde_teknantes.lnb.phone.api.client.ui.Avatar
 import fr.bde_teknantes.lnb.phone.api.client.ui.Clickable
 import fr.bde_teknantes.lnb.phone.api.client.ui.Colors
+import fr.bde_teknantes.lnb.phone.api.client.ui.Easing
 import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
 import fr.bde_teknantes.lnb.phone.api.client.ui.IconButton
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitDrawing
+import fr.bde_teknantes.lnb.phone.api.client.ui.Motion
 import fr.bde_teknantes.lnb.phone.api.client.ui.Radius
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextMetrics
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStyle
@@ -95,7 +97,29 @@ class PostCard(
     /** Whether the highlight is on now. */
     val isHighlighted: Boolean get() = now - highlightAt < HIGHLIGHT_MS + FADE_MS
 
-    override fun heightFor(width: Float): Float = cardLayout()?.height ?: 0f
+    private var collapseAt = Float.NaN
+    private var wrapped = false
+
+    /** Folds the cell away (art direction 9.9, 14): its height goes to 0 in 150 ms, ease-in, its content fading out. */
+    fun collapse() {
+        if (collapseAt.isNaN()) collapseAt = now
+    }
+
+    /** Whether the cell is folding away, or folded. */
+    val isCollapsing: Boolean get() = !collapseAt.isNaN()
+
+    /** Whether the cell has folded away: it can leave its list. */
+    val isCollapsed: Boolean get() = collapseProgress() >= 1f
+
+    private fun collapseProgress(): Float = if (collapseAt.isNaN()) 0f else ((now - collapseAt) / Motion.SHORT_MS).coerceIn(0f, 1f)
+
+    override fun heightFor(width: Float): Float {
+        val full = cardLayout()?.height ?: 0f
+        return if (isCollapsing) full * (1f - Easing.IN.ease(collapseProgress())) else full
+    }
+
+    // A cell folding away is out of reach: nothing in it can be clicked again.
+    override fun hitTest(localX: Float, localY: Float): Widget? = if (isCollapsing) null else super.hitTest(localX, localY)
 
     override fun update() {
         post()?.let { last = it }
@@ -118,6 +142,8 @@ class PostCard(
         pin.at(214f, row, ActionButton.DISC, ActionButton.DISC)
         more.visible = look.more
         more.at(220f, 5f + l.shift)
+        // A card without hover (a thread's main post) does nothing when clicked: no tap for it.
+        silent = !look.hover
         badge.visible = l.badge
         // Vertically centred on the 18 dp name line, 4 dp after the name.
         badge.at(PostCardLayout.CONTENT_X + l.nameWidth + 4f, l.nameY + 1f)
@@ -129,8 +155,15 @@ class PostCard(
         val l = cardLayout() ?: return
         val p = l.post
         val h = l.height
+        // Folding away: cut to the shrinking height, the content fading (closed in renderOver).
+        wrapped = isCollapsing
+        if (wrapped) {
+            canvas.pushClip(0f, 0f, width, height)
+            canvas.pushAlpha(1f - collapseProgress())
+        }
         if (l.pinned) canvas.fillRect(0f, 0f, width, h, Colors.SURFACE)
-        KitDrawing.stateTint(canvas, interaction, 0f, 0f, width, h)
+        // A thread's main post has no hover and isn't clicked (9.7).
+        if (look.hover) KitDrawing.stateTint(canvas, interaction, 0f, 0f, width, h)
         val since = now - highlightAt
         if (since < HIGHLIGHT_MS + FADE_MS) {
             val alpha = if (since < HIGHLIGHT_MS) 1f else 1f - (since - HIGHLIGHT_MS) / FADE_MS
@@ -160,9 +193,17 @@ class PostCard(
         l.bodyLines.forEachIndexed { i, line ->
             canvas.drawText(line, PostCardLayout.CONTENT_X, l.bodyY + i * TextStyle.BODY.lineHeight, TextStyle.BODY, Colors.TEXT_1)
         }
+        l.fullTimeY?.let { y -> look.fullTime?.let { canvas.drawText(it, PostCardLayout.CONTENT_X, y, TextStyle.CAPTION, Colors.TEXT_2) } }
         // The unseen-replies marker's dot: 6 dp, centred at x 50, on the reply icon's middle.
         if (p.unseenReplies > 0) canvas.fillCircle(47f, l.actionY + 11f, 6f, Colors.ACCENT)
         canvas.hairline(0f, width, h - 1f)
+    }
+
+    override fun renderOver(canvas: AppCanvas) {
+        if (!wrapped) return
+        canvas.popAlpha()
+        canvas.popClip()
+        wrapped = false
     }
 
     /** An invisible strip that shows a tooltip: the moderator's private line. */
