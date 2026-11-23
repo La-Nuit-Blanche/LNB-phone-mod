@@ -354,7 +354,9 @@ class ThreadScreen(
                     reveal(id)
                     cards[id]?.highlight()
                 }
-                thread.hasMore && !thread.moreFailed -> session.loadMoreReplies(threadId)
+                // A later page that couldn't load keeps the landing: the retry row brings it, and the thread lands then.
+                thread.hasMore -> if (!thread.moreFailed) session.loadMoreReplies(threadId)
+                // The whole thread is there and the reply isn't: it went.
                 else -> landing = null
             }
         }

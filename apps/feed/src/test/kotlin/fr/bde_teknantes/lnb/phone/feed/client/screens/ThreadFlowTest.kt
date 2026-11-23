@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.ZoneOffset
 import java.util.UUID
@@ -193,7 +192,6 @@ class ThreadFlowTest {
     }
 
     @Test
-    @Disabled("Defect: a reply's notification whose later page fails drops the landing; after Retry the thread doesn't scroll to the reply (ThreadScreen.afterSync sets landing = null on moreFailed)")
     fun `a reply's notification whose later page failed lands on the reply once Retry brought it`() {
         r.state()
         val target = reply(main, minutesAgo = 1).copy(text = "cible")
