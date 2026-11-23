@@ -179,7 +179,13 @@ The server never computes a right. It uses the cached state for the command's vi
 Every request payload carries a `requestId` chosen by the client; the server answers it with the same ID, on the server thread, once the backend answered. Before calling the backend the server checks, in this order:
 
 1. The sender is a `ServerPlayer` from the payload context. It is the `player` and the `viewer` of every call; no payload names a player.
-2. The per-player limits: at most 4 backend calls in flight for the player; reads (`open`, `load_feed`, `load_thread`) a burst of 20 then 10 a second; writes (`create_post`, `create_reply`, `like`, `pin`, `delete`) a burst of 10 then 1 a second; `seen_*` at most 2 a second, the extra ones dropped. Over a limit, the server answers `RATE_LIMITED` without calling the site. These are a backstop against a modified client; the site's per-account limits are the real ones.
+2. The limits (`PlayerLimits`). The site lets the whole Minecraft server make 1,200 calls a minute, shared by every player, so the server keeps each client to a small share of it and all of them together well under it, leaving room for its own calls (the relay, the queue, the reads at each reconnection):
+   - at most 4 backend calls in flight for the player;
+   - per kind: reads (`open`, `load_feed`, `load_thread`, and the state read the server makes for the player at join or after a `notAllowed`, `banned`, `notLinked` or `feed.writing` refusal) a burst of 20, then 1 a second; writes (`create_post`, `create_reply`, `like`, `pin`, `delete`) a burst of 10, then 1 every 2 seconds; `seen_*` a burst of 3, then 1 every 2 seconds, the extra ones dropped (the client sends `seen_feed` when what it shows changes, not on a timer);
+   - per player, all kinds together: a burst of 40, then 90 a minute;
+   - the whole server, every player together: a burst of 100, then 600 a minute.
+
+   Leaving resets nothing: a client that leaves and comes back finds the allowance it left, and answers to calls made before it left free the slots they took. Over a limit, the server answers `RATE_LIMITED` (1 second) without calling the site; an `open` past it gets no answer, and a state read past it is skipped. A player scrolling both feeds, opening threads and liking quickly stays far under these; the site's per-account limits are the ones about behaviour.
 3. The fields: text through `TextLimits.canSend(text.trim(), 280)`, sent trimmed; a cursor of at most 128 characters; anything else is bounded by the codecs. A payload that fails answers `INVALID` (the client never sends one).
 
 Then it calls the backend and maps the result to an `Outcome` (section 5.3).

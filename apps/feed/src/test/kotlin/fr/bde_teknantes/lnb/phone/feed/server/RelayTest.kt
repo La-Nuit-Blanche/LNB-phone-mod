@@ -39,7 +39,11 @@ class RelayTest {
         val players = (1..count).map { UUID(1, it.toLong()) }
         host.online += players
         host.online += bystander
-        players.forEach(service::handleOpen)
+        // Opens spread over time, as real players' are: the whole server's allowance is 10 a second.
+        for (player in players) {
+            host.time += 100
+            service.handleOpen(player)
+        }
         return players
     }
 

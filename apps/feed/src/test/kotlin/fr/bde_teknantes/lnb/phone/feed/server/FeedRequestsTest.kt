@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
@@ -348,16 +347,17 @@ class FeedRequestsTest {
     }
 
     @Test
-    fun `reads come in a burst of 20, then 10 a second`() {
+    fun `reads come in a burst of 20, then 1 a second, the join's read included`() {
         every("page", BackendResult.Ok(FeedPage(FeedKind.GLOBAL, emptyList(), emptyList(), null)))
-        host.time = 1_000
+        // The join took one read: give it back first.
+        host.time += 1_000
         for (i in 1..21) service.handleRequest(camille, LoadFeedPayload(i, FeedKind.GLOBAL, null))
         assertEquals(20, backend.calls("page").size)
         assertEquals(Outcome.RATE_LIMITED, outcome(camille, 21))
-        host.time += 50
+        host.time += 500
         service.handleRequest(camille, LoadThreadPayload(22, thread, null))
         assertEquals(Outcome.RATE_LIMITED, outcome(camille, 22), "loads of threads share the reads' allowance")
-        host.time += 50
+        host.time += 500
         service.handleRequest(camille, LoadFeedPayload(23, FeedKind.GLOBAL, null))
         assertEquals(21, backend.calls("page").size)
         // Reads don't use up writes.
@@ -367,29 +367,29 @@ class FeedRequestsTest {
     }
 
     @Test
-    fun `writes come in a burst of 10, then 1 a second`() {
+    fun `writes come in a burst of 10, then 1 every 2 seconds`() {
         every("delete", BackendResult.Ok(Unit))
         for (i in 1..11) service.handleRequest(camille, DeletePayload(i, post))
         assertEquals(10, backend.calls("delete").size)
         assertEquals(ResultPayload(11, Outcome.RATE_LIMITED, retryAfter = 1), answer(camille, 11))
-        host.time += 500
+        host.time += 1_000
         service.handleRequest(camille, PinPayload(12, post, false, false))
         assertEquals(Outcome.RATE_LIMITED, outcome(camille, 12))
-        host.time += 500
+        host.time += 1_000
         every("pin", BackendResult.Ok(PinState(emptyList(), null)))
         service.handleRequest(camille, PinPayload(13, post, false, false))
         assertEquals(Outcome.OK, outcome(camille, 13))
     }
 
     @Test
-    fun `seen marks past 2 a second are dropped, and a guest's are never sent`() {
+    fun `seen marks past a burst of 3, then 1 every 2 seconds, are dropped, and a guest's are never sent`() {
         every("markFeedSeen", BackendResult.Ok(Unit))
         every("markThreadSeen", BackendResult.Ok(Unit))
         repeat(5) { service.handleSeenFeed(camille, FeedKind.GLOBAL, time) }
         service.handleSeenThread(camille, thread)
-        assertEquals(2, backend.calls("markFeedSeen").size)
+        assertEquals(3, backend.calls("markFeedSeen").size)
         assertTrue(backend.calls("markThreadSeen").isEmpty())
-        host.time += 500
+        host.time += 2_000
         service.handleSeenThread(camille, thread)
         assertEquals(listOf(camille, thread), backend.calls("markThreadSeen").single().args)
         assertTrue(host.sentTo(camille).isEmpty(), "seen marks have no answer")
@@ -402,37 +402,35 @@ class FeedRequestsTest {
         service.handleSeenThread(guest, thread)
         // Nor one whose state isn't known yet.
         service.handleSeenFeed(UUID(1, 6), FeedKind.GLOBAL, time)
-        assertEquals(2, backend.calls("markFeedSeen").size)
+        assertEquals(3, backend.calls("markFeedSeen").size)
         assertEquals(1, backend.calls("markThreadSeen").size)
     }
 
     @Test
     fun `opens past the reads' burst are dropped without an answer`() {
         for (i in 1..25) service.handleOpen(camille)
-        assertEquals(1 + 20, backend.calls("player").count { it.arg<UUID>(0) == camille }, "the join's read and 20 opens")
+        assertEquals(1 + 19, backend.calls("player").count { it.arg<UUID>(0) == camille }, "the join's read and 19 opens: 20 reads")
     }
 
     @Test
-    @Disabled(
-        "Defect (minor): leaving forgets the player's in-flight count, and answers to calls made before they left " +
-            "still call PlayerLimits.finish when they come, taking slots off the count of the player's next visit. A " +
-            "modified client that leaves and comes back while 4 calls wait gets 8 in flight, past the 4 of " +
-            "feed-app.md 4.3.",
-    )
-    fun `answers to calls made before a player left don't free the slots of their next visit`() {
+    fun `answers to calls made before a player left free their own slots, not the next visit's`() {
         backend.auto = { call -> if (call.name == "player") BackendResult.Ok(ScriptedBackend.linked(call.arg(0), "p")) else null }
+        host.time += 1_000
         for (i in 1..4) service.handleRequest(camille, LoadFeedPayload(i, FeedKind.GLOBAL, null))
         service.onLeave(camille)
         service.onJoin(camille)
         for (i in 11..14) service.handleRequest(camille, LoadFeedPayload(i, FeedKind.GLOBAL, null))
-        assertEquals(8, backend.calls("page").size, "a new visit starts with a fresh count")
-        backend.calls("page").take(4).forEach { it.answer(BackendResult.Ok(FeedPage(FeedKind.GLOBAL, emptyList(), emptyList(), null))) }
-        service.handleRequest(camille, LoadFeedPayload(20, FeedKind.GLOBAL, null))
-        assertEquals(8, backend.calls("page").size, "the 9th call is refused: 4 calls of this visit still wait")
+        // Leaving resets nothing: the 4 calls of the last visit still wait, so the new visit gets none, nor its join read.
+        assertEquals(4, backend.calls("page").size)
+        assertEquals(Outcome.RATE_LIMITED, outcome(camille, 11))
+        backend.calls("page").take(2).forEach { it.answer(BackendResult.Ok(FeedPage(FeedKind.GLOBAL, emptyList(), emptyList(), null))) }
+        for (i in 20..22) service.handleRequest(camille, LoadFeedPayload(i, FeedKind.GLOBAL, null))
+        assertEquals(6, backend.calls("page").size, "two slots freed, two calls more, never past 4 in flight")
+        assertEquals(Outcome.RATE_LIMITED, outcome(camille, 22))
     }
 
     @Test
-    fun `leaving forgets the player's limits and watching, and a late answer goes nowhere`() {
+    fun `leaving forgets watching, and a late answer goes nowhere`() {
         backend.auto = { null }
         service.handleOpen(camille)
         service.handleRequest(camille, LikePayload(1, post, true))

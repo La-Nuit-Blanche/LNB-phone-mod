@@ -46,6 +46,7 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
     val relay = Relay(backend, host, watchers, rights, notifier)
     private val limits = PlayerLimits(host::millis)
     private var lastDrain = 0L
+    private var lastPrune = 0L
 
     fun isWatcher(player: UUID) = player in watchers
 
@@ -66,17 +67,30 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
             lastDrain = now
             notifier.drain()
         }
+        if (now - lastPrune >= PRUNE_EVERY_MS) {
+            lastPrune = now
+            limits.prune()
+        }
     }
 
-    /** Nothing waits for it: the site being away never delays joining. */
+    /**
+     * Nothing waits for it: the site being away never delays joining. The read counts against the player's limits,
+     * so that leaving and joining again in a loop can't make the server ask the site without end.
+     */
     fun onJoin(player: UUID) {
-        rights.refresh(player)
+        refreshCharged(player)
     }
 
+    /** The player's limits stay: a client that comes back finds the allowance it left. */
     fun onLeave(player: UUID) {
         watchers -= player
         rights.forget(player)
-        limits.forget(player)
+    }
+
+    /** Reads [player]'s state again for the player's sake, within their limits; skipped past them. */
+    private fun refreshCharged(player: UUID) {
+        if (!limits.tryStart(player, PlayerLimits.Kind.READ)) return
+        rights.refresh(player).whenComplete { _, _ -> limits.finish(player) }
     }
 
     // ---- Requests ----
@@ -173,14 +187,14 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
             is BackendResult.Ok -> Outcome.OK
             is BackendResult.Unavailable -> Outcome.UNAVAILABLE
             is BackendResult.Disabled -> {
-                if (result.flag == "feed.writing") rights.refresh(player)
+                if (result.flag == "feed.writing") refreshCharged(player)
                 Outcome.DISABLED
             }
             is BackendResult.Refused -> when (result.problem) {
                 "rateLimited" -> Outcome.RATE_LIMITED
-                "notLinked" -> Outcome.NOT_LINKED.also { rights.refresh(player) }
-                "banned" -> Outcome.BANNED.also { rights.refresh(player) }
-                "notAllowed" -> Outcome.NOT_ALLOWED.also { rights.refresh(player) }
+                "notLinked" -> Outcome.NOT_LINKED.also { refreshCharged(player) }
+                "banned" -> Outcome.BANNED.also { refreshCharged(player) }
+                "notAllowed" -> Outcome.NOT_ALLOWED.also { refreshCharged(player) }
                 "notFound" -> Outcome.NOT_FOUND
                 "pinLimit" -> Outcome.PIN_LIMIT
                 "notPinnable" -> Outcome.NOT_PINNABLE
@@ -213,5 +227,6 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
 
     private companion object {
         const val DRAIN_EVERY_MS = 5 * 60 * 1000L
+        const val PRUNE_EVERY_MS = 60 * 1000L
     }
 }
