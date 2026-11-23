@@ -578,6 +578,9 @@ What `PhoneNotifications.send` gives the player: a badge on the app's icon and t
 over the open phone, or the closed phone peeking up from the corner with the banner (unless the player turned the
 preview off); a chime (unless sounds are off). A player who is offline gets it when they next log in, as a badge.
 Opening the app, by any route, clears its notifications. `clearApp` and `clearTarget` take them back.
+`send` also takes a collection of UUIDs, and `sendToEveryone` reaches every player who has played on the world, with
+a variant that leaves some out (`except`: an announcement's author, who mustn't be told of their own post; from
+phone 0.1.1).
 
 - **Text.** Title and text are translatable components with keys in your language files, so they are shown in the
   recipient's language. What a player wrote goes in as an argument, never as the key (see the mistakes below). The

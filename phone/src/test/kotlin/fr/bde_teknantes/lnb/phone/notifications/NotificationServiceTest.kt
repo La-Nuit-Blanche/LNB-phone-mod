@@ -97,6 +97,33 @@ class NotificationServiceTest {
     }
 
     @Test
+    fun `everyone but the excluded, where an excluded player gets nothing, connected or offline`() {
+        host.known += listOf(alice, bob)
+        host.online += carol
+        val dave = UUID(0, 4)
+        host.known += dave
+        host.online += dave
+        assertEquals(2, service.sendToEveryone(host, feed, title, text, "post:1", setOf(bob, dave)))
+        assertEquals(setOf(alice, carol), store.playersWithNotifications)
+        // Neither the offline excluded player (stored nothing) nor the connected one (sent nothing) heard of it.
+        assertTrue(store.of(bob).isEmpty())
+        assertTrue(host.sentTo(dave).isEmpty())
+        assertEquals(1, host.sentTo(carol).size)
+    }
+
+    @Test
+    fun `an empty except is everyone, and unknown UUIDs in it change nothing`() {
+        host.known += listOf(alice, bob)
+        host.online += carol
+        assertEquals(3, service.sendToEveryone(host, feed, title, text, null, emptySet()))
+        assertEquals(setOf(alice, bob, carol), store.playersWithNotifications)
+        val other = FakeHost()
+        other.known += listOf(alice, bob)
+        assertEquals(2, service.sendToEveryone(other, feed, title, text, null, setOf(UUID(9, 9))))
+        assertEquals(setOf(alice, bob), other.store!!.playersWithNotifications)
+    }
+
+    @Test
     fun `a notification too large to send is not stored`() {
         host.broken = { true }
         host.online += alice

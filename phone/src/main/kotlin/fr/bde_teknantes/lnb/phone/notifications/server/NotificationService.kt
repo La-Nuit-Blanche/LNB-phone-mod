@@ -99,7 +99,16 @@ internal class NotificationService(private val millis: () -> Long = { System.nan
 
     /** [send] to every player who has played on this world, connected or not; not to players who join later. */
     fun sendToEveryone(host: NotificationHost, appId: ResourceLocation, title: Component, text: Component, target: String?): Int =
-        send(host, host.knownPlayers(), appId, title, text, target)
+        sendToEveryone(host, appId, title, text, target, emptySet())
+
+    /**
+     * [send] to every player who has played on this world but those in [except] (an announcement's author), connected
+     * or not. UUIDs in [except] that aren't players of the world change nothing.
+     */
+    fun sendToEveryone(host: NotificationHost, appId: ResourceLocation, title: Component, text: Component, target: String?, except: Set<UUID>): Int {
+        val players = host.knownPlayers()
+        return send(host, if (except.isEmpty()) players else players.filterNot { it in except }, appId, title, text, target)
+    }
 
     /** Removes [player]'s notifications from [appId] (only those leading to [target], if given), on their client too. */
     fun clear(host: NotificationHost, player: UUID, appId: ResourceLocation, target: String?) {
