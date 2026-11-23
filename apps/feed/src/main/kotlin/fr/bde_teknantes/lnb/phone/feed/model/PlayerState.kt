@@ -62,7 +62,10 @@ data class PlayerState(
     }
 }
 
-/** Whether the server can reach Feed on the site, as the client is told with each `state`. */
+/**
+ * Whether the server can reach Feed on the site, as the client is told with each `state`. Travels by ordinal:
+ * reordering, inserting or removing a value needs a bump of `FeedNetwork.PROTOCOL_VERSION`.
+ */
 enum class Availability {
     OK,
 
@@ -77,7 +80,10 @@ enum class Availability {
     }
 }
 
-/** What became of a client's request (`docs/feed-app.md` 5.3). */
+/**
+ * What became of a client's request (`docs/feed-app.md` 5.3). Travels by ordinal: reordering, inserting or removing a
+ * value needs a bump of `FeedNetwork.PROTOCOL_VERSION`.
+ */
 enum class Outcome {
     OK,
     UNAVAILABLE,

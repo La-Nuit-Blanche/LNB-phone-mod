@@ -25,7 +25,10 @@ internal object Wire {
     /** A string of at most [maxUnits] UTF-16 units. */
     fun string(maxUnits: Int): StreamCodec<ByteBuf, String> = ByteBufCodecs.stringUtf8(maxUnits)
 
-    /** An enum as one byte, by ordinal; an unknown ordinal fails to decode. */
+    /**
+     * An enum as one byte, by ordinal; an unknown ordinal fails to decode. Its values' order is then part of the
+     * protocol: changing it needs a bump of `FeedNetwork.PROTOCOL_VERSION`.
+     */
     inline fun <reified E : Enum<E>> enumByte(): StreamCodec<ByteBuf, E> {
         val values = enumValues<E>()
         return StreamCodec.of(

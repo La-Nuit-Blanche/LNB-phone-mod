@@ -92,8 +92,8 @@ interface FeedBackend {
     fun setAnnouncer(target: UUID, announcer: Boolean, issuer: Issuer?): CompletableFuture<BackendResult<AnnouncerState>>
     fun announcers(): CompletableFuture<BackendResult<List<AnnouncerEntry>>>
 
-    /** Starts delivering the site's changes to [listener], until [stop]. */
-    fun start(server: MinecraftServer, listener: FeedEventListener)
+    /** Starts delivering the site's changes to [listener] (on any thread: it hops to the server thread), until [stop]. */
+    fun start(listener: FeedEventListener)
     fun stop()
 }
 
@@ -170,7 +170,7 @@ A **watcher** is an online player who opened Feed since they joined (the `open` 
 
 ### 4.2 Rights
 
-`RightsCache` keeps each online player's `PlayerState` (`feed-mod.md` 4.1). It reads it when the player joins (in the background: nothing waits for it), at every `open` (the tab dots in it must be fresh), and again at once on a `rights` event naming the player, on a `notAllowed`, `banned` or `notLinked` answer to their action, for every online player on `onConnected`, and whenever a copy older than 5 minutes is about to be used (the command); it forgets it when they leave. Each new state goes to the player (`state` payload) if they watch, and the command tree is sent again (`server.commands.sendCommands(player)`), so `/feed announcer` appears or disappears.
+`RightsCache` keeps each online player's `PlayerState` (`feed-mod.md` 4.1). It reads it when the player joins (in the background: nothing waits for it), at every `open` (the tab dots in it must be fresh), and again at once on a `rights` event naming the player, on a `notAllowed`, `banned` or `notLinked` answer to their action, for every online player on `onConnected`, and whenever a copy older than 5 minutes is about to be used (the command: read at the next tick, and not again within a minute of the last read, answered or not); it forgets it when they leave. Reads are numbered per player, and an older one answered after a newer one is not kept. Each new state goes to the player (`state` payload) if they watch, and when its `moderate` right differs from the copy before (none counting as false) the command tree is sent again (`server.commands.sendCommands(player)`), so `/feed announcer` appears or disappears.
 
 The server never computes a right. It uses the cached state for the command's visibility only; every action goes to the backend, which decides.
 
@@ -351,7 +351,7 @@ fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, e
 /feed announcer list
 ```
 
-- **Who may run it.** A player whose cached state has `rights.moderate` (a site admin or Warden admin), or the server console. The command's `requires` checks exactly that: for a player, the cached `moderate`; for anything else, permission level 4, which the console has and command blocks and functions don't. The tree is sent again when a player's state changes (4.2). The site checks again: a player's call carries them as `issuer`, and the site answers `issuerNotAllowed` unless they moderate. The console's carries no issuer.
+- **Who may run it.** A player whose cached state has `rights.moderate` (a site admin or Warden admin), or the server console. The command's `requires` checks exactly that: for a player, the cached `moderate`; for anything else, permission level 4, which the console has and command blocks and functions don't. A player acts only as themselves: the command must come from them (the source that started it, which `execute` never changes) and still run as them, so `execute as <moderator>` run by an operator, a command block or a function never acts in a moderator's name; from anything that isn't a player, it goes as the console only at level 4, which `execute` can't raise. The tree is sent again when a player's `moderate` right changes (4.2). The site checks again: a player's call carries them as `issuer`, and the site answers `issuerNotAllowed` unless they moderate. The console's carries no issuer.
 - **The target** is a Minecraft username, online or not. Its UUID is the offline UUID of the name (`UUIDUtil.createOfflinePlayerUUID(username)`), as the server runs in offline mode.
 - `add` and `remove` call `setAnnouncer(uuid, true|false, issuer)`; `list` calls `announcers()`. Answers, in the issuer's language: done; already so; `viaRole` (they are a moderator, so an announcer already); `notLinked` (no LNB account); `impliedByRole` (a moderator can't lose it); `issuerNotAllowed`; unavailable.
 - A change made here sends a `rights` event like one made in the admin, so the target's app follows within a second.
@@ -412,7 +412,7 @@ How each part of the art direction's section 9 is fed. "Session" is `FeedSession
 
 ## 10. Strings the art direction doesn't have yet
 
-Every string the app shows is in the art direction's section 13.2, guests', unavailability and refusal snackbars included (its 9.11 says where each of `guest.*`, `snackbar.banned`, `snackbar.writing_off` and `snackbar.too_fast` shows; `snackbar.too_fast` has no Retry action). What it still lacks are the answers of the `/feed announcer` command (section 7), which are chat lines, not phone strings: `command.lnbphone_feed.announcer.added`, `.removed`, `.already`, `.via_role`, `.not_linked`, `.implied_by_role`, `.not_allowed`, `.unavailable` and `.list` (with `.list.empty`), in `en_us.json` and `fr_fr.json`, to be worded by the art direction's owner.
+Every string the app shows is in the art direction's section 13.2, guests', unavailability and refusal snackbars included (its 9.11 says where each of `guest.*`, `snackbar.banned`, `snackbar.writing_off` and `snackbar.too_fast` shows; `snackbar.too_fast` has no Retry action). What it still lacks are the answers of the `/feed announcer` command (section 7), which are chat lines, not phone strings: `command.lnbphone_feed.announcer.added`, `.removed`, `.already`, `.via_role`, `.not_linked`, `.implied_by_role`, `.not_allowed`, `.unavailable` and `.list` (with `.list.empty`), in `en_us.json` and `fr_fr.json`, to be worded by the art direction's owner. The mod adds three more: `.already_not` (removing someone who wasn't an announcer: the site answers both cases the same, so the command reads the target's state first to tell them apart), `.invalid_name` (what was typed isn't a Minecraft username) and `command.lnbphone_feed.dev.set` (the memory backend's `/feed dev` switches). Its wording of all of them is a first draft.
 
 ## 11. Where the design and the contract differ
 

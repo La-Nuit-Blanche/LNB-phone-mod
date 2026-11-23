@@ -7,7 +7,10 @@ import net.minecraft.network.codec.StreamCodec
 import java.time.Instant
 import java.util.UUID
 
-/** One of the two feeds. [wire] is how the site and the targets write it. */
+/**
+ * One of the two feeds. [wire] is how the site and the targets write it.
+ * Travels by ordinal: reordering, inserting or removing a value needs a bump of `FeedNetwork.PROTOCOL_VERSION`.
+ */
 enum class FeedKind(val wire: String) {
     ANNOUNCEMENTS("announcements"),
     GLOBAL("global");
