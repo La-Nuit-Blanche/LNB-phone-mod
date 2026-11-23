@@ -10,6 +10,46 @@ import fr.bde_teknantes.lnb.phone.client.ui.Placement
 class SnackbarAction(val label: String, val onClick: () -> Unit)
 
 /**
+ * One snackbar shown by [KitScreen.showSnackbar] or [KitScreen.showErrorSnackbar]: [dismiss] takes that one away, and
+ * nothing else, also once it was handed to the next screen. A snackbar that went (its time ran out, another replaced
+ * it, it was dismissed) stays gone: the handle then does nothing.
+ *
+ * ```kotlin
+ * private var lost: SnackbarHandle? = null
+ * fun connectionLost() { lost = showErrorSnackbar("Connection lost", SnackbarAction("Retry") { retry() }) }
+ * fun connectionBack() = lost?.dismiss()
+ * ```
+ */
+class SnackbarHandle internal constructor() {
+    private var screen: KitScreen? = null
+    private var snackbar: Snackbar? = null
+
+    internal var dismissed = false
+        private set
+
+    internal fun showOn(screen: KitScreen, snackbar: Snackbar) {
+        this.screen = screen
+        this.snackbar = snackbar
+    }
+
+    /** Whether this snackbar is on screen now (not replaced, faded out or dismissed). */
+    val isShowing: Boolean
+        get() {
+            val s = screen ?: return false
+            val shown = snackbar ?: return false
+            return !dismissed && s.shownSnackbar === shown && shown.isShowing(s.now)
+        }
+
+    /** Takes this snackbar away at once, if it still shows; another one showing in its place stays. */
+    fun dismiss() {
+        if (dismissed) return
+        dismissed = true
+        val s = screen ?: return
+        if (s.shownSnackbar === snackbar) s.dismissSnackbar()
+    }
+}
+
+/**
  * The snackbar (art direction 8.7): 240 x 40 dp at (8, 322), sliding up in 150 ms, held 3 s (6 s with an action),
  * fading out in 150 ms. Shown with [KitScreen.showSnackbar]. Its timeline is fixed when it is created, so its state at
  * any time is a pure function of the clock.
@@ -20,6 +60,7 @@ internal class Snackbar(
     private val error: Boolean,
     private val shownAt: Float,
     private val slideIn: Boolean,
+    private val handle: SnackbarHandle,
 ) : Widget() {
     private val actionButton = action?.let { a ->
         add(Button(a.label) {
@@ -79,9 +120,9 @@ internal class Snackbar(
     }
 
     /** What a snackbar is, with where it is in its timeline: handed from a screen to the next. */
-    class Saved(val text: String, val action: SnackbarAction?, val error: Boolean, val elapsed: Float, val fadeAfter: Float)
+    class Saved(val text: String, val action: SnackbarAction?, val error: Boolean, val elapsed: Float, val fadeAfter: Float, val handle: SnackbarHandle)
 
-    fun saved(now: Float) = Saved(text, action, error, now - shownAt, fadeFrom - shownAt)
+    fun saved(now: Float) = Saved(text, action, error, now - shownAt, fadeFrom - shownAt, handle)
 
     companion object {
         const val HOLD_MS = 3000f
@@ -90,7 +131,7 @@ internal class Snackbar(
         /** The snackbar [saved] described, carrying on from where it was at [now]. */
         fun restore(saved: Saved, now: Float): Snackbar {
             val shownAt = now - saved.elapsed
-            return Snackbar(saved.text, saved.action, saved.error, shownAt, slideIn = saved.elapsed < Motion.SHORT_MS).also {
+            return Snackbar(saved.text, saved.action, saved.error, shownAt, slideIn = saved.elapsed < Motion.SHORT_MS, saved.handle).also {
                 it.fadeFrom = shownAt + saved.fadeAfter
             }
         }
