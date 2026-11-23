@@ -1,4 +1,4 @@
-package fr.bde_teknantes.lnb.phone.client.smooth
+package fr.bde_teknantes.lnb.phone.text
 
 import java.text.BreakIterator
 import java.text.StringCharacterIterator

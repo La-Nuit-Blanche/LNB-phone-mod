@@ -2,7 +2,7 @@ package fr.bde_teknantes.lnb.phone.client.notifications
 
 import fr.bde_teknantes.lnb.phone.client.smooth.EmojiShaping
 import fr.bde_teknantes.lnb.phone.client.smooth.FontMetrics
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 
 /**
  * Makes a notification's title or text drawable by the banner's fonts (Inter: Latin, Greek and Cyrillic; the emoji

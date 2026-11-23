@@ -1,4 +1,4 @@
-package fr.bde_teknantes.lnb.phone.client.smooth
+package fr.bde_teknantes.lnb.phone.text
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

@@ -28,7 +28,8 @@ interface EmojiMetrics {
 
 /**
  * Which face draws a grapheme, and what an emoji grapheme draws. There is no shaping engine in the smooth layer: this
- * is the small part of one that emoji need, decided per grapheme ([Graphemes]), never per code point.
+ * is the small part of one that emoji need, decided per grapheme ([fr.bde_teknantes.lnb.phone.text.Graphemes]),
+ * never per code point.
  *
  * **Which face.** A grapheme goes to the emoji face when the face has its first character and one of these holds:
  * - it asks for emoji: a variation selector 16 after the first character, a skin tone, a ZWJ, tags, or a keycap mark;

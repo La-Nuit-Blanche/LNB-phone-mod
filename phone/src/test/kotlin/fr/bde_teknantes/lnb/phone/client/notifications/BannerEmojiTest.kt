@@ -1,8 +1,8 @@
 package fr.bde_teknantes.lnb.phone.client.notifications
 
 import fr.bde_teknantes.lnb.phone.client.smooth.EmojiShaping
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
-import fr.bde_teknantes.lnb.phone.client.smooth.GraphemesTest
+import fr.bde_teknantes.lnb.phone.text.Graphemes
+import fr.bde_teknantes.lnb.phone.text.GraphemesTest
 import fr.bde_teknantes.lnb.phone.client.smooth.RealFaces
 import fr.bde_teknantes.lnb.phone.client.smooth.RealFaces.emojiGlyph
 import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
@@ -145,32 +145,23 @@ class BannerEmojiTest {
     private fun drawnAfterCut(sequence: String, room: Int) = RealFaces.drawn(clean(cutText(sequence, room)))
 
     @Test
-    fun `today, a family cut by the server's limit draws as the man, or as a man and a woman, not as the family`() {
-        // Reported, not changed: NotificationLimits cuts by UTF-16 units (a pair is never split, a sequence is), so a
-        // family cut by the limit reaches the banner as a part of it. This is what the banner draws for each cut.
-        val man = emojiGlyph(0x1F468)
-        val woman = emojiGlyph(0x1F469)
-        assertEquals(emptyList<Int>(), drawnAfterCut(family, 0))
-        assertEquals(emptyList<Int>(), drawnAfterCut(family, 1), "half a pair is dropped")
-        assertEquals(listOf(man), drawnAfterCut(family, 2))
-        assertEquals(listOf(man), drawnAfterCut(family, 3), "the man and a joiner that draws nothing")
-        assertEquals(listOf(man), drawnAfterCut(family, 4))
-        assertEquals(listOf(man, woman), drawnAfterCut(family, 5), "two emoji side by side")
-        assertEquals(listOf(man, woman), drawnAfterCut(family, 7))
-        assertEquals(1, drawnAfterCut(family, 8).size, "uncut: one glyph")
-        assertEquals(cutText(family, 3), cp(0x1F468, 0x200D), "the cut text itself ends with a joiner")
+    fun `a family cut by the server's limit arrives whole or not at all`() {
+        // NotificationLimits cuts between graphemes: a family that straddles the limit goes, it never reaches the banner
+        // as a man, or a man and a woman, or a text ending on a joiner.
+        for (room in 0 until family.length) assertEquals("", cutText(family, room), "room $room")
+        assertEquals(family, cutText(family, family.length))
+        assertEquals(1, drawnAfterCut(family, family.length).size, "uncut: one glyph")
     }
 
     @Test
-    fun `today, a flag, a toned emoji and a keycap cut by the server's limit`() {
-        // A flag cut to its first indicator: a stray letter glyph. A tone cut off: the plain emoji. A keycap cut before
-        // its mark: the digit.
-        assertEquals(listOf(emojiGlyph(0x1F1EB)), drawnAfterCut(flag, 2))
-        assertEquals(1, drawnAfterCut(flag, 4).size)
-        assertEquals(listOf(emojiGlyph(0x1F44D)), drawnAfterCut(tone, 2))
-        assertEquals(listOf('1'.code), drawnAfterCut(keycap, 2))
-        assertEquals(listOf('1'.code), drawnAfterCut(keycap, 1))
-        assertEquals(1, drawnAfterCut(keycap, 3).size)
+    fun `a flag, a toned emoji and a keycap cut by the server's limit arrive whole or not at all`() {
+        for (sequence in listOf(flag, tone, keycap)) {
+            for (room in 0 until sequence.length) assertEquals("", cutText(sequence, room), "${sequence.length} cut at $room")
+            assertEquals(sequence, cutText(sequence, sequence.length))
+            assertEquals(1, drawnAfterCut(sequence, sequence.length).size)
+        }
+        // Text before the cut is kept up to the last whole grapheme.
+        assertEquals("ok ", cutText("ok $flag", 4))
     }
 
     @Test

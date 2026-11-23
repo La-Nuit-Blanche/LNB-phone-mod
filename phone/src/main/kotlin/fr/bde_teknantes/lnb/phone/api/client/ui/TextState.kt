@@ -1,7 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.TextLimits
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 
 /**
  * The content of a [TextField] or [TextArea]: the text, the caret and the selection, with the editing operations.

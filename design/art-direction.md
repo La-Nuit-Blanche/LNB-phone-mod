@@ -1107,7 +1107,7 @@ Notifications are kept per player on the server and saved with the world. Apps s
 |---|---|
 | Slots | 50 notifications per player, **shared by all apps**. When the list is full, the oldest notification of the mod that holds the most is dropped, so a busy app cannot push out the others' |
 | Lifetime | 30 days; an older notification is dropped |
-| Title | cut to 128 characters (never refused: an app forwarding the start of a long post gets the start) |
+| Title | cut to 128 characters (never refused: an app forwarding the start of a long post gets the start), between graphemes: an emoji sequence that straddles the limit is left out whole, never split |
 | Text | cut to 320 characters, likewise. A banner shows far less (10.1) |
 | Rate | a backstop per player and per mod: a burst of 20, then one every 3 seconds; the rest are dropped and logged. Far above what a real app sends, it only stops a looping app from flooding a player |
 

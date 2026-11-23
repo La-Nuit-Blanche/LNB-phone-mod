@@ -4,7 +4,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.TextStateGraphemeTest.Companion.
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStateGraphemeTest.Companion.FR
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStateGraphemeTest.Companion.SKIN
 import fr.bde_teknantes.lnb.phone.api.client.ui.TextStateGraphemeTest.Companion.cp
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 import fr.bde_teknantes.lnb.phone.client.smooth.RealFaces
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals

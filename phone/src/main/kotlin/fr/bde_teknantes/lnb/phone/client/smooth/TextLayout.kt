@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.smooth
 
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 /**
  * Text measurement, truncation and wrapping, in dp, from [FontMetrics] alone. Advances are the font's unhinted ones,
  * scaled linearly, so a string measures the same in dp at every GUI scale and wraps at the same words everywhere;

@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.client.smooth
 
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 import fr.bde_teknantes.lnb.phone.client.notifications.BannerText
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse

@@ -1,7 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
 import fr.bde_teknantes.lnb.phone.client.ui.EditCommand
 import fr.bde_teknantes.lnb.phone.client.ui.EditKey

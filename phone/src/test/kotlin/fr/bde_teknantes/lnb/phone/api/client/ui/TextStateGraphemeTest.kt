@@ -1,8 +1,8 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.TextLimits
-import fr.bde_teknantes.lnb.phone.client.smooth.Graphemes
-import fr.bde_teknantes.lnb.phone.client.smooth.GraphemesTest
+import fr.bde_teknantes.lnb.phone.text.Graphemes
+import fr.bde_teknantes.lnb.phone.text.GraphemesTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
