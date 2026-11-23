@@ -1284,6 +1284,9 @@ class FeedSession(
         list.next = list.loadedWith[kept.last()]
         list.hasMore = true
         list.moreFailed = false
+        // A later page in flight would land after the new end, leaving a hole: its answer is dropped.
+        requests.entries.removeIf { (_, r) -> r is PendingRequest.LoadFeed && r.feed == list.kind && r.more }
+        list.loadingMore = false
         collect()
         changed()
     }

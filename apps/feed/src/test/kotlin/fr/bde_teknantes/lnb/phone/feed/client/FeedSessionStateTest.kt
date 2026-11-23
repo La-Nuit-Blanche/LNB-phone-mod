@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -481,10 +480,6 @@ class FeedSessionStateTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: a list trimmed while a later page is in flight takes that page's posts after the trimmed end, leaving " +
-            "a hole in the list that is never filled (the cursor goes on from the late page).",
-    )
     fun `a page in flight when the list is trimmed leaves no hole`() {
         val posts = (1..260).map { post(minutesAgo = it.toLong()) }
         session.show(FeedKind.GLOBAL)
