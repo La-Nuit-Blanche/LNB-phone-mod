@@ -7,8 +7,8 @@ import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
 import fr.bde_teknantes.lnb.phone.api.client.TileColor
 import fr.bde_teknantes.lnb.phone.feed.Feed
 import fr.bde_teknantes.lnb.phone.feed.FeedMod
-import fr.bde_teknantes.lnb.phone.feed.FeedTarget
 import fr.bde_teknantes.lnb.phone.feed.client.screens.FeedScreen
+import fr.bde_teknantes.lnb.phone.feed.client.screens.FeedTargetScreens
 import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.server.FeedServer
 import fr.bde_teknantes.lnb.phone.feed.server.backend.memory.SampleContent
@@ -69,18 +69,10 @@ object FeedClient {
 
     /**
      * The screens a notification opens (`docs/feed-app.md` 6.2): an announcement lands on Announcements, scrolled to it
-     * and highlighted. A reply's target opens the tab of its feed for now; the thread screen, built next, goes on top of
-     * it. Anything else opens Feed on Announcements.
+     * and highlighted. A reply's target opens its thread over the tab of its feed, scrolled to the reply and highlighted.
+     * Anything else opens Feed on Announcements.
      */
-    fun targetScreens(target: String): List<AppScreen> = when (val parsed = FeedTarget.parse(target)) {
-        is FeedTarget.Post -> {
-            session.land(parsed.postId)
-            listOf(FeedScreen(session, strings, FeedKind.ANNOUNCEMENTS, fromHome = true))
-        }
-        // The thread screen (task M3) goes on top of this one, at the reply.
-        is FeedTarget.Reply -> listOf(FeedScreen(session, strings, parsed.feed, fromHome = false))
-        null -> emptyList()
-    }
+    fun targetScreens(target: String): List<AppScreen> = FeedTargetScreens.screens(session, strings, target)
 
     private fun onLoggingOut(event: ClientPlayerNetworkEvent.LoggingOut) {
         // What the client holds belongs to the server just left. Hop to the client thread, where it is used.
