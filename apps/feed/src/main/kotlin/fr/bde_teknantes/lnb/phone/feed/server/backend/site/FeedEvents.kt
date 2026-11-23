@@ -20,8 +20,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Keeps the site's `GET /api/feed/server/events` open on its own daemon thread (`docs/feed-mod.md` 8), written like
  * `QuestEvents` in lnb-quests: the last event ID kept in memory and sent on reconnection, a connection dropped after
- * [SILENCE_MS] silent (the site pings after 25), a backoff from 1 to 30 seconds, 60 seconds while the site answers
- * 503 `disabled`.
+ * [SILENCE_MS] silent (the site pings after 25), a backoff from 1 to 30 seconds (back to 1 only after a connection
+ * that stayed up [HEALTHY_MS]), 60 seconds while the site answers 503 `disabled`.
  *
  * The listener hears [FeedEventListener.onConnected] after each successful connection, and
  * [FeedEventListener.onDisconnected] once when a connection is lost or refused, not again for each failed retry. It is
@@ -54,6 +54,7 @@ class FeedEvents(
 
     // Both reset when a connection succeeds; used by the stream's own thread only.
     private var backoffMs = MIN_BACKOFF_MS
+    private var connectedAt: Long? = null
     /** What the listener was last told since the stream was up: null for nothing, else whether it was "disabled". */
     private var reported: Boolean? = null
 
@@ -104,6 +105,11 @@ class FeedEvents(
                 e.message ?: e.javaClass.simpleName
             }
             connected = false
+            // Only a connection that stayed up a while starts the backoff over: a proxy that accepts the stream and
+            // drops it at once would otherwise bring a reconnection, and its whole catch-up, every second.
+            val since = connectedAt
+            connectedAt = null
+            if (since != null && clock() - since >= HEALTHY_MS) backoffMs = MIN_BACKOFF_MS
             if (!running) break
             // Once per loss, and again only if the reason turns from "unreachable" to "switched off" or back.
             if (reported != disabled) {
@@ -140,7 +146,7 @@ class FeedEvents(
         stream = response.body()
         lastDataAt = clock()
         connected = true
-        backoffMs = MIN_BACKOFF_MS
+        connectedAt = clock()
         reported = null
         LOGGER.info("Connected to LNB's Feed event stream")
         listener.onConnected()
@@ -191,6 +197,9 @@ class FeedEvents(
         private const val MIN_BACKOFF_MS = 1_000L
         private const val MAX_BACKOFF_MS = 30_000L
         private const val DISABLED_RETRY_MS = 60_000L
+
+        /** How long a connection must stay up before the backoff starts again from its first step. */
+        const val HEALTHY_MS = 60_000L
 
         /** The site pings after 25 quiet seconds: past this, the connection is presumed dead. */
         private const val SILENCE_MS = 75_000L

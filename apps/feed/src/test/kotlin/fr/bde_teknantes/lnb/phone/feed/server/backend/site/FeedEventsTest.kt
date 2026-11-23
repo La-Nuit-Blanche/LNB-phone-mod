@@ -132,7 +132,7 @@ class FeedEventsTest {
     }
 
     @Test
-    fun `failed retries back off from 1 to 30 seconds, telling the listener once, until a connection resets it`() {
+    fun `failed retries back off from 1 to 30 seconds, telling the listener once, until a lasting connection resets it`() {
         val stream = FakeSite.Stream()
         val answers = refuse(*Array(7) { FakeSite.Reply(502, "<html>") }, stream)
         events.start(listener)
@@ -146,10 +146,27 @@ class FeedEventsTest {
         assertEquals("connected", next(), "told once, not for each failed retry")
         assertEquals(1, answers.size)
 
-        // A connection resets the backoff: the next loss waits a second again.
+        // A connection that lasted a minute resets the backoff: the next loss waits a second again.
+        now.addAndGet(FeedEvents.HEALTHY_MS)
         stream.end()
         assertEquals("disconnected", next())
         assertEquals(1_000, nextSleep())
+    }
+
+    @Test
+    fun `a stream accepted and dropped at once keeps backing off, so catch-ups don't come every second`() {
+        val streams = List(6) { FakeSite.Stream() }
+        refuse(*streams.toTypedArray())
+        events.start(listener)
+        val waits = streams.take(5).map { stream ->
+            assertEquals("connected", next())
+            stream.end()
+            assertEquals("disconnected", next())
+            val wait = nextSleep()
+            wake.release()
+            wait
+        }
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L), waits)
     }
 
     @Test
