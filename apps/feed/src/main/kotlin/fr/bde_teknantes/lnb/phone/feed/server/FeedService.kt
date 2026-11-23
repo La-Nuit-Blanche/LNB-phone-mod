@@ -45,6 +45,9 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
     val notifier = FeedNotifier(backend, host, sink)
     val relay = Relay(backend, host, watchers, rights, notifier)
     private val limits = PlayerLimits(host::millis)
+
+    // What a client can make the server say goes through here, so that a modified one can't flood the log.
+    private val log = ThrottledLog(FeedMod.LOGGER, host::millis)
     private var lastDrain = 0L
     private var lastPrune = 0L
 
@@ -113,7 +116,7 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
         val call = call(player, request)
         if (call == null) {
             limits.finish(player)
-            FeedMod.LOGGER.warn("Feed refused a malformed {} request", request.type().id().path)
+            log.warn("malformed", "Feed refused a malformed {} request", request.type().id().path)
             return host.send(player, failed(request, Outcome.INVALID))
         }
         call.whenComplete { result, error ->
@@ -199,16 +202,16 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
                 "pinLimit" -> Outcome.PIN_LIMIT
                 "notPinnable" -> Outcome.NOT_PINNABLE
                 "emptyText", "tooLong" -> {
-                    FeedMod.LOGGER.warn("The site refused a Feed {} as {}, which the server's own check let through", route, result.problem)
+                    log.warn("text", "The site refused a Feed {} as {}, which the server's own check let through", route, result.problem)
                     Outcome.INVALID
                 }
                 "idempotencyMismatch" -> {
-                    FeedMod.LOGGER.error("Feed {}: an idempotency key was reused for another request (a bug, or a forged client)", route)
+                    log.error("idempotency", "Feed {}: an idempotency key was reused for another request (a bug, or a forged client)", route)
                     Outcome.INVALID
                 }
                 else -> {
                     if (result.status == 429) return Outcome.RATE_LIMITED
-                    FeedMod.LOGGER.warn("Unexpected answer from the site to a Feed {}: HTTP {} {}", route, result.status, result.problem ?: "(no problem)")
+                    log.warn("unexpected", "Unexpected answer from the site to a Feed {}: HTTP {} {}", route, result.status, result.problem ?: "(no problem)")
                     Outcome.UNAVAILABLE
                 }
             }
