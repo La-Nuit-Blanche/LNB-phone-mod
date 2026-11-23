@@ -8,11 +8,14 @@ import java.util.UUID
  * applied to. An answer whose ID isn't waiting (late, after a disconnection, or forged) is dropped.
  */
 internal sealed interface PendingRequest {
-    /** `load_feed`: the first page when [before] is null and not [more], otherwise the page after [before]. */
-    data class LoadFeed(val feed: FeedKind, val more: Boolean, val before: String?) : PendingRequest
+    /**
+     * `load_feed`: the first page when [before] is null and not [more], otherwise the page after [before]. [generation]
+     * is the session's count of `reset`s when it was sent: an answer from before the last one is out of date.
+     */
+    data class LoadFeed(val feed: FeedKind, val more: Boolean, val before: String?, val generation: Int = 0) : PendingRequest
 
-    /** `load_thread`: the first page of replies, or the page after [after]. */
-    data class LoadThread(val threadId: UUID, val more: Boolean, val after: String?) : PendingRequest
+    /** `load_thread`: the first page of replies, or the page after [after]; [generation] as for [LoadFeed]. */
+    data class LoadThread(val threadId: UUID, val more: Boolean, val after: String?, val generation: Int = 0) : PendingRequest
 
     data class Like(val postId: UUID) : PendingRequest
 

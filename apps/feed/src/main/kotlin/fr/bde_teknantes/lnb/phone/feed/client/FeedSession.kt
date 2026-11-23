@@ -158,6 +158,9 @@ class FeedSession(
     private var threadSeenSent: UUID? = null
 
     private var ticks = 0
+
+    /** How many `reset`s came: a page asked before the last one answers with what the site held before it. */
+    private var resets = 0
     private val openApps = HashSet<Any>()
     private var nextAutoRetry = 0
     private var manualRetry = false
@@ -552,7 +555,9 @@ class FeedSession(
             if (payload.outcome == Outcome.OK) {
                 if (list.loaded) mergeFirstPage(list, payload) else replaceFirstPage(list, payload)
                 list.firstError = null
-                list.stale = false
+                // Asked before the last reset: shown, but loaded again and merged.
+                list.stale = request.generation != resets
+                if (list.stale) list.reloadNotBefore = 0
             } else if (payload.outcome == Outcome.RATE_LIMITED) {
                 // Not a failure to show: the server's limits ask to wait a moment (the skeletons stay).
                 list.reloadNotBefore = ticks + READ_RETRY_TICKS
@@ -588,7 +593,8 @@ class FeedSession(
                     posts[main.id] = main
                     mergeThreadPage(thread, payload.replies, payload.next)
                     thread.firstError = null
-                    thread.stale = false
+                    thread.stale = request.generation != resets
+                    if (thread.stale) thread.reloadNotBefore = 0
                     if (viewingThread == thread.id) markThreadSeen(thread.id)
                 }
                 payload.outcome == Outcome.NOT_FOUND -> threadGone(thread.id)
@@ -669,6 +675,7 @@ class FeedSession(
 
     /** The server reconnected to the site: every list and thread is reloaded and merged when shown. */
     fun onReset() {
+        resets++
         for (list in feeds.values) if (list.loaded) {
             list.stale = true
             list.reloadNotBefore = 0
@@ -731,14 +738,14 @@ class FeedSession(
     private fun loadFirst(list: FeedList) {
         list.loadingFirst = true
         list.firstError = null
-        request(PendingRequest.LoadFeed(list.kind, more = false, before = null)) { LoadFeedPayload(it, list.kind, null) }
+        request(PendingRequest.LoadFeed(list.kind, more = false, before = null, generation = resets)) { LoadFeedPayload(it, list.kind, null) }
         changed()
     }
 
     private fun loadThreadFirst(thread: ThreadState) {
         thread.loadingFirst = true
         thread.firstError = null
-        request(PendingRequest.LoadThread(thread.id, more = false, after = null)) { LoadThreadPayload(it, thread.id, null) }
+        request(PendingRequest.LoadThread(thread.id, more = false, after = null, generation = resets)) { LoadThreadPayload(it, thread.id, null) }
         changed()
     }
 

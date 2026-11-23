@@ -208,6 +208,32 @@ class FeedSessionResetTest {
     }
 
     @Test
+    fun `a first page asked before a reset is shown but stays stale, and loads again`() {
+        val before = r.sendsLoad(FeedKind.GLOBAL) { session.loadIfNeeded(FeedKind.GLOBAL) }
+        session.onReset()
+        val old = post(minutesAgo = 5)
+        session.onPage(PagePayload(before.requestId, Outcome.OK, FeedKind.GLOBAL, emptyList(), listOf(old), null))
+        assertEquals(listOf(old.id), global.posts)
+        assertTrue(global.stale)
+        // Loaded again, after the reset: now current.
+        val fresh = post(minutesAgo = 1)
+        r.firstPage(FeedKind.GLOBAL, listOf(fresh, old))
+        assertFalse(global.stale)
+        assertEquals(listOf(fresh.id), global.waiting)
+    }
+
+    @Test
+    fun `a thread asked before a reset stays stale`() {
+        val main = post()
+        session.loadThreadIfNeeded(main.id)
+        val before = r.last<LoadThreadPayload>()
+        session.onReset()
+        session.onThread(ThreadPayload(before.requestId, Outcome.OK, main, emptyList(), null))
+        assertTrue(session.thread(main.id).loaded)
+        assertTrue(session.thread(main.id).stale)
+    }
+
+    @Test
     fun `a later page in flight across a reset is appended, whichever answer comes first`() {
         for (moreFirst in listOf(true, false)) {
             val rec = FeedFixtures.Recorder()
