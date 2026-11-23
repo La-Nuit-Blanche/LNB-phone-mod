@@ -64,6 +64,63 @@ class SmoothFontTest {
         }
     }
 
+    /** [bytes] with the head table's units per em set to [unitsPerEm]: every glyph [unitsPerEm] times bigger or smaller. */
+    private fun withUnitsPerEm(bytes: ByteArray, unitsPerEm: Int): ByteArray {
+        val copy = bytes.copyOf()
+        val buf = java.nio.ByteBuffer.wrap(copy)
+        val (head, _) = GposKerning.findTable(buf, "head")!!
+        buf.putShort(head + 18, unitsPerEm.toShort())
+        return copy
+    }
+
+    @Test
+    fun `a glyph far bigger than the size asked for is refused before it is rendered`() {
+        // Units per em 16 instead of 2048: the smile is about 160 em, thousands of pixels at body size. Rendering it
+        // would allocate its bitmap twice before anything could refuse it.
+        val huge = withUnitsPerEm(InterMetrics.bytes("noto_emoji.ttf"), 16)
+        SmoothFont.fromMemory(memory(huge), "giant Noto Emoji").use { font ->
+            val started = System.nanoTime()
+            assertNull(font.rasterizeGlyph(font.glyphId(0x1F600), 19.5f, 0f, SmoothFont.Hinting.NONE))
+            assertTrue(System.nanoTime() - started < 200_000_000L)
+            assertTrue(!EmojiFace.usable(font), "refused as the emoji face, so the next pack down is tried")
+        }
+        // The real font's glyphs are well inside the limit at every size.
+        SmoothFont.fromMemory(memory(InterMetrics.bytes("noto_emoji.ttf")), "Noto Emoji").use { font ->
+            for (size in listOf(11f, 19.5f, 76.5f)) assertNotNull(font.rasterizeGlyph(font.glyphId(0x1F602), size, 0f, SmoothFont.Hinting.NONE))
+            assertTrue(EmojiFace.usable(font))
+        }
+        SmoothFont.fromMemory(memory(InterMetrics.bytes("inter_regular.ttf")), "Inter").use { assertTrue(!EmojiFace.usable(it)) }
+    }
+
+    @Test
+    fun `the emoji face shapes a grapheme once, wherever it stands in a text`() {
+        EmojiFace(SmoothFont.fromMemory(memory(InterMetrics.bytes("noto_emoji.ttf")), "Noto Emoji")).use { face ->
+            val family = "👨‍👩‍👧"
+            var computed = 0
+            val first = face.shaped(family) { computed++; intArrayOf(1, 0, family.length) }
+            assertTrue(first === face.shaped(family) { computed++; intArrayOf() })
+            assertEquals(1, computed)
+            // Through EmojiShaping, the offsets follow the grapheme's place in each text.
+            val flag = "🇫🇷"
+            val at0 = EmojiShaping.shape("${flag}x", 0, flag.length, face)
+            val at3 = EmojiShaping.shape("ab $flag", 3, 3 + flag.length, face)
+            assertEquals(3, at0.size)
+            assertTrue(at0[0] > 0 && at0[0] == at3[0])
+            assertEquals(listOf(0, flag.length), listOf(at0[1], at0[2]))
+            assertEquals(listOf(3, 3 + flag.length), listOf(at3[1], at3[2]))
+        }
+    }
+
+    @Test
+    fun `asking for the default weight is the default instance, the same glyph either way`() {
+        SmoothFont.fromMemory(memory(InterMetrics.bytes("noto_emoji.ttf")), "Noto Emoji").use { font ->
+            val smile = font.glyphId(0x1F600)
+            val asked = font.rasterizeGlyph(smile, 19.5f, 0f, SmoothFont.Hinting.NONE, 400f)!!
+            val default = font.rasterizeGlyph(smile, 19.5f, 0f, SmoothFont.Hinting.NONE)!!
+            assertTrue(asked.coverage.contentEquals(default.coverage))
+        }
+    }
+
     @Test
     fun `a file that is not a font fails cleanly, every time`() {
         repeat(3) {

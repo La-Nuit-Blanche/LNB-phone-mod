@@ -17,6 +17,13 @@ interface EmojiMetrics {
      * one glyph), packed as `(ligature glyph shl 32) or components`, or 0 when there is none.
      */
     fun ligature(glyphs: IntArray, from: Int, count: Int): Long = 0L
+
+    /**
+     * What [grapheme] shapes to, from a cache when the face keeps one: text is laid out again at every frame it is
+     * drawn, and shaping a grapheme asks the font's tables, which a replaced font may make slow. [shape] computes it;
+     * the result is never changed by the caller.
+     */
+    fun shaped(grapheme: String, shape: () -> IntArray): IntArray = shape()
 }
 
 /**
@@ -103,9 +110,16 @@ object EmojiShaping {
     /**
      * What the emoji grapheme `text[start, end)` draws, as triples `(glyph, from, to)`: each glyph of [emoji] (or -1
      * for a part that draws nothing) and the range of the text it stands for. The ranges follow each other and cover
-     * the grapheme; the first triple is the base emoji, or the sequence composed from it.
+     * the grapheme; the first triple is the base emoji, or the sequence composed from it. Asked once per grapheme and
+     * face ([EmojiMetrics.shaped]), not at every frame.
      */
     fun shape(text: String, start: Int, end: Int, emoji: EmojiMetrics): IntArray {
+        val grapheme = text.substring(start, end)
+        val relative = emoji.shaped(grapheme) { compose(grapheme, 0, grapheme.length, emoji) }
+        return IntArray(relative.size) { if (it % 3 == 0) relative[it] else relative[it] + start }
+    }
+
+    private fun compose(text: String, start: Int, end: Int, emoji: EmojiMetrics): IntArray {
         val capacity = text.codePointCount(start, end)
         val glyphs = IntArray(capacity)
         val chars = IntArray(capacity)

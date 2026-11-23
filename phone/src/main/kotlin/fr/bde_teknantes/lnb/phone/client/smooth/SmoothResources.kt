@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.NativeImage
 import fr.bde_teknantes.lnb.phone.LnbPhone
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap
-import net.minecraft.Util
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.DefaultPlayerSkin
 import net.minecraft.resources.ResourceLocation
@@ -13,6 +12,9 @@ import net.minecraft.server.packs.resources.ResourceManager
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener
 import org.lwjgl.opengl.GL11
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.math.roundToInt
 
 /**
@@ -40,6 +42,10 @@ object SmoothResources : ResourceManagerReloadListener {
     private var emojiFace: EmojiFace? = null
     private var emojiFailed = false
     private var emojiLoad: CompletableFuture<EmojiFace?>? = null
+    private var emojiWaited = false
+
+    /** How long the render thread waits, once, for the emoji face still loading. */
+    private const val EMOJI_WAIT_MS = 50L
     private var warnedOversize = false
     private var guiScale = 2
     private var lastAtlasClear = 0L
@@ -114,63 +120,90 @@ object SmoothResources : ResourceManagerReloadListener {
 
     /**
      * The text, measured and laid out in [weight]: Inter's metrics and the emoji face ([TextFace]). What measuring and
-     * drawing use, so the two always agree.
+     * drawing use, so the two always agree. A new one once the emoji face arrives, so that nothing laid out while it
+     * was loading (with boxes) is taken from a cache afterwards.
      */
     fun face(weight: FontWeight): TextFace {
         RenderThread.check("Measuring or drawing smooth text")
+        collectEmoji()
         faces[weight]?.let { return it }
         return TextFace(font(weight)) { emoji() }.also { faces[weight] = it }
     }
 
     /**
-     * The emoji face, from the highest resource pack with a working file, as for Inter: opened in the background by
-     * [preloadEmoji] when the phone is about to open, or here the first time a text needs it. Unlike Inter, a missing
-     * emoji font costs only the emoji: with no usable file at all this is null (logged once per resource reload) and
-     * emoji are missing-glyph boxes, as characters no font has.
+     * The emoji face, from the highest resource pack with a working file, as for Inter. It is opened on a thread of
+     * its own, started by [preloadEmoji] when the phone is about to open, or here the first time a text needs it; the
+     * first time, this waits for it at most [EMOJI_WAIT_MS], and otherwise answers null (emoji are boxes for a frame or
+     * two) until it is there. Unlike Inter, a missing or broken emoji font costs only the emoji: then this is null for
+     * good (logged once per resource reload), as for characters no font has.
      */
     fun emoji(): EmojiFace? {
         RenderThread.check("Measuring or drawing emoji")
+        collectEmoji()
         emojiFace?.let { return it }
         if (emojiFailed) return null
-        val pending = emojiLoad
-        emojiLoad = null
-        // Still being read: wait for it, which is never longer than reading it here would be.
-        val face = if (pending != null) {
+        val pending = emojiLoad ?: startEmojiLoad()
+        if (!emojiWaited) {
+            emojiWaited = true
             try {
-                pending.join()
+                pending.get(EMOJI_WAIT_MS, TimeUnit.MILLISECONDS)
+            } catch (e: TimeoutException) {
+                LnbPhone.LOGGER.warn("The emoji font is still loading after {} ms: emoji show as boxes until it is there", EMOJI_WAIT_MS)
             } catch (e: Exception) {
-                LnbPhone.LOGGER.error("Loading the emoji font {} failed: emoji show as boxes", EMOJI_FILE, e)
-                null
+                // A failed load: collected just below.
             }
-        } else {
-            loadEmoji(Minecraft.getInstance().resourceManager.getResourceStack(EMOJI_FILE).asReversed())
+            collectEmoji()
+        }
+        return emojiFace
+    }
+
+    /** Starts opening the emoji face in the background (the file, its ligatures), so that the first emoji does not wait. */
+    fun preloadEmoji() {
+        RenderThread.check("Pre-loading the emoji font")
+        collectEmoji()
+        if (emojiFace == null && !emojiFailed && emojiLoad == null) startEmojiLoad()
+    }
+
+    private fun startEmojiLoad(): CompletableFuture<EmojiFace?> {
+        // The pack list is read here, on the render thread; only opening the files happens on the loader's thread, a
+        // thread of its own rather than the game's shared executor, whose queue may be long when the phone opens.
+        val stack = Minecraft.getInstance().resourceManager.getResourceStack(EMOJI_FILE).asReversed()
+        val executor = Executor { task -> Thread(task, "LNB Phone emoji font").apply { isDaemon = true }.start() }
+        return CompletableFuture.supplyAsync({ loadEmoji(stack) }, executor).also { emojiLoad = it }
+    }
+
+    /** Takes the emoji face once its load is over, whatever ended it: a face, null, or any throwable (no emoji then). */
+    private fun collectEmoji() {
+        val pending = emojiLoad ?: return
+        if (!pending.isDone) return
+        emojiLoad = null
+        val face = try {
+            pending.getNow(null)
+        } catch (e: Exception) {
+            LnbPhone.LOGGER.error("Loading the emoji font {} failed: emoji show as boxes", EMOJI_FILE, e)
+            null
         }
         if (face == null) emojiFailed = true else emojiFace = face
-        return face
+        // Faces handed out while it loaded have no emoji, and caches keyed by them hold boxes: from now on, new ones.
+        faces.clear()
     }
 
     /**
-     * Starts opening the emoji face on a background thread (reading the file, its ligatures), so that neither the
-     * pre-warm nor the first emoji waits for it. Nothing is rasterised ahead.
+     * The first working emoji font of [stack], best first, with its ligatures read; null (logged) when none works. A
+     * font works when it draws U+1F600 as a single-colour outline: a colour font (bitmaps, or colour layers over empty
+     * outlines) would pass a lookup and then draw blank emoji.
      */
-    fun preloadEmoji() {
-        RenderThread.check("Pre-loading the emoji font")
-        if (emojiFace != null || emojiFailed || emojiLoad != null) return
-        val stack = Minecraft.getInstance().resourceManager.getResourceStack(EMOJI_FILE).asReversed()
-        emojiLoad = CompletableFuture.supplyAsync({ loadEmoji(stack) }, Util.backgroundExecutor())
-    }
-
-    /** The first working emoji font of [stack], best first, with its ligatures read; null (logged) when none works. */
     private fun loadEmoji(stack: List<Resource>): EmojiFace? {
         val load = { resource: Resource ->
             val font = SmoothFont.load(resource.open(), "$EMOJI_FILE from ${resource.sourcePackId()}")
-            // A font with none of the emoji's glyphs would draw nothing but boxes: the next one down is better.
-            if (font.glyphId(0x1F600) == 0) {
+            try {
+                check(EmojiFace.usable(font)) { "No single-colour emoji in $EMOJI_FILE from ${resource.sourcePackId()}" }
+                font.ligatures
+                EmojiFace(font)
+            } catch (e: Throwable) {
                 font.close()
-                throw IllegalStateException("No emoji in $EMOJI_FILE from ${resource.sourcePackId()}")
+                throw e
             }
-            font.ligatures
-            EmojiFace(font)
         }
         val face = Fallback.firstLoading(stack, load) { resource, e ->
             LnbPhone.LOGGER.error(
@@ -418,6 +451,7 @@ object SmoothResources : ResourceManagerReloadListener {
         emojiFace?.close()
         emojiFace = null
         emojiFailed = false
+        emojiWaited = false
         // A face still being read comes from the packs before the reload: closed when it arrives, never used.
         emojiLoad?.thenAccept { it?.close() }
         emojiLoad = null

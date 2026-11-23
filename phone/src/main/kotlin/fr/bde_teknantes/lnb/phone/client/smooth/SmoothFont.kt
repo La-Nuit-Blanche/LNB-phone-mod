@@ -133,13 +133,19 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
         }
         // Outlines only, as Minecraft's own provider loads them: a font with embedded bitmaps (monochrome, or colour)
         // would otherwise hand back pixels in another format.
-        val flags = FreeType.FT_LOAD_RENDER or FT_LOAD_NO_BITMAP or hinting.loadFlags
-        if (FreeTypeUtil.checkError(FreeType.FT_Load_Glyph(f, glyphId, flags), "Glyph render")) return null
+        val flags = FT_LOAD_NO_BITMAP or hinting.loadFlags
+        if (FreeTypeUtil.checkError(FreeType.FT_Load_Glyph(f, glyphId, flags), "Glyph load")) return null
         val slot = f.glyph() ?: return null
+        // Measured before it is rendered: a replaced font can have a glyph thousands of pixels wide at body size (a
+        // tiny units-per-em, a huge outline), and rendering allocates its bitmap, twice, before the atlas could refuse.
+        val limit = maxGlyphPx(sizePx) * 64L
+        val metrics = slot.metrics()
+        if (metrics.width() > limit || metrics.height() > limit || metrics.width() < 0 || metrics.height() < 0) return null
+        if (FreeTypeUtil.checkError(FreeType.FT_Render_Glyph(slot, (hinting.loadFlags ushr 16) and 0xF), "Glyph render")) return null
         val bitmap = slot.bitmap()
         val width = bitmap.width()
         val height = bitmap.rows()
-        if (width <= 0 || height <= 0) return null
+        if (width <= 0 || height <= 0 || width > maxGlyphPx(sizePx) + 2 || height > maxGlyphPx(sizePx) + 2) return null
         val pitch = bitmap.pitch()
         if (bitmap.pixel_mode().toInt() != FT_PIXEL_MODE_GRAY || abs(pitch) < width) return null
         val source = bitmap.buffer(abs(pitch) * height) ?: return null
@@ -157,7 +163,10 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
     /** Sets a variable font to [weight] (NaN: its default) when it is not there already. */
     private fun applyWeight(weight: Float) {
         val axis = weightAxis ?: return
-        val target = if (weight.isNaN()) Float.NaN else weight.coerceIn(axis.min, axis.max)
+        // The default weight is the default instance however it is asked for: no coordinates to set back and forth
+        // between drawing Regular text (400 for Noto Emoji) and reading metrics.
+        val clamped = if (weight.isNaN()) Float.NaN else weight.coerceIn(axis.min, axis.max)
+        val target = if (clamped * 65536f == axis.defaults[axis.index].toFloat()) Float.NaN else clamped
         if (target == appliedWeight || (target.isNaN() && appliedWeight.isNaN())) return
         MemoryStack.stackPush().use { stack ->
             val coords = stack.callocCLong(axis.defaults.size)
@@ -182,6 +191,12 @@ class SmoothFont private constructor(private var memory: ByteBuffer?, private va
         private const val FT_LOAD_NO_BITMAP = 1 shl 3
         private const val FT_PIXEL_MODE_GRAY = 2
         private const val WGHT = 0x77676874L // 'wght'
+
+        /**
+         * The widest or tallest glyph rasterised at [sizePx] per em, in pixels: four em, far beyond any letter or
+         * emoji (an emoji is 1.27 em wide), and a few pixels for the smallest sizes.
+         */
+        internal fun maxGlyphPx(sizePx: Float): Int = (4f * sizePx).toInt() + 16
 
         /** The weight axis of a variable font, or null for a static font or one FreeType can't vary. */
         private fun readWeightAxis(face: FT_Face): WeightAxis? {
