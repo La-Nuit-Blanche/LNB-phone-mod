@@ -213,18 +213,21 @@ accounts of A and B linked to LNB accounts. The LNB website's repository says ho
     Feed"; the client log's list of phone apps holds `lnbphone_feed:feed`; the home screen has Feed's icon, a white glyph
     on an azure tile. A third client without Feed's jar is refused at once with a message naming the missing mod.
 31. **Reading.** B opens Feed: it opens on "Announcements", with the pinned posts first, each under a "Pinned" line. A
-    card shows a face, a name (a first name and an initial, bold), the handle in grey, the text, the time (`2m`, `3h`)
-    and the reply and like counts. An anonymous post shows "Anonymous", a grey person and no handle. Scroll, then open
-    "Global": the posts are newest first, and the end of the list reads "You're all caught up" (while a page loads, a
-    spinner shows there). Press Up and Up again: the phone is back on the same tab, at the same place. Leave the world and
-    join again: Feed opens afresh on Announcements, and no post from the last visit shows before the new list arrives.
+    sample post's card shows a face, a name (a first name and an initial, bold), the handle in grey, the text, the time
+    (`2m`, `3h`) and the reply and like counts; A's and B's own posts show the username alone, with no handle (the
+    memory backend knows no real names). An anonymous post shows "Anonymous", a grey person and no handle. Scroll, then
+    open "Global": the posts are newest first, and the end of the list reads "You're all caught up" (while a page loads,
+    a spinner shows there). Press Up and Up again: the phone is back on the same tab, at the same place. Leave the world
+    and join again: Feed opens afresh on Announcements, and no post from the last visit shows before the new list
+    arrives.
 32. **Posting.** B, on Global, presses the round button: Compose opens with the field focused. Type: the counter turns
     amber in the last 20 characters and red past 280, and "Post" is disabled when the text is empty or past 280. Press
     "Post" (or Ctrl+Enter): the button shows a spinner, then the snackbar says "Posted", and the post is at the top of
     Global, highlighted. A's phone, with Feed open on Global at the top, shows it at once, highlighted, with no reload.
-    Scroll A's list down and have B post again: A's list does not move, a pill reads "1 new post" with an up arrow;
-    a click scrolls up to it. Post four times within a minute: the fourth is refused with "Slow down! Wait N s" and the
-    text stays in the field. Close Compose with text in it and open it again: the draft is still there.
+    Scroll A's list down and have B post again: A's list does not move, a pill reads "1 new post" with an up arrow; a
+    click scrolls up to it. Post four times within a minute: the fourth is refused with "Slow down! Wait 41s" (the
+    seconds left) and the text stays in the field. Close Compose with text in it and open it again: the draft is still
+    there.
 33. **Replies and their notifications.** A posts on Global. B opens the post and replies, then replies to A's reply.
     With A's phone closed: it rises with the banner "New reply" and "B: the text", with two chimes; a click on the banner
     (or Up, then the banner) opens the thread, scrolled to the reply, which is highlighted. With A's phone open on the home
@@ -244,19 +247,20 @@ accounts of A and B linked to LNB accounts. The LNB website's repository says ho
 35. **Likes.** B likes a post of A in both feeds: the heart fills at once and the count goes up. A, with Feed open on that
     post, sees the count move within a second, with no reload. B unlikes: the count goes back. Click the heart quickly
     a dozen times: the count never goes negative or counts one player twice, and a like the server refuses (too fast)
-    goes back with "Slow down! Wait N s". Likes never notify anyone.
-36. **Announcer and moderator.** A types `/feed` and the chat completes `announcer`; B has no `/feed` command. A runs
-    `/feed announcer list`: "No announcers besides the moderators." `/feed announcer add B`: "B can now post
-    announcements."; B's phone shows the round button on "Announcements" within a second, with no new login, and the
-    destination control in Compose. `/feed announcer remove B` takes it away again. Adding an operator reads "A is a
-    moderator, so already posts announcements." A pins an announcement from its more menu in the feed or with the pin
-    button of its thread: "Post pinned", the post moves into the pinned group on B's open "Announcements" within a
-    second. Pin until three are pinned, then a fourth: the dialog "Replace a pin?" appears, and confirming unpins the
-    oldest. Unpin: "Post unpinned". A deletes a post of B's (more menu, "Delete", the dialog "Delete this post?"): it
-    leaves B's open feed within a second, with its replies, and B, inside that thread, is taken back to the feed with
-    "This post was deleted". B has no more menu on A's posts, and has one on B's own. A deletes an announcement while B is
-    offline: B joins and finds no badge for it. On an anonymous post, A (moderator) sees a line "Author: B" with a tooltip
-    "Only moderators can see this", B (the author) sees "Posted anonymously by you", and a third player sees neither.
+    goes back with "Slow down! Wait 2s" (the seconds left). Likes never notify anyone.
+36. **Announcer and moderator.** A types `/feed` and the chat offers `announcer` and `dev` (the memory backend's
+    switches, item 37); B has no `/feed` command. A runs `/feed announcer list`: "No announcers besides the moderators."
+    `/feed announcer add B`: "B can now post announcements."; B's phone shows the round button on "Announcements" within
+    a second, with no new login, and the destination control in Compose. `/feed announcer remove B` takes it away again.
+    Adding an operator reads "A is a moderator, so already posts announcements." A pins an announcement with the pin
+    button of its action row, on the feed or on its thread's main post (the more menu holds only "Delete"): "Post
+    pinned", the post moves into the pinned group on B's open "Announcements" within a second. Pin until three are
+    pinned, then a fourth: the dialog "Replace a pin?" appears, and confirming unpins the oldest. Unpin: "Post
+    unpinned". A deletes a post of B's (more menu, "Delete", the dialog "Delete this post?"): it leaves B's open feed
+    within a second, with its replies, and B, inside that thread, is taken back to the feed with "This post was
+    deleted". B has no more menu on A's posts, and has one on B's own. A deletes an announcement while B is offline: B
+    joins and finds no badge for it. On an anonymous post, A (moderator) sees a line "Author: B" with a tooltip "Only
+    moderators can see this", B (the author) sees "Posted anonymously by you", and a third player sees neither.
 37. **A guest, writing paused, and the site away.** Put B's username under `memory.guests` and restart: B has no round
     button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a thread
     shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still gets the
@@ -294,8 +298,10 @@ accounts of A and B linked to LNB accounts. The LNB website's repository says ho
     without the list jumping, behind the pill if B has scrolled.
 42. **The website: Feed off, writing off.** Switch the `feed` flag off on the site: a Feed opened afresh shows "Feed is
     switched off" with "Retry", an open one shows "Connection lost"; switch it on: Feed recovers within a minute (the
-    stream retries every 60 seconds while the site answers that it is off). Switch `feed.writing` off: the round buttons go,
-    the strip reads "Writing is paused"; on: they come back.
+    stream retries every 60 seconds while the site answers that it is off). Switch `feed.writing` off: the site sends no
+    event for it, so a Feed opened afterwards has no round buttons and the strip reads "Writing is paused", and a Feed
+    already open learns of it from its next post, reply or like, refused with "Writing is paused". Switch it on: a Feed
+    opened afterwards has them back.
 43. **The website: roles.** Give B the announcer role on the website's People page: the round button on "Announcements"
     appears on B's phone within a second, with no new login; take it away: it goes. `/feed announcer add` and `remove`
     work from the server's console and for an `admin` or `warden-admin` account in game; for an operator who is not a
