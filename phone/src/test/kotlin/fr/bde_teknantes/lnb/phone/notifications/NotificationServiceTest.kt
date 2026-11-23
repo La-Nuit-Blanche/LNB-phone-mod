@@ -1,5 +1,6 @@
 package fr.bde_teknantes.lnb.phone.notifications
 
+import fr.bde_teknantes.lnb.phone.api.PhoneNotifications
 import fr.bde_teknantes.lnb.phone.notifications.network.NotificationAddedPayload
 import fr.bde_teknantes.lnb.phone.notifications.network.NotificationsClearedPayload
 import fr.bde_teknantes.lnb.phone.notifications.network.NotificationsSyncPayload
@@ -121,6 +122,58 @@ class NotificationServiceTest {
         other.known += listOf(alice, bob)
         assertEquals(2, service.sendToEveryone(other, feed, title, text, null, setOf(UUID(9, 9))))
         assertEquals(setOf(alice, bob), other.store!!.playersWithNotifications)
+    }
+
+    @Test
+    fun `an except that names everyone sends nothing and marks nothing dirty`() {
+        host.known += listOf(alice, bob)
+        host.online += carol
+        assertEquals(0, service.sendToEveryone(host, feed, title, text, "post:1", setOf(alice, bob, carol, UUID(9, 9))))
+        assertEquals(emptySet<UUID>(), store.playersWithNotifications)
+        assertEquals(emptyList<Any>(), host.sent)
+        assertFalse(host.data!!.isDirty)
+    }
+
+    @Test
+    fun `with an except, an offline player finds it at login and an excluded one finds nothing`() {
+        host.known += listOf(alice, bob)
+        assertEquals(1, service.sendToEveryone(host, feed, title, text, "post:1", setOf(bob)))
+        assertEquals(emptyList<Any>(), host.sent)
+        host.online += listOf(alice, bob)
+        service.login(host, alice)
+        service.login(host, bob)
+        val forAlice = (host.sentTo(alice).single() as NotificationsSyncPayload).notifications.single()
+        assertFalse(forAlice.delivered, "came in while she was away: a badge, no peek")
+        assertEquals("post:1", forAlice.target)
+        assertEquals(emptyList<PhoneNotification>(), (host.sentTo(bob).single() as NotificationsSyncPayload).notifications)
+    }
+
+    @Test
+    fun `with an except, the backstop and the shared slots still apply to each recipient`() {
+        host.known += listOf(alice, bob)
+        repeat(NotificationService.APP_BURST + 1) { service.sendToEveryone(host, feed, title, text, null, setOf(bob)) }
+        assertEquals(NotificationService.APP_BURST, store.of(alice).size, "the 21st is over the per-mod burst")
+        assertTrue(store.of(bob).isEmpty())
+
+        // Carol's slots are full of another mod's notifications: one of the busiest mod's goes to make room.
+        val quests = ResourceLocation.fromNamespaceAndPath("quests", "quests")
+        repeat(PhoneNotifications.MAX_PER_PLAYER) { store.add(carol, quests, title, Component.literal("q$it"), null, host.time, false) }
+        host.known += carol
+        clock += 3_000
+        assertEquals(2, service.sendToEveryone(host, feed, title, Component.literal("announce"), null, setOf(bob)))
+        val forCarol = store.of(carol)
+        assertEquals(PhoneNotifications.MAX_PER_PLAYER, forCarol.size)
+        assertEquals("announce", forCarol.last().text.string)
+        assertFalse(forCarol.any { it.text.string == "q0" }, "the oldest of the mod holding the most went")
+    }
+
+    @Test
+    fun `a player both known and connected, or named twice in except, is counted once`() {
+        host.known += listOf(alice, bob)
+        host.online += alice
+        assertEquals(1, service.sendToEveryone(host, feed, title, text, null, setOf(bob, bob)))
+        assertEquals(1, store.of(alice).size)
+        assertEquals(1, host.sentTo(alice).size)
     }
 
     @Test
