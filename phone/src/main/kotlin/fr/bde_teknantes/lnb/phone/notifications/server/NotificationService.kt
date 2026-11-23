@@ -191,7 +191,8 @@ internal class NotificationService(private val millis: () -> Long = { System.nan
         val (sendable, broken) = data.store.of(player).partition { fits(host, it) }
         for (notification in broken) {
             data.store.remove(player, notification.id)
-            LnbPhone.LOGGER.warn("Phone notification {} of {} can't be sent and was removed: {}", notification.id, player, notification)
+            // Neither the player nor the text: an app's notification can tie a player to what they wrote anonymously.
+            LnbPhone.LOGGER.warn("Phone notification {} from {} can't be sent and was removed", notification.id, notification.appId)
         }
         if (broken.isNotEmpty()) data.setDirty()
         host.send(player, NotificationsSyncPayload(sendable, login))

@@ -271,6 +271,36 @@ class NotificationServiceTest {
         assertEquals(listOf("good"), store.of(alice).map { it.text.string })
     }
 
+    @Test
+    fun `the log line for a notification that can't be sent names neither the player nor the text`() {
+        service.send(host, listOf(alice), feed, Component.translatable("t", "Mika"), Component.translatable("x", "Mika", "secret words"), null)
+        host.broken = { true }
+        host.online += alice
+        val lines = captureLog { service.login(host, alice) }
+        val line = lines.single { "can't be sent" in it }
+        assertFalse("secret words" in line || "Mika" in line || alice.toString() in line, line)
+        assertTrue(feed.toString() in line, line)
+    }
+
+    /** What the phone's logger writes while [block] runs. */
+    private fun captureLog(block: () -> Unit): List<String> {
+        val lines = java.util.Collections.synchronizedList(ArrayList<String>())
+        val logger = org.apache.logging.log4j.LogManager.getLogger(fr.bde_teknantes.lnb.phone.LnbPhone::class.java) as org.apache.logging.log4j.core.Logger
+        val appender = object : org.apache.logging.log4j.core.appender.AbstractAppender("capture", null, null, true, emptyArray()) {
+            override fun append(event: org.apache.logging.log4j.core.LogEvent) {
+                lines += event.message.formattedMessage
+            }
+        }
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            block()
+        } finally {
+            logger.removeAppender(appender)
+        }
+        return lines
+    }
+
     // ---- Requests from clients ----
 
     @Test
