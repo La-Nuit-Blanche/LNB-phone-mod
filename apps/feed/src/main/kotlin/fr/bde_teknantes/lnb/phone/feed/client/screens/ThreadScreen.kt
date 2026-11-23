@@ -288,7 +288,7 @@ class ThreadScreen(
             val card = mainCard ?: newCard(threadId).also { mainCard = it }
             card.look = CardLook(
                 more = main.canDelete && writes,
-                pin = main.canPin && writes,
+                pin = FeedWriting.showsPin(main) && writes,
                 time = false,
                 fullTime = FeedFormat.fullTime(main.createdAt, session.clock(), zone, strings),
                 hover = false,

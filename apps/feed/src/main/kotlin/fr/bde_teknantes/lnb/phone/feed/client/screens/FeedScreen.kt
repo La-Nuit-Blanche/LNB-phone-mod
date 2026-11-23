@@ -21,6 +21,7 @@ import fr.bde_teknantes.lnb.phone.feed.client.FeedFormat
 import fr.bde_teknantes.lnb.phone.feed.client.FeedNotice
 import fr.bde_teknantes.lnb.phone.feed.client.FeedSession
 import fr.bde_teknantes.lnb.phone.feed.client.FeedStrings
+import fr.bde_teknantes.lnb.phone.feed.client.FeedWriting
 import fr.bde_teknantes.lnb.phone.feed.client.LikeAttempt
 import fr.bde_teknantes.lnb.phone.feed.client.NewPosts
 import fr.bde_teknantes.lnb.phone.feed.client.Place
@@ -326,7 +327,7 @@ class FeedScreen(
         private fun lookOf(post: PostView): CardLook {
             val writes = session.writeBlock() == null
             // The pin button on an announcement's main post only, whatever the view says (art direction 9.3).
-            val pinnable = post.canPin && post.feed == FeedKind.ANNOUNCEMENTS && !post.isReply
+            val pinnable = FeedWriting.showsPin(post)
             return CardLook(more = post.canDelete && writes, pin = pinnable && writes)
         }
 

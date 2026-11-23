@@ -38,6 +38,15 @@ class FeedWritingTest {
     }
 
     @Test
+    fun `the pin button is an announcement's main post's alone, whatever the view says`() {
+        val announcement = post(fr.bde_teknantes.lnb.phone.feed.model.FeedKind.ANNOUNCEMENTS, text = "a", canPin = true)
+        assertTrue(FeedWriting.showsPin(announcement))
+        assertFalse(FeedWriting.showsPin(announcement.copy(canPin = false)))
+        assertFalse(FeedWriting.showsPin(post(text = "global", canPin = true)))
+        assertFalse(FeedWriting.showsPin(reply(announcement).copy(canPin = true)))
+    }
+
+    @Test
     fun `the composer's target and its name`() {
         val main = post(text = "x")
         assertNull(FeedWriting.targetOf(main))

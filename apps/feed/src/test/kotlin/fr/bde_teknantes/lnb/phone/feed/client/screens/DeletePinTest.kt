@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.ZoneOffset
 
@@ -312,10 +311,6 @@ class DeletePinTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: ThreadScreen.syncRows shows the main post's pin button from canPin alone; a Global post whose view says " +
-            "canPin gets it in its thread (art direction 9.3, 9.4: never on Global posts, whatever the view says)",
-    )
     fun `a Global post's thread has no pin button even when its view says it can be pinned`() {
         val g = post(text = "global", canPin = true)
         val t = thread(ANNOUNCER, g, emptyList())

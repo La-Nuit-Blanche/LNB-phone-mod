@@ -2,6 +2,7 @@ package fr.bde_teknantes.lnb.phone.feed.client
 
 import fr.bde_teknantes.lnb.phone.api.TextLimits
 import fr.bde_teknantes.lnb.phone.feed.Feed
+import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.model.PostView
 
 /**
@@ -15,6 +16,13 @@ object FeedWriting {
      * The text is sent trimmed.
      */
     fun canSend(text: String): Boolean = TextLimits.canSend(text, Feed.MAX_TEXT)
+
+    /**
+     * Whether [post]'s card has the pin button, in a feed or as a thread's main post, before who may write is asked:
+     * an announcement's main post the viewer can pin, never a Global post or a reply, whatever the view says (art
+     * direction 9.3, 9.4).
+     */
+    fun showsPin(post: PostView): Boolean = post.canPin && post.feed == FeedKind.ANNOUNCEMENTS && !post.isReply
 
     /** The display name others see for [post]: null when it is anonymous (`Anonyme`), even to a moderator. */
     fun publicName(post: PostView): String? = if (post.anonymous) null else post.author?.displayName
