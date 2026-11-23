@@ -36,6 +36,9 @@ class GsubLigatures(font: ByteBuffer) {
             } ?: emptyList()
         } catch (e: Exception) {
             emptyList()
+        } catch (e: OutOfMemoryError) {
+            // Not expected within the budget; if it happens all the same, the allocation that failed is not kept.
+            emptyList()
         }
     }
 
@@ -95,10 +98,12 @@ class GsubLigatures(font: ByteBuffer) {
      * Reads the ligature lookups of one GSUB table of [length] bytes, with the same defences as the kerning reader:
      * every structure is parsed once per offset (shared ones are reused) and every entry read or allocated is charged
      * to a budget proportional to the table's size, so overlapping offsets cannot multiply a small table into a huge
-     * one. A table that runs out gets no ligatures at all.
+     * one. The budget also has a ceiling ([MAX_BUDGET]), since what a query may scan is bounded by it and queries come
+     * from drawing: a big table, honest about its size, still can't make one emoji cost milliseconds. A table that runs
+     * out gets no ligatures at all.
      */
     private class Parser(private val b: ByteBuffer, length: Int) {
-        val allowed = BUDGET_PER_BYTE * length.coerceAtLeast(0) + BUDGET_BASE
+        val allowed = minOf(BUDGET_PER_BYTE * length.coerceAtLeast(0) + BUDGET_BASE, MAX_BUDGET)
         private var budget = allowed
         val left: Long get() = budget
         private val coverages = HashMap<Int, Coverage>()
@@ -161,6 +166,7 @@ class GsubLigatures(font: ByteBuffer) {
         private fun body(at: Int): Subtable? = if (at in bodies) bodies[at] else readLigatureSubst(at).also { bodies[at] = it }
 
         private fun readLigatureSubst(at: Int): Subtable? {
+            charge(OBJECT_COST)
             if (u16(at) != 1) return null
             val coverage = coverage(at + u16(at + 2))
             val setCount = u16(at + 4)
@@ -176,20 +182,22 @@ class GsubLigatures(font: ByteBuffer) {
         /** A ligature set, parsed once per offset; ligatures longer than any real emoji sequence are skipped. */
         private fun ligatureSet(at: Int): Array<Ligature> = ligatureSets.getOrPut(at) {
             val count = u16(at)
-            charge(count.toLong())
+            charge(count.toLong() + OBJECT_COST)
             val ligatures = ArrayList<Ligature>(count)
             for (i in 0 until count) {
                 val lig = at + u16(at + 2 + 2 * i)
                 val glyph = u16(lig)
                 val components = u16(lig + 2)
                 if (components < 2 || components > MAX_COMPONENTS) continue
-                charge(components.toLong())
+                // Objects cost what they weigh, so memory is bounded by the budget like the work.
+                charge(components.toLong() + OBJECT_COST)
                 ligatures.add(Ligature(glyph, IntArray(components - 1) { u16(lig + 4 + 2 * it) }))
             }
             ligatures.toTypedArray()
         }
 
         private fun coverage(at: Int): Coverage = coverages.getOrPut(at) {
+            charge(OBJECT_COST)
             when (u16(at)) {
                 1 -> {
                     val count = u16(at + 2)
@@ -218,8 +226,22 @@ class GsubLigatures(font: ByteBuffer) {
         /** Longer than any emoji sequence (a kiss with two skin tones is 10 components); longer ones are skipped. */
         const val MAX_COMPONENTS = 16
 
-        /** Work units allowed per byte of GSUB table, and a floor for tiny tables, as for kerning. */
-        const val BUDGET_PER_BYTE = 4L
+        /**
+         * Work units allowed per byte of GSUB table, and a floor for tiny tables. More per byte than for kerning: a
+         * ligature is a few bytes that become an object ([OBJECT_COST]), and Noto Emoji's 3,770 of them in 38 KB use
+         * about 81,000 units, an eighth of what this allows it.
+         */
+        const val BUDGET_PER_BYTE = 16L
         const val BUDGET_BASE = 4096L
+
+        /**
+         * The most work any GSUB table may cost, whatever its size: twelve times what Noto Emoji uses, room for a
+         * bigger emoji font, while a query, which scans no more entries than were paid for, stays around a millisecond
+         * in the worst case, and memory in a few megabytes.
+         */
+        const val MAX_BUDGET = 1_000_000L
+
+        /** What an object kept for good costs, in work units, as for kerning ([GposKerning.OBJECT_COST]). */
+        const val OBJECT_COST = GposKerning.OBJECT_COST
     }
 }

@@ -35,6 +35,9 @@ class GposKerning(font: ByteBuffer) {
             } ?: emptyList()
         } catch (e: Exception) {
             emptyList()
+        } catch (e: OutOfMemoryError) {
+            // Not expected within the budget; if it happens all the same, the allocation that failed is not kept.
+            emptyList()
         }
     }
 
@@ -141,11 +144,14 @@ class GposKerning(font: ByteBuffer) {
      *
      * A hostile table can point many offsets at one large structure, or overlap structures, to make a few hundred
      * kilobytes declare billions of entries. So every structure is parsed once per offset (shared ones are reused),
-     * and every entry read or allocated is charged to a budget proportional to the table's size. A real table never
-     * comes close (a test holds Inter under a quarter of it); a table that runs out gets no kerning at all.
+     * and every entry read or allocated is charged to a budget proportional to the table's size, and never above
+     * [MAX_BUDGET]. Objects cost more than array entries ([OBJECT_COST]), so memory is bounded by the budget too. A
+     * lookup referenced twice, or a subtable referenced twice by one lookup, is kept once: a real font never repeats
+     * one, and each copy would be another object and another step of every kerning asked for. A real table never comes
+     * close (a test holds Inter under a quarter of it); a table that runs out gets no kerning at all.
      */
     private class Parser(private val b: ByteBuffer, length: Int) {
-        val allowed = BUDGET_PER_BYTE * length.coerceAtLeast(0) + BUDGET_BASE
+        val allowed = minOf(BUDGET_PER_BYTE * length.coerceAtLeast(0) + BUDGET_BASE, MAX_BUDGET)
         private var budget = allowed
         val left: Long get() = budget
         private val coverages = HashMap<Int, Coverage>()
@@ -183,11 +189,14 @@ class GposKerning(font: ByteBuffer) {
 
             // OpenType applies lookups in lookup-list order, not in the feature's order.
             val result = ArrayList<Subtable>()
+            val seenLookups = HashSet<Int>()
             for (index in lookups) {
                 val lookup = lookupList + u16(lookupList + 2 + 2 * index)
+                if (!seenLookups.add(lookup)) continue
                 val type = u16(lookup)
                 val count = u16(lookup + 4)
                 charge(count.toLong())
+                val seenSubtables = HashSet<Int>()
                 for (j in 0 until count) {
                     var sub = lookup + u16(lookup + 6 + 2 * j)
                     var subType = type
@@ -195,8 +204,11 @@ class GposKerning(font: ByteBuffer) {
                         subType = u16(sub + 2)
                         sub += u32(sub + 4)
                     }
-                    if (subType != 2) continue
-                    body(sub)?.let { result.add(it.inLookup(index)) }
+                    if (subType != 2 || !seenSubtables.add(sub)) continue
+                    body(sub)?.let {
+                        charge(OBJECT_COST)
+                        result.add(it.inLookup(index))
+                    }
                 }
             }
             return result
@@ -206,6 +218,7 @@ class GposKerning(font: ByteBuffer) {
         private fun body(at: Int): Subtable? = if (at in bodies) bodies[at] else readPairPos(at).also { bodies[at] = it }
 
         private fun readPairPos(at: Int): Subtable? {
+            charge(OBJECT_COST)
             val format = u16(at)
             val coverage = coverage(at + u16(at + 2))
             val format1 = u16(at + 4)
@@ -259,13 +272,14 @@ class GposKerning(font: ByteBuffer) {
             pairSets[key]?.let { return it }
             val count = u16(at)
             if (at + 2L + stride.toLong() * count > b.limit()) throw IndexOutOfBoundsException("Pair set runs past the font")
-            charge(2L * count)
+            charge(2L * count + OBJECT_COST)
             val seconds = IntArray(count) { u16(at + 2 + stride * it) }
             val advances = IntArray(count) { if (xAdvance < 0) 0 else s16(at + 2 + stride * it + 2 + xAdvance) }
             return (seconds to advances).also { pairSets[key] = it }
         }
 
         private fun coverage(at: Int): Coverage = coverages.getOrPut(at) {
+            charge(OBJECT_COST)
             when (u16(at)) {
                 1 -> {
                     val count = u16(at + 2)
@@ -287,6 +301,7 @@ class GposKerning(font: ByteBuffer) {
         }
 
         private fun classDef(at: Int): ClassDef = classDefs.getOrPut(at) {
+            charge(OBJECT_COST)
             when (u16(at)) {
                 1 -> {
                     val start = u16(at + 2)
@@ -317,13 +332,31 @@ class GposKerning(font: ByteBuffer) {
         const val BUDGET_PER_BYTE = 4L
         const val BUDGET_BASE = 4096L
 
-        /** Offset and length of the table [tag], or null. */
+        /**
+         * The most work any GPOS table may cost, whatever its size; Inter uses a small part of it (a test holds it to
+         * a quarter), and memory stays in megabytes.
+         */
+        const val MAX_BUDGET = 2_000_000L
+
+        /** What an object kept for good costs, in work units: about its size in bytes over two. */
+        const val OBJECT_COST = 16L
+
+        /**
+         * Offset and length of the table [tag], or null when there is none, or when its directory entry does not fit
+         * in the file. The length is the one budget every reader sizes its work by, so it is never taken on trust: a
+         * table can't be longer than what the file holds after its offset. FreeType skips such an entry too, so a
+         * font with a lying directory still opens, and must not get a budget from the lie.
+         */
         fun findTable(b: ByteBuffer, tag: String): Pair<Int, Int>? {
             val count = b.getShort(4).toInt() and 0xFFFF
             for (i in 0 until count) {
                 val record = 12 + 16 * i
                 val name = String(CharArray(4) { (b.get(record + it).toInt() and 0xFF).toChar() })
-                if (name == tag) return b.getInt(record + 8) to b.getInt(record + 12)
+                if (name != tag) continue
+                // Unsigned 32-bit fields, read as longs: a "negative" one is a huge one.
+                val offset = b.getInt(record + 8).toLong() and 0xFFFFFFFFL
+                val length = b.getInt(record + 12).toLong() and 0xFFFFFFFFL
+                return if (offset + length <= b.limit()) offset.toInt() to length.toInt() else null
             }
             return null
         }

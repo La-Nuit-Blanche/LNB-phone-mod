@@ -314,6 +314,7 @@ class GsubHostileTest {
             "ligature count 65535" to patch(base, set, 0xFFFF),
             "component count 65535" to patch(base, ligature + 2, 0xFFFF),
             "table length 0xFFFFFFF0" to patch(base, 12 + 12, -16, 4),
+            "table length 0x7FFFFFF0" to patch(base, 12 + 12, 0x7FFFFFF0, 4),
             "table length 0" to patch(base, 12 + 12, 0, 4),
             "table offset past the end" to patch(base, 12 + 8, 0x7FFFFFF0, 4),
             "table count 65535" to patch(base, 4, 0xFFFF),
@@ -387,20 +388,22 @@ class GsubHostileTest {
         val bytes = multiplier(subtables = 20_000, ligatures = 30_000)
         assertTrue(bytes.size < 200_000, "${bytes.size} bytes")
         val gsub = parse(bytes)
+        gsub.ligature(intArrayOf(1, 56), 0, 2)
         val started = System.nanoTime()
         repeat(5) { gsub.ligature(intArrayOf(1, 56), 0, 2) }
         val millis = (System.nanoTime() - started) / 1_000_000
-        assertTrue(millis < 500, "5 ligature lookups took $millis ms on a ${bytes.size}-byte table (${gsub.size} ligatures)")
+        assertTrue(millis < 25, "5 ligature lookups took $millis ms on a ${bytes.size}-byte table (${gsub.size} ligatures)")
     }
 
     @Test
     fun `many distinct subtables sharing one big ligature set also stay quick to query`() {
         val bytes = multiplier(subtables = 8_000, ligatures = 30_000, distinctSubtables = true)
         val gsub = parse(bytes)
+        gsub.ligature(intArrayOf(1, 56), 0, 2)
         val started = System.nanoTime()
         repeat(5) { gsub.ligature(intArrayOf(1, 56), 0, 2) }
         val millis = (System.nanoTime() - started) / 1_000_000
-        assertTrue(millis < 500, "5 ligature lookups took $millis ms on a ${bytes.size}-byte table")
+        assertTrue(millis < 25, "5 ligature lookups took $millis ms on a ${bytes.size}-byte table")
     }
 
     @Test
