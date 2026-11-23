@@ -328,7 +328,7 @@ Badge, LED, banner or peek and chime, delivery at the next login for offline pla
 
 ### 6.5 The phone's addition: notifying everyone except some players
 
-The phone gains two overloads of `PhoneNotifications.sendToEveryone`, built with the mod's first task (in this repository, in `phone/`). They are **additive**: the existing functions keep their signatures and behaviour, and apps built against an older phone keep working. Feed then requires the phone version that has them, 0.1.1 or later (its `lnbphone` range starts at the phone it is built against, as the app plugin writes it: 0.2.0, the version whose snackbar functions return a handle, which apps built against 0.1 must be rebuilt for).
+The phone has two overloads of `PhoneNotifications.sendToEveryone` that leave some players out. Feed needs them, since an announcement must not notify its author, but they are general, so they live in the phone (`phone/`, in this repository) like the rest of the notification API. They came in phone 0.1.1, beside the existing functions, whose signatures and behaviour did not change. Feed doesn't run on 0.1.1, though: an app's `lnbphone` range, which the app plugin writes, starts at the phone it is built against and stops before the next minor version, so Feed 0.2.0 needs a phone from 0.2.0 up to, not including, 0.3. And 0.2.0 is not compatible with apps built against 0.1: `KitScreen.showSnackbar` and `showErrorSnackbar` now return a `SnackbarHandle` where they returned nothing, which changes their binary signature, so such an app must be rebuilt (its own range, up to 0.2, already keeps it off a 0.2 phone).
 
 ```kotlin
 /**
