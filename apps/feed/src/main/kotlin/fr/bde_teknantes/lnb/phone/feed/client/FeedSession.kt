@@ -1,0 +1,1158 @@
+package fr.bde_teknantes.lnb.phone.feed.client
+
+import fr.bde_teknantes.lnb.phone.api.TextLimits
+import fr.bde_teknantes.lnb.phone.feed.Feed
+import fr.bde_teknantes.lnb.phone.feed.model.Availability
+import fr.bde_teknantes.lnb.phone.feed.model.CountUpdate
+import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
+import fr.bde_teknantes.lnb.phone.feed.model.Outcome
+import fr.bde_teknantes.lnb.phone.feed.model.Pin
+import fr.bde_teknantes.lnb.phone.feed.model.PlayerState
+import fr.bde_teknantes.lnb.phone.feed.model.PostView
+import fr.bde_teknantes.lnb.phone.feed.model.RemovedItem
+import fr.bde_teknantes.lnb.phone.feed.network.CreatePostPayload
+import fr.bde_teknantes.lnb.phone.feed.network.CreateReplyPayload
+import fr.bde_teknantes.lnb.phone.feed.network.DeletePayload
+import fr.bde_teknantes.lnb.phone.feed.network.LikePayload
+import fr.bde_teknantes.lnb.phone.feed.network.LoadFeedPayload
+import fr.bde_teknantes.lnb.phone.feed.network.LoadThreadPayload
+import fr.bde_teknantes.lnb.phone.feed.network.OpenPayload
+import fr.bde_teknantes.lnb.phone.feed.network.PagePayload
+import fr.bde_teknantes.lnb.phone.feed.network.PinPayload
+import fr.bde_teknantes.lnb.phone.feed.network.ResultPayload
+import fr.bde_teknantes.lnb.phone.feed.network.SeenFeedPayload
+import fr.bde_teknantes.lnb.phone.feed.network.SeenThreadPayload
+import fr.bde_teknantes.lnb.phone.feed.network.StatePayload
+import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+import java.time.Instant
+import java.util.EnumMap
+import java.util.UUID
+
+/** What the client knows of Feed's reachability (`docs/feed-app.md` 8). */
+enum class FeedAvailability {
+    /** Nothing asked yet. */
+    UNKNOWN,
+
+    /** `open` sent, no answer yet. */
+    LOADING,
+    OK,
+    UNAVAILABLE,
+    DISABLED,
+}
+
+/** Something the screen shown reports once, as a snackbar (art direction 9.4, 9.9, 9.11, 9.12). */
+sealed interface FeedNotice {
+    /** `Connexion perdue`, an error snackbar with Retry ([FeedSession.retryConnection]). */
+    data object ConnectionLost : FeedNotice
+
+    /** Feed is back: a `Connexion perdue` still showing goes, with no message. */
+    data object ConnectionBack : FeedNotice
+
+    /** `Action impossible`. */
+    data object ActionFailed : FeedNotice
+
+    /** `Doucement ! Attends {n} s`. */
+    data class TooFast(val seconds: Int) : FeedNotice
+
+    /** An action refused for who the player is: the block's text. */
+    data class Refused(val block: WriteBlock) : FeedNotice
+
+    /** `Post épinglé` or `Post désépinglé`. */
+    data class PinDone(val pinned: Boolean) : FeedNotice
+
+    /** The server found 3 pins already (two announcers at once): the "Replace a pin?" dialog for [postId]. */
+    data class PinLimit(val postId: UUID) : FeedNotice
+
+    /** `Post supprimé` or `Réponse supprimée`. */
+    data class Deleted(val postId: UUID, val reply: Boolean) : FeedNotice
+}
+
+/** What a click on a heart did. */
+enum class LikeAttempt {
+    /** Shown at once and sent. */
+    SENT,
+
+    /** The player may not write ([FeedSession.writeBlock]): nothing changes, the screen says why. */
+    BLOCKED,
+
+    /** Nothing to like (the post went). */
+    IGNORED,
+}
+
+/** What a click on a pin button did. */
+enum class PinAttempt { SENT, NEEDS_REPLACE, BLOCKED, IGNORED }
+
+/**
+ * Feed's state on the client (`docs/feed-app.md` 8): availability, the player's state and rights, one copy of every
+ * post and reply held, the two feeds with their pages, pinned group, waiting posts and scroll, the threads, the drafts,
+ * the unread dots, the likes and pins shown before the server answered, and the requests waiting for an answer.
+ *
+ * Screens are rebuilt at every visit and read everything from here; they catch up with [revision] in their tick. The
+ * server's payloads come in through the `on…` functions, requests go out through [send]. Client thread only.
+ *
+ * Plain logic: no game class is touched, so a test fills a session by hand, with [send] recording what goes out and
+ * [clock] fixed.
+ */
+class FeedSession(
+    private val send: (CustomPacketPayload) -> Unit,
+    /** Real time, for relative times and the pin shown before the server answers. */
+    val clock: () -> Instant = Instant::now,
+) {
+    /** Goes up at every change a screen may show. */
+    var revision = 0
+        private set
+
+    var availability = FeedAvailability.UNKNOWN
+        private set
+
+    /** The player's last state (rights, `me`, the dots), kept while the site is away; null until the first. */
+    var state: PlayerState? = null
+        private set
+
+    private val posts = HashMap<UUID, PostView>()
+    private val feeds = EnumMap<FeedKind, FeedList>(FeedKind::class.java).apply {
+        for (kind in FeedKind.entries) put(kind, FeedList(kind))
+    }
+    private val unread = EnumMap<FeedKind, Boolean>(FeedKind::class.java)
+
+    // Access order: the most recently used last, so the eldest goes first.
+    private val threads = LinkedHashMap<UUID, ThreadState>(16, 0.75f, true)
+    private val replyDrafts = LinkedHashMap<UUID, ReplyDraft>(16, 0.75f, true)
+
+    /** The Compose draft. */
+    val compose = ComposeDraft()
+
+    private val requests = HashMap<Int, PendingRequest>()
+    private val ids = RequestIds()
+    private val pendingLikes = HashMap<UUID, PendingLike>()
+    private val pendingPins = HashMap<UUID, List<Pin>>()
+    private val deleting = HashSet<UUID>()
+    private val highlights = HashSet<UUID>()
+    private val reveals = EnumMap<FeedKind, UUID>(FeedKind::class.java)
+    private val threadReveals = HashMap<UUID, UUID>()
+
+    // Posts and replies known to be gone, so that a late `live` or `result` doesn't bring them back.
+    private val gone = BoundedSet(GONE_REMEMBERED)
+
+    // Live replies whose marker was raised, so that a reply delivered twice raises it once.
+    private val raisedFor = BoundedSet(GONE_REMEMBERED)
+
+    private var landing: UUID? = null
+    private var notice: FeedNotice? = null
+
+    /** The feed on screen, set by the feed screen while it shows one; null otherwise. */
+    var viewing: FeedKind? = null
+        private set
+
+    /** The thread on screen, set by the thread screen; null otherwise. */
+    var viewingThread: UUID? = null
+        private set
+    private var threadSeenSent: UUID? = null
+
+    private var ticks = 0
+    private var nextAutoRetry = 0
+    private var manualRetry = false
+    private var retryDeadline = 0
+    private val lastSeenSent = EnumMap<FeedKind, Instant>(FeedKind::class.java)
+    private var lastSeenTick = Int.MIN_VALUE / 2
+
+    // ---- Reading ----
+
+    /** The view of [id] held, or null. */
+    fun post(id: UUID): PostView? = posts[id]
+
+    fun feed(kind: FeedKind): FeedList = feeds.getValue(kind)
+
+    /** The thread of [id], made if new, and kept as the most recently used of the [MAX_THREADS]. */
+    fun thread(id: UUID): ThreadState {
+        threads[id]?.let { return it }
+        val thread = ThreadState(id)
+        threads[id] = thread
+        trimThreads()
+        return thread
+    }
+
+    /** The thread of [id] if held. */
+    fun threadOrNull(id: UUID): ThreadState? = threads[id]
+
+    /** The tab dot of [kind] (art direction 9.6). The tabs hide it on the active tab. */
+    fun isUnread(kind: FeedKind): Boolean = unread[kind] == true
+
+    /** Why the player may not write now, or null when they may (or their state isn't known yet). */
+    fun writeBlock(): WriteBlock? {
+        val s = state ?: return null
+        return when {
+            !s.linked -> WriteBlock.GUEST
+            s.banned -> WriteBlock.BANNED
+            !s.writing -> WriteBlock.WRITING_OFF
+            else -> null
+        }
+    }
+
+    /** Whether the compose button shows on [kind]: announcers on Announcements, players with an account on Global. */
+    fun canCompose(kind: FeedKind): Boolean {
+        val s = state ?: return false
+        if (writeBlock() != null) return false
+        return if (kind == FeedKind.ANNOUNCEMENTS) s.rights.announce else s.rights.write
+    }
+
+    /** Whether something is on screen to keep readable when the connection drops. */
+    val hasLoadedContent: Boolean get() = feeds.values.any { it.loaded } || threads.values.any { it.loaded }
+
+    /** Whether [id] is being deleted (the dialog's confirm button loads). */
+    fun isDeleting(id: UUID) = id in deleting
+
+    /** The reply draft of [threadId], made if new, kept as the most recently used of the [MAX_REPLY_DRAFTS]. */
+    fun replyDraft(threadId: UUID): ReplyDraft {
+        replyDrafts[threadId]?.let { return it }
+        val draft = ReplyDraft(threadId)
+        replyDrafts[threadId] = draft
+        while (replyDrafts.size > MAX_REPLY_DRAFTS) replyDrafts.remove(replyDrafts.keys.first())
+        return draft
+    }
+
+    /** What the screen shown should say, once. */
+    fun takeNotice(): FeedNotice? = notice.also { notice = null }
+
+    /** Whether [id] should get the post highlight now (once). */
+    fun takeHighlight(id: UUID): Boolean = highlights.remove(id)
+
+    /** Whether [id] is waiting for its highlight. */
+    fun wantsHighlight(id: UUID): Boolean = id in highlights
+
+    /** A post of [kind] to scroll into view (an own post just published), once. */
+    fun takeReveal(kind: FeedKind): UUID? = reveals.remove(kind)
+
+    /** A reply of the thread of [threadId] to scroll into view (an own reply), once. */
+    fun takeThreadReveal(threadId: UUID): UUID? = threadReveals.remove(threadId)
+
+    // ---- What the screens tell ----
+
+    /** The feed screen shows [kind] (or nothing, null): live posts elsewhere light that tab's dot. */
+    fun show(kind: FeedKind?) {
+        if (viewing == kind) return
+        val left = viewing
+        viewing = kind
+        // A list the player stopped looking at is trimmed to its bound now, not under their eyes.
+        if (left != null) trimFeed(feed(left))
+    }
+
+    /** The thread screen shows [threadId] (or nothing, null). Its first page shown, it is marked seen. */
+    fun showThread(threadId: UUID?) {
+        if (viewingThread != threadId) threadSeenSent = null
+        viewingThread = threadId
+        if (threadId != null && threads[threadId]?.loaded == true) markThreadSeen(threadId)
+    }
+
+    /**
+     * The player is viewing [kind]: its dot clears, and the site hears the newest post shown (pinned included) when it
+     * changed, once every 2 seconds at most (`seen_feed`).
+     */
+    fun markViewed(kind: FeedKind) {
+        if (unread[kind] == true) {
+            unread[kind] = false
+            changed()
+        }
+        val list = feed(kind)
+        if (!list.loaded || state?.linked != true || ticks - lastSeenTick < SEEN_EVERY_TICKS) return
+        val newest = (list.pinnedIds.asSequence() + list.postIds.asSequence()).mapNotNull { posts[it]?.createdAt }.maxOrNull() ?: return
+        val last = lastSeenSent[kind]
+        if (last != null && !newest.isAfter(last)) return
+        lastSeenSent[kind] = newest
+        lastSeenTick = ticks
+        send(SeenFeedPayload(kind, newest))
+    }
+
+    /**
+     * The notification of an announcement was opened (art direction 9.10): Announcements lands on [postId], scrolled
+     * so that it is fully visible, highlighted. Taken by the feed screen once the list is loaded ([takeLanding]).
+     */
+    fun land(postId: UUID) {
+        landing = postId
+        changed()
+    }
+
+    /**
+     * The post to land on in [kind], once its list is loaded: highlighted, and brought out of the waiting posts when it
+     * waits there. Null when there is none, or not yet.
+     */
+    fun takeLanding(kind: FeedKind): UUID? {
+        val id = landing ?: return null
+        if (kind != FeedKind.ANNOUNCEMENTS || !feed(kind).loaded) return null
+        landing = null
+        if (id in feed(kind).waitingIds) releaseWaiting(kind)
+        if (feed(kind).holds(id)) highlights += id
+        return id
+    }
+
+    /**
+     * Inserts the waiting posts of [kind] at their place, highlighted (a click on the pill, or the place scrolled into
+     * view). Returns them, newest first.
+     */
+    fun releaseWaiting(kind: FeedKind): List<UUID> {
+        val list = feed(kind)
+        if (list.waitingIds.isEmpty()) return emptyList()
+        val released = list.waitingIds.toList()
+        list.waitingIds.clear()
+        for (id in released.asReversed()) {
+            insertByDate(list, id)
+            highlights += id
+        }
+        changed()
+        return released
+    }
+
+    // ---- Requests ----
+
+    /** Feed was opened (the root screen shown): the player becomes a watcher and gets their state. */
+    fun open() {
+        if (availability == FeedAvailability.UNKNOWN) availability = FeedAvailability.LOADING
+        send(OpenPayload)
+        changed()
+    }
+
+    /** Loads the first page of [kind] when it is missing or stale (`docs/feed-app.md` 8), not after a failure. */
+    fun loadIfNeeded(kind: FeedKind) {
+        val list = feed(kind)
+        if (list.loadingFirst || list.retrying) return
+        val due = if (list.loaded) list.stale else list.firstError == null
+        if (due && ticks >= list.reloadNotBefore) loadFirst(list)
+    }
+
+    /** Loads the next page of [kind], as its end comes into view. */
+    fun loadMore(kind: FeedKind) {
+        val list = feed(kind)
+        if (!list.loaded || !list.hasMore || list.loadingMore || list.moreFailed || list.loadingFirst) return
+        if (ticks < list.moreNotBefore) return
+        list.loadingMore = true
+        request(PendingRequest.LoadFeed(kind, more = true, before = list.next)) { LoadFeedPayload(it, kind, list.next) }
+        changed()
+    }
+
+    /** The retry row of [kind]: the spinner row again, and the page asked again. */
+    fun retryMore(kind: FeedKind) {
+        feed(kind).moreFailed = false
+        loadMore(kind)
+    }
+
+    /**
+     * The error block's Retry (art direction 9.12, F-3): asks the server whether Feed is back (`open`); on `OK` the list
+     * loads (skeletons, then the posts), otherwise the block returns.
+     */
+    fun retryFirst(kind: FeedKind) {
+        val list = feed(kind)
+        if (list.retrying || list.loadingFirst) return
+        list.retrying = true
+        retryDeadline = ticks + RETRY_TIMEOUT_TICKS
+        send(OpenPayload)
+        changed()
+    }
+
+    /** The `Connexion perdue` snackbar's Retry: `open` at once; if it fails again, the snackbar shows again. */
+    fun retryConnection() {
+        manualRetry = true
+        nextAutoRetry = ticks + AUTO_RETRY_TICKS
+        send(OpenPayload)
+    }
+
+    /** Loads [threadId] when it is missing or stale. */
+    fun loadThreadIfNeeded(threadId: UUID) {
+        val thread = thread(threadId)
+        if (thread.loadingFirst || thread.deleted) return
+        val due = if (thread.loaded) thread.stale else thread.firstError == null
+        if (due && ticks >= thread.reloadNotBefore) loadThreadFirst(thread)
+    }
+
+    /** The thread's error block Retry. */
+    fun retryThread(threadId: UUID) {
+        val thread = thread(threadId)
+        thread.firstError = null
+        loadThreadIfNeeded(threadId)
+    }
+
+    fun loadMoreReplies(threadId: UUID) {
+        val thread = thread(threadId)
+        if (!thread.loaded || !thread.hasMore || thread.loadingMore || thread.moreFailed || thread.loadingFirst) return
+        if (ticks < thread.moreNotBefore) return
+        thread.loadingMore = true
+        request(PendingRequest.LoadThread(threadId, more = true, after = thread.next)) { LoadThreadPayload(it, threadId, thread.next) }
+        changed()
+    }
+
+    fun retryReplies(threadId: UUID) {
+        thread(threadId).moreFailed = false
+        loadMoreReplies(threadId)
+    }
+
+    /**
+     * A click on the heart of [postId] (art direction 9.3, F-6): shown at once and sent; undone if the answer isn't `OK`.
+     * Blocked for guests, banned players and while writing is off (9.11).
+     */
+    fun toggleLike(postId: UUID): LikeAttempt {
+        if (writeBlock() != null) return LikeAttempt.BLOCKED
+        val post = posts[postId] ?: return LikeAttempt.IGNORED
+        val liked = !post.liked
+        val pending = pendingLikes.getOrPut(postId) { PendingLike(post.liked, post.likes) }
+        posts[postId] = post.copy(liked = liked, likes = (post.likes + if (liked) 1 else -1).coerceAtLeast(0))
+        pending.latest = request(PendingRequest.Like(postId)) { LikePayload(it, postId, liked) }
+        changed()
+        return LikeAttempt.SENT
+    }
+
+    /** Publishes the Compose draft (art direction 9.8), with its key kept across a Retry. */
+    fun sendPost(): Boolean {
+        val draft = compose
+        val text = draft.text.text.trim()
+        if (draft.sending || writeBlock() != null || !sendable(draft.text.text)) return false
+        val key = draft.key.forSending(draft.fingerprint())
+        draft.sending = true
+        draft.outcome = null
+        val feed = draft.destination
+        val anonymous = draft.anonymous
+        request(PendingRequest.CreatePost(key)) { CreatePostPayload(it, key, feed, text, anonymous) }
+        changed()
+        return true
+    }
+
+    /** Sends the reply draft of [threadId] (art direction 9.7). */
+    fun sendReply(threadId: UUID): Boolean {
+        val draft = replyDraft(threadId)
+        val text = draft.text.text.trim()
+        if (draft.sending || writeBlock() != null || !sendable(draft.text.text)) return false
+        val key = draft.key.forSending(draft.fingerprint())
+        draft.sending = true
+        draft.outcome = null
+        val replyTo = draft.target?.replyTo
+        val anonymous = draft.anonymous
+        request(PendingRequest.CreateReply(threadId, key)) { CreateReplyPayload(it, key, threadId, replyTo, text, anonymous) }
+        changed()
+        return true
+    }
+
+    /**
+     * A click on the pin button of [postId] (art direction 9.4): shown at once and sent. With 3 pinned and not
+     * [replace], nothing is sent: the screen asks first, then calls again with [replace].
+     */
+    fun togglePin(postId: UUID, replace: Boolean): PinAttempt {
+        if (writeBlock() != null) return PinAttempt.BLOCKED
+        val post = posts[postId] ?: return PinAttempt.IGNORED
+        if (!post.canPin || post.isReply || postId in pendingPins) return PinAttempt.IGNORED
+        val pinning = post.pinnedAt == null
+        val group = pinGroup()
+        if (pinning && !replace && group.size >= Feed.MAX_PINS) return PinAttempt.NEEDS_REPLACE
+        pendingPins[postId] = group
+        val shown = if (pinning) (listOf(Pin(postId, clock())) + group).take(Feed.MAX_PINS) else group.filter { it.id != postId }
+        applyPinGroup(shown)
+        if (pinning) highlights += postId
+        request(PendingRequest.Pin(postId, pinning)) { PinPayload(it, postId, pinning, replace) }
+        changed()
+        return PinAttempt.SENT
+    }
+
+    /** Deletes [postId] once the player confirmed (art direction 9.9): the cell goes when the server agrees. */
+    fun delete(postId: UUID): Boolean {
+        if (postId in deleting || posts[postId]?.canDelete != true) return false
+        deleting += postId
+        request(PendingRequest.Delete(postId)) { DeletePayload(it, postId) }
+        changed()
+        return true
+    }
+
+    /** Called 20 times a second by the screen shown: the automatic retry while the connection is lost. */
+    fun tick() {
+        ticks++
+        val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED
+        if (lost && hasLoadedContent && (viewing != null || viewingThread != null) && ticks >= nextAutoRetry) {
+            nextAutoRetry = ticks + AUTO_RETRY_TICKS
+            send(OpenPayload)
+        }
+        if (ticks == retryDeadline) {
+            // `open` went unanswered: the block comes back rather than spinning for ever.
+            var any = false
+            for (list in feeds.values) if (list.retrying) {
+                list.retrying = false
+                any = true
+            }
+            if (any) changed()
+        }
+    }
+
+    // ---- The server's payloads ----
+
+    fun onState(payload: StatePayload) {
+        val before = availability
+        availability = when (payload.available) {
+            Availability.OK -> FeedAvailability.OK
+            Availability.UNAVAILABLE -> FeedAvailability.UNAVAILABLE
+            Availability.DISABLED -> FeedAvailability.DISABLED
+        }
+        payload.state?.let { s ->
+            state = s
+            for (kind in FeedKind.entries) unread[kind] = s.unread[kind] && viewing != kind
+        }
+        val wasLost = before == FeedAvailability.UNAVAILABLE || before == FeedAvailability.DISABLED
+        if (availability == FeedAvailability.OK) {
+            if (wasLost && hasLoadedContent) notice = FeedNotice.ConnectionBack
+            manualRetry = false
+            for (list in feeds.values) if (list.retrying) {
+                list.retrying = false
+                list.firstError = null
+                loadFirst(list)
+            }
+        } else {
+            if (hasLoadedContent && (!wasLost || manualRetry)) {
+                notice = FeedNotice.ConnectionLost
+                nextAutoRetry = ticks + AUTO_RETRY_TICKS
+            }
+            manualRetry = false
+            val outcome = if (availability == FeedAvailability.DISABLED) Outcome.DISABLED else Outcome.UNAVAILABLE
+            for (list in feeds.values) if (list.retrying) {
+                list.retrying = false
+                if (!list.loaded) list.firstError = outcome
+            }
+        }
+        changed()
+    }
+
+    fun onPage(payload: PagePayload) {
+        val request = requests[payload.requestId] as? PendingRequest.LoadFeed ?: return
+        requests.remove(payload.requestId)
+        val list = feed(request.feed)
+        if (!request.more) {
+            list.loadingFirst = false
+            if (payload.outcome == Outcome.OK) {
+                if (list.loaded) mergeFirstPage(list, payload) else replaceFirstPage(list, payload)
+                list.firstError = null
+                list.stale = false
+            } else if (payload.outcome == Outcome.RATE_LIMITED) {
+                // Not a failure to show: the server's limits ask to wait a moment (the skeletons stay).
+                list.reloadNotBefore = ticks + READ_RETRY_TICKS
+            } else if (list.loaded) {
+                // A stale list that couldn't reload stays readable, and tries again later.
+                list.reloadNotBefore = ticks + AUTO_RETRY_TICKS
+                if (payload.outcome == Outcome.UNAVAILABLE || payload.outcome == Outcome.DISABLED) notice = FeedNotice.ConnectionLost
+            } else {
+                list.firstError = payload.outcome
+            }
+        } else {
+            list.loadingMore = false
+            when {
+                payload.outcome == Outcome.OK && list.loaded -> appendPage(list, payload, request.before)
+                // The spinner row stays, and asks again in a moment.
+                payload.outcome == Outcome.RATE_LIMITED -> list.moreNotBefore = ticks + READ_RETRY_TICKS
+                else -> list.moreFailed = list.loaded
+            }
+        }
+        collect()
+        changed()
+    }
+
+    fun onThread(payload: ThreadPayload) {
+        val request = requests[payload.requestId] as? PendingRequest.LoadThread ?: return
+        requests.remove(payload.requestId)
+        val thread = threads[request.threadId] ?: return
+        val main = payload.post
+        if (!request.more) {
+            thread.loadingFirst = false
+            when {
+                payload.outcome == Outcome.OK && main != null && main.id == thread.id && !main.isReply -> {
+                    posts[main.id] = main
+                    mergeThreadPage(thread, payload.replies, payload.next)
+                    thread.firstError = null
+                    thread.stale = false
+                    if (viewingThread == thread.id) markThreadSeen(thread.id)
+                }
+                payload.outcome == Outcome.NOT_FOUND -> threadGone(thread.id)
+                payload.outcome == Outcome.RATE_LIMITED -> thread.reloadNotBefore = ticks + READ_RETRY_TICKS
+                thread.loaded -> thread.reloadNotBefore = ticks + AUTO_RETRY_TICKS
+                else -> thread.firstError = if (payload.outcome == Outcome.OK) Outcome.UNAVAILABLE else payload.outcome
+            }
+        } else {
+            thread.loadingMore = false
+            if (payload.outcome == Outcome.OK && thread.loaded) {
+                for (reply in payload.replies) {
+                    if (reply.threadId != thread.id || reply.id in gone || reply.id in thread.replyIds) continue
+                    posts[reply.id] = reply
+                    thread.replyIds += reply.id
+                }
+                thread.next = payload.next
+                thread.hasMore = payload.next != null
+            } else if (payload.outcome == Outcome.NOT_FOUND) {
+                threadGone(thread.id)
+            } else if (payload.outcome == Outcome.RATE_LIMITED) {
+                thread.moreNotBefore = ticks + READ_RETRY_TICKS
+            } else {
+                thread.moreFailed = thread.loaded
+            }
+        }
+        collect()
+        changed()
+    }
+
+    fun onResult(payload: ResultPayload) {
+        val request = requests.remove(payload.requestId) ?: return
+        when (request) {
+            is PendingRequest.Like -> likeAnswered(request, payload)
+            is PendingRequest.CreatePost -> postAnswered(payload)
+            is PendingRequest.CreateReply -> replyAnswered(request, payload)
+            is PendingRequest.Pin -> pinAnswered(request, payload)
+            is PendingRequest.Delete -> deleteAnswered(request, payload)
+            // A read answered with `result`: only a broken server sends that.
+            is PendingRequest.LoadFeed, is PendingRequest.LoadThread -> requests[payload.requestId] = request
+        }
+        changed()
+    }
+
+    /** New posts and replies, each the player's own view (`docs/feed-app.md` 8, "A live post"). */
+    fun onLive(views: List<PostView>) {
+        for (view in views) {
+            if (view.id in gone) continue
+            if (view.isReply) liveReply(view) else livePost(view)
+        }
+        changed()
+    }
+
+    fun onRemoved(items: List<RemovedItem>) {
+        for (item in items) removePost(item.id)
+        collect()
+        changed()
+    }
+
+    fun onCounts(items: List<CountUpdate>) {
+        for (item in items) {
+            val post = posts[item.id] ?: continue
+            val pending = pendingLikes[item.id]
+            if (pending != null) {
+                // The heart the player just clicked stays as shown; the answer to the like settles the count.
+                pending.confirmedLikes = item.likes
+                posts[item.id] = post.copy(replies = item.replies)
+            } else {
+                posts[item.id] = post.copy(likes = item.likes, replies = item.replies)
+            }
+        }
+        changed()
+    }
+
+    fun onPins(group: List<Pin>) {
+        applyPinGroup(group)
+        changed()
+    }
+
+    /** The server reconnected to the site: every list and thread is reloaded and merged when shown. */
+    fun onReset() {
+        for (list in feeds.values) if (list.loaded) {
+            list.stale = true
+            list.reloadNotBefore = 0
+        }
+        for (thread in threads.values) if (thread.loaded) {
+            thread.stale = true
+            thread.reloadNotBefore = 0
+        }
+        if (hasLoadedContent && availability != FeedAvailability.OK) notice = FeedNotice.ConnectionBack
+        changed()
+    }
+
+    /** The player left the server: nothing held belongs to the next one. */
+    fun clear() {
+        availability = FeedAvailability.UNKNOWN
+        state = null
+        posts.clear()
+        feeds.values.forEach { it.reset() }
+        unread.clear()
+        threads.clear()
+        replyDrafts.clear()
+        compose.clear()
+        compose.destination = FeedKind.GLOBAL
+        compose.outcome = null
+        requests.clear()
+        pendingLikes.clear()
+        pendingPins.clear()
+        deleting.clear()
+        highlights.clear()
+        reveals.clear()
+        threadReveals.clear()
+        gone.clear()
+        raisedFor.clear()
+        landing = null
+        notice = null
+        viewing = null
+        viewingThread = null
+        threadSeenSent = null
+        manualRetry = false
+        lastSeenSent.clear()
+        changed()
+    }
+
+    // ---- Inside ----
+
+    private fun changed() {
+        revision++
+    }
+
+    private fun request(pending: PendingRequest, payload: (Int) -> CustomPacketPayload): Int {
+        val id = ids.next()
+        requests[id] = pending
+        send(payload(id))
+        return id
+    }
+
+    private fun sendable(text: String) = TextLimits.canSend(text.trim(), Feed.MAX_TEXT)
+
+    private fun loadFirst(list: FeedList) {
+        list.loadingFirst = true
+        list.firstError = null
+        request(PendingRequest.LoadFeed(list.kind, more = false, before = null)) { LoadFeedPayload(it, list.kind, null) }
+        changed()
+    }
+
+    private fun loadThreadFirst(thread: ThreadState) {
+        thread.loadingFirst = true
+        thread.firstError = null
+        request(PendingRequest.LoadThread(thread.id, more = false, after = null)) { LoadThreadPayload(it, thread.id, null) }
+        changed()
+    }
+
+    private fun usable(view: PostView, kind: FeedKind) = view.feed == kind && !view.isReply && view.id !in gone
+
+    private fun replaceFirstPage(list: FeedList, page: PagePayload) {
+        list.pinnedIds.clear()
+        list.postIds.clear()
+        list.waitingIds.clear()
+        list.loadedWith.clear()
+        if (list.kind == FeedKind.ANNOUNCEMENTS) {
+            for (view in page.pinned) if (usable(view, list.kind) && view.id !in list.pinnedIds) {
+                posts[view.id] = view
+                list.pinnedIds += view.id
+            }
+        }
+        for (view in page.posts) if (usable(view, list.kind) && !list.holds(view.id)) {
+            posts[view.id] = view.copy(pinnedAt = null)
+            list.postIds += view.id
+            list.loadedWith[view.id] = null
+        }
+        list.next = page.next
+        list.hasMore = page.next != null
+        list.moreFailed = false
+        list.loaded = true
+    }
+
+    private fun appendPage(list: FeedList, page: PagePayload, before: String?) {
+        for (view in page.posts) {
+            if (!usable(view, list.kind) || list.holds(view.id)) continue
+            posts[view.id] = view.copy(pinnedAt = null)
+            list.postIds += view.id
+            list.loadedWith[view.id] = before
+        }
+        list.next = page.next
+        list.hasMore = page.next != null
+    }
+
+    /**
+     * A first page over a list already held, after a `reset` (`docs/feed-app.md` 8): posts newer than the newest held
+     * arrive as live posts do, held posts the page lacks within its span went meanwhile, the rest is updated in place.
+     */
+    private fun mergeFirstPage(list: FeedList, page: PagePayload) {
+        if (list.kind == FeedKind.ANNOUNCEMENTS) {
+            val pinned = page.pinned.filter { usable(it, list.kind) && it.pinnedAt != null }
+            for (view in pinned) posts[view.id] = view
+            applyPinGroup(pinned.map { Pin(it.id, it.pinnedAt!!) })
+        }
+        val fresh = page.posts.filter { usable(it, list.kind) }
+        val inPage = fresh.mapTo(HashSet()) { it.id } + list.pinnedIds
+        val newestHeld = list.postIds.firstOrNull()?.let(posts::get)?.createdAt
+        val oldest = fresh.lastOrNull()?.createdAt
+        // With no next page, the page is the whole feed; otherwise it covers its own time span only.
+        val covers = { id: UUID -> page.next == null || (oldest != null && posts[id]?.createdAt?.isBefore(oldest) == false) }
+        for (id in (list.postIds + list.waitingIds)) if (id !in inPage && covers(id)) {
+            list.removeId(id)
+            gone += id
+        }
+        for (view in fresh) {
+            val held = list.holds(view.id)
+            posts[view.id] = if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null)
+            if (held) continue
+            if (newestHeld == null || view.createdAt.isAfter(newestHeld)) {
+                insertWaiting(list, view.id)
+                if (!view.mine && viewing != list.kind) unread[list.kind] = true
+            } else {
+                insertByDate(list, view.id)
+                list.loadedWith[view.id] = null
+            }
+        }
+        val oldestHeld = list.postIds.lastOrNull()?.let(posts::get)?.createdAt
+        if (page.next == null) {
+            list.next = null
+            list.hasMore = false
+        } else if (oldest == null || oldestHeld == null || !oldestHeld.isBefore(oldest)) {
+            // The held list ends within the page: the page's cursor is the one to go on with.
+            list.next = page.next
+            list.hasMore = true
+        }
+        list.loaded = true
+    }
+
+    private fun mergeThreadPage(thread: ThreadState, replies: List<PostView>, next: String?) {
+        val fresh = replies.filter { it.threadId == thread.id && it.id !in gone }
+        if (!thread.loaded) {
+            thread.replyIds.clear()
+            for (reply in fresh) if (reply.id !in thread.replyIds) {
+                posts[reply.id] = reply
+                thread.replyIds += reply.id
+            }
+            thread.next = next
+            thread.hasMore = next != null
+            thread.loaded = true
+            return
+        }
+        val inPage = fresh.mapTo(HashSet()) { it.id }
+        val newest = fresh.lastOrNull()?.createdAt
+        val covers = { id: UUID -> next == null || (newest != null && posts[id]?.createdAt?.isAfter(newest) == false) }
+        thread.replyIds.removeAll { id -> (id !in inPage && covers(id)).also { if (it) gone += id } }
+        for (reply in fresh) {
+            posts[reply.id] = reply
+            if (reply.id in thread.replyIds) continue
+            var i = thread.replyIds.size
+            while (i > 0 && posts[thread.replyIds[i - 1]]?.createdAt?.isAfter(reply.createdAt) == true) i--
+            thread.replyIds.add(i, reply.id)
+        }
+        val newestHeld = thread.replyIds.lastOrNull()?.let(posts::get)?.createdAt
+        if (next == null) {
+            thread.next = null
+            thread.hasMore = false
+        } else if (newest == null || newestHeld == null || !newestHeld.isAfter(newest)) {
+            thread.next = next
+            thread.hasMore = true
+        }
+    }
+
+    private fun livePost(view: PostView) {
+        val list = feed(view.feed)
+        val held = list.holds(view.id)
+        if (held) {
+            posts[view.id] = if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null)
+            return
+        }
+        if (list.loaded) {
+            posts[view.id] = view.copy(pinnedAt = null)
+            insertWaiting(list, view.id)
+        }
+        if (!view.mine && viewing != view.feed) unread[view.feed] = true
+    }
+
+    private fun liveReply(view: PostView) {
+        val threadId = view.threadId ?: return
+        val thread = threads[threadId]
+        val held = thread?.replyIds?.contains(view.id) == true
+        if (held) {
+            posts[view.id] = view
+        } else if (thread != null && thread.loaded && !thread.hasMore) {
+            posts[view.id] = view
+            thread.replyIds += view.id
+        }
+        if (!view.answersMe || view.mine || !raisedFor.add(view.id)) return
+        if (viewingThread == threadId) {
+            // The player is reading this thread: seen at once, nothing raised.
+            threadSeenSent = null
+            markThreadSeen(threadId)
+            return
+        }
+        // As the site counts it (feed-mod.md 3): on what the reply answers when that is the player's, and on the
+        // thread's main post when that is the player's; never on someone else's post.
+        val answered = view.replyTo?.id ?: threadId
+        raiseMarker(answered)
+        if (answered != threadId) raiseMarker(threadId)
+    }
+
+    private fun raiseMarker(id: UUID) {
+        val post = posts[id] ?: return
+        if (post.mine) posts[id] = post.copy(unseenReplies = post.unseenReplies + 1)
+    }
+
+    private fun markThreadSeen(threadId: UUID) {
+        if (threadSeenSent == threadId) return
+        threadSeenSent = threadId
+        for ((id, post) in posts.entries.toList()) {
+            if ((id == threadId || post.threadId == threadId) && post.unseenReplies != 0) posts[id] = post.copy(unseenReplies = 0)
+        }
+        if (state?.linked == true) send(SeenThreadPayload(threadId))
+        changed()
+    }
+
+    private fun insertWaiting(list: FeedList, id: UUID) {
+        if (id in list.waitingIds) return
+        val at = posts[id]?.createdAt ?: return
+        var i = 0
+        while (i < list.waitingIds.size && posts[list.waitingIds[i]]?.createdAt?.isAfter(at) == true) i++
+        list.waitingIds.add(i, id)
+        while (list.waitingIds.size > MAX_FEED) list.waitingIds.removeAt(list.waitingIds.size - 1)
+    }
+
+    /** Puts [id] in [list]'s posts at its date, unless its date lies past what is loaded (a later page has it). */
+    private fun insertByDate(list: FeedList, id: UUID) {
+        if (id in list.postIds) return
+        val at = posts[id]?.createdAt ?: return
+        var i = 0
+        while (i < list.postIds.size && posts[list.postIds[i]]?.createdAt?.isAfter(at) != false) i++
+        if (i == list.postIds.size && list.hasMore && list.postIds.isNotEmpty()) return
+        list.postIds.add(i, id)
+    }
+
+    private fun pinGroup(): List<Pin> = feed(FeedKind.ANNOUNCEMENTS).pinnedIds.mapNotNull { id -> posts[id]?.pinnedAt?.let { Pin(id, it) } }
+
+    /** The whole pinned group, most recent pin first (a `pins` payload, a page, a pin's answer). */
+    private fun applyPinGroup(group: List<Pin>) {
+        val list = feed(FeedKind.ANNOUNCEMENTS)
+        val pinned = group.distinctBy { it.id }.sortedByDescending { it.pinnedAt }.take(Feed.MAX_PINS)
+        val ids = pinned.map { it.id }
+        for (id in list.pinnedIds.toList()) if (id !in ids) {
+            // Unpinned: back to its date order in the list.
+            list.pinnedIds.remove(id)
+            posts[id]?.let { posts[id] = it.copy(pinnedAt = null) }
+            insertByDate(list, id)
+        }
+        var unknown = false
+        list.pinnedIds.clear()
+        for (pin in pinned) {
+            val post = posts[pin.id]
+            if (post == null || post.feed != FeedKind.ANNOUNCEMENTS || post.isReply) {
+                unknown = true
+                continue
+            }
+            posts[pin.id] = post.copy(pinnedAt = pin.pinnedAt)
+            list.postIds.remove(pin.id)
+            list.waitingIds.remove(pin.id)
+            list.pinnedIds += pin.id
+        }
+        // A post pinned that the client doesn't hold: the first page brings it.
+        if (unknown && list.loaded) {
+            list.stale = true
+            list.reloadNotBefore = 0
+        }
+    }
+
+    private fun removePost(id: UUID) {
+        gone += id
+        for (list in feeds.values) list.removeId(id)
+        for (thread in threads.values) thread.replyIds.remove(id)
+        if (threads.containsKey(id)) threadGone(id)
+        pendingLikes.remove(id)
+        pendingPins.remove(id)
+        highlights.remove(id)
+        posts.remove(id)
+    }
+
+    private fun threadGone(threadId: UUID) {
+        val thread = threads[threadId] ?: return
+        thread.deleted = true
+        thread.loadingFirst = false
+        thread.loadingMore = false
+        thread.replyIds.clear()
+        gone += threadId
+        for (list in feeds.values) list.removeId(threadId)
+        posts.remove(threadId)
+    }
+
+    private fun likeAnswered(request: PendingRequest.Like, payload: ResultPayload) {
+        val pending = pendingLikes[request.postId] ?: return
+        val latest = pending.latest == payload.requestId
+        if (payload.outcome == Outcome.OK) {
+            val liked = payload.liked ?: return
+            val likes = payload.likes ?: return
+            pending.confirmedLiked = liked
+            pending.confirmedLikes = likes
+            if (latest) {
+                pendingLikes.remove(request.postId)
+                posts[request.postId]?.let { posts[request.postId] = it.copy(liked = liked, likes = likes) }
+            }
+            return
+        }
+        // Only the last click decides: an earlier one that failed is overtaken by it.
+        if (!latest) return
+        pendingLikes.remove(request.postId)
+        posts[request.postId]?.let { posts[request.postId] = it.copy(liked = pending.confirmedLiked, likes = pending.confirmedLikes) }
+        if (payload.outcome == Outcome.NOT_FOUND) {
+            removePost(request.postId)
+            collect()
+        } else {
+            notice = actionNotice(payload)
+        }
+    }
+
+    private fun postAnswered(payload: ResultPayload) {
+        val draft = compose
+        draft.sending = false
+        val post = payload.post
+        if (payload.outcome != Outcome.OK || post == null) {
+            draft.outcome = draftFailure(payload)
+            return
+        }
+        draft.clear()
+        draft.outcome = DraftOutcome.Sent(post)
+        if (post.id in gone || post.isReply) return
+        val list = feed(post.feed)
+        posts[post.id] = post.copy(pinnedAt = null)
+        if (!list.loaded) return
+        // Always at its place, scrolled into view (art direction 9.5): the posts waiting before it come along.
+        list.waitingIds.remove(post.id)
+        releaseWaiting(post.feed)
+        if (!list.holds(post.id)) list.postIds.add(0, post.id)
+        highlights += post.id
+        reveals[post.feed] = post.id
+    }
+
+    private fun replyAnswered(request: PendingRequest.CreateReply, payload: ResultPayload) {
+        val draft = replyDrafts[request.threadId]
+        draft?.sending = false
+        val reply = payload.post
+        if (payload.outcome == Outcome.NOT_FOUND) {
+            draft?.outcome = DraftOutcome.ThreadGone
+            removePost(request.threadId)
+            collect()
+            return
+        }
+        if (payload.outcome != Outcome.OK || reply == null) {
+            draft?.outcome = draftFailure(payload)
+            return
+        }
+        draft?.clear()
+        draft?.outcome = DraftOutcome.Sent(reply)
+        if (reply.id in gone || reply.threadId != request.threadId) return
+        val thread = threads[request.threadId] ?: return
+        posts[reply.id] = reply
+        if (thread.loaded && !thread.hasMore && reply.id !in thread.replyIds) thread.replyIds += reply.id
+        if (reply.id in thread.replyIds) {
+            highlights += reply.id
+            threadReveals[thread.id] = reply.id
+        }
+    }
+
+    private fun pinAnswered(request: PendingRequest.Pin, payload: ResultPayload) {
+        val before = pendingPins.remove(request.postId)
+        if (payload.outcome == Outcome.OK) {
+            payload.pinned?.let(::applyPinGroup)
+            notice = FeedNotice.PinDone(request.pinned)
+            return
+        }
+        before?.let(::applyPinGroup)
+        notice = if (payload.outcome == Outcome.PIN_LIMIT) FeedNotice.PinLimit(request.postId) else actionNotice(payload)
+    }
+
+    private fun deleteAnswered(request: PendingRequest.Delete, payload: ResultPayload) {
+        deleting -= request.postId
+        if (payload.outcome == Outcome.OK || payload.outcome == Outcome.NOT_FOUND) {
+            val reply = posts[request.postId]?.isReply == true
+            removePost(request.postId)
+            collect()
+            if (payload.outcome == Outcome.OK) notice = FeedNotice.Deleted(request.postId, reply)
+        } else {
+            notice = actionNotice(payload)
+        }
+    }
+
+    /** What a refused like, pin or delete says (`docs/feed-app.md` 5.3). */
+    private fun actionNotice(payload: ResultPayload): FeedNotice = when (payload.outcome) {
+        Outcome.RATE_LIMITED -> FeedNotice.TooFast(payload.retryAfter?.coerceIn(1, 3600) ?: 1)
+        Outcome.NOT_LINKED -> FeedNotice.Refused(WriteBlock.GUEST)
+        Outcome.BANNED -> FeedNotice.Refused(WriteBlock.BANNED)
+        else -> FeedNotice.ActionFailed
+    }
+
+    /** What a refused draft says: the draft stays, with its key. */
+    private fun draftFailure(payload: ResultPayload): DraftOutcome = when (payload.outcome) {
+        Outcome.RATE_LIMITED -> DraftOutcome.TooFast(payload.retryAfter?.coerceIn(1, 3600) ?: 1)
+        Outcome.NOT_LINKED -> DraftOutcome.Refused(WriteBlock.GUEST)
+        Outcome.BANNED -> DraftOutcome.Refused(WriteBlock.BANNED)
+        else -> DraftOutcome.SendFailed
+    }
+
+    /** A list the player isn't looking at keeps its newest [MAX_FEED] posts; the older ones load again on scroll. */
+    private fun trimFeed(list: FeedList) {
+        if (list.postIds.size <= MAX_FEED) return
+        val kept = list.postIds.subList(0, MAX_FEED).toList()
+        val dropped = list.postIds.subList(MAX_FEED, list.postIds.size).toList()
+        list.postIds.clear()
+        list.postIds += kept
+        dropped.forEach { list.loadedWith.remove(it) }
+        // The page of the oldest kept post is asked again; what is still held is skipped.
+        list.next = list.loadedWith[kept.last()]
+        list.hasMore = true
+        list.moreFailed = false
+        collect()
+        changed()
+    }
+
+    private fun trimThreads() {
+        while (threads.size > MAX_THREADS) {
+            val eldest = threads.keys.firstOrNull { it != viewingThread } ?: return
+            threads.remove(eldest)
+        }
+        collect()
+    }
+
+    /** Drops the views no list or thread refers to any more. */
+    private fun collect() {
+        val kept = HashSet<UUID>()
+        for (list in feeds.values) list.allIds().forEach { kept += it }
+        for (thread in threads.values) {
+            kept += thread.id
+            kept += thread.replyIds
+        }
+        posts.keys.retainAll(kept)
+    }
+
+    /** A like shown before the server answered: what to put back if the last click fails. */
+    private class PendingLike(var confirmedLiked: Boolean, var confirmedLikes: Int) {
+        var latest = 0
+    }
+
+    /** A set that forgets its oldest entries past [max]. */
+    private class BoundedSet(private val max: Int) {
+        private val items = LinkedHashSet<UUID>()
+
+        fun add(id: UUID): Boolean {
+            val added = items.add(id)
+            while (items.size > max) items.remove(items.first())
+            return added
+        }
+
+        operator fun plusAssign(id: UUID) {
+            add(id)
+        }
+
+        operator fun contains(id: UUID) = id in items
+
+        fun clear() = items.clear()
+    }
+
+    companion object {
+        /** Posts per feed when it isn't shown (`docs/feed-app.md` 8); also the most posts waiting behind the pill. */
+        const val MAX_FEED = 200
+
+        const val MAX_THREADS = 16
+        const val MAX_REPLY_DRAFTS = 20
+
+        /** The longest draft: past 280, so the counter can show how far over the text went (art direction 8.7). */
+        const val MAX_DRAFT = 1000
+
+        /** About 15 seconds between automatic `open`s while the connection is lost (art direction 9.12). */
+        const val AUTO_RETRY_TICKS = 300
+
+        /** How long the error block's Retry waits for `open`'s answer. */
+        const val RETRY_TIMEOUT_TICKS = 300
+
+        /**
+         * `seen_feed` at most once every 2 seconds, and only when what is shown changed: the server drops seen marks
+         * past a burst of 3, then one every 2 seconds (`docs/feed-app.md` 4.3).
+         */
+        const val SEEN_EVERY_TICKS = 40
+
+        /**
+         * A read the server refused as too frequent (`RATE_LIMITED`) is asked again after this: pages carry no
+         * `retryAfter`, and the server's own limit lets one read through a second.
+         */
+        const val READ_RETRY_TICKS = 40
+
+        private const val GONE_REMEMBERED = 1024
+    }
+}

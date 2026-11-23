@@ -11,39 +11,34 @@ import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
 
 /**
  * Where the server's payloads land on the client, on the client thread (`FeedNetwork` names these in its lambdas, so
- * this class loads only when a payload arrives, never on a dedicated server).
- *
- * Nothing is kept yet: the client's state, `FeedSession` (`docs/feed-app.md` 8), comes with the screens, and each
- * function here then hands its payload to it. The client sends its requests with
- * `PacketDistributor.sendToServer(...)`: `OpenPayload` when the root screen is shown, `LoadFeedPayload` and
- * `LoadThreadPayload` for what is missing or stale, the writes with a request ID it matches in [onPage], [onThread]
- * and [onResult].
+ * this class loads only when a payload arrives, never on a dedicated server). Each goes to the client's state,
+ * [FeedClient.session], which the screens read.
  */
 object FeedClientPayloads {
     /** Availability and the player's state: rights, `me`, the tab dots (or the last state, while the site is away). */
-    fun onState(payload: StatePayload) = Unit
+    fun onState(payload: StatePayload) = FeedClient.session.onState(payload)
 
     /** A feed page, answering `load_feed` with the same request ID. */
-    fun onPage(payload: PagePayload) = Unit
+    fun onPage(payload: PagePayload) = FeedClient.session.onPage(payload)
 
     /** A thread page, answering `load_thread`. */
-    fun onThread(payload: ThreadPayload) = Unit
+    fun onThread(payload: ThreadPayload) = FeedClient.session.onThread(payload)
 
     /** A write's outcome. */
-    fun onResult(payload: ResultPayload) = Unit
+    fun onResult(payload: ResultPayload) = FeedClient.session.onResult(payload)
 
     /** New posts or replies, each this player's own view. */
-    fun onLive(payload: LivePayload) = Unit
+    fun onLive(payload: LivePayload) = FeedClient.session.onLive(payload.posts)
 
-    fun onRemoved(payload: RemovedPayload) = Unit
+    fun onRemoved(payload: RemovedPayload) = FeedClient.session.onRemoved(payload.items)
 
-    fun onCounts(payload: CountsPayload) = Unit
+    fun onCounts(payload: CountsPayload) = FeedClient.session.onCounts(payload.items)
 
-    fun onPins(payload: PinsPayload) = Unit
+    fun onPins(payload: PinsPayload) = FeedClient.session.onPins(payload.pinned)
 
     /** The server reconnected to the site: everything held is stale. */
-    fun onReset() = Unit
+    fun onReset() = FeedClient.session.onReset()
 
     /** The player left the server. */
-    fun clear() = Unit
+    fun clear() = FeedClient.session.clear()
 }
