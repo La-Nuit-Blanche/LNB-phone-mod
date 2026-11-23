@@ -28,7 +28,8 @@ jobs:
       # public repository, as lnb-economy's CI does. Without it the build fails here (settings.gradle.kts).
       # Pinned to the commit Feed is built and tested against (Warden 0.5.0), so that a change to Warden can't silently
       # change what Feed is checked against. To move it: build Warden at the new commit, put its jar in apps/feed/libs,
-      # check Feed with ./gradlew build, then set ref below to that commit's full hash (and lnbwarden_version_range in
+      # check Feed with ./gradlew build, then set ref below to that commit's full hash, and the commit in the
+      # `git checkout` lines of README.md and apps/feed/README.md (and lnbwarden_version_range in
       # apps/feed/gradle.properties if Feed now needs the newer Warden).
       - name: Checkout LNB Warden
         uses: actions/checkout@v4
