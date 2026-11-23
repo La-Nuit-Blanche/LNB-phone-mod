@@ -327,9 +327,13 @@ What the list screen shows:
   home, so no screen built in the old language is seen again. What you keep outside your screens (drafts, scroll
   positions) stays.
 - **Hooks.** `KitScreen` keeps `AppScreen`'s drawing and input methods for itself. You override `onScreenShown`,
-  `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves
-  the phone for good, it is where you stop what the screen started (a listener, a request). Here the rows are rebuilt
-  each time the screen shows, so a player who joined meanwhile is there on the way back.
+  `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves the
+  phone for good, it is where you stop what the screen started (a listener, a request). `onClosed` never comes for a
+  screen that threw, nor for one built for a stack that never opened (another screen of it failed while being created).
+  An app that keeps something running for as long as its screens are open asks `isOnPhone` instead: true from the moment
+  the phone has the screen, under another screen or with the phone put away included, and false for good once it closed
+  or threw (from phone 0.2.0; Feed's session does this). Here the rows are rebuilt each time the screen shows, so a
+  player who joined meanwhile is there on the way back.
 - **Kept state.** The list's position is a `ScrollState` from `PingSession` (step 6): coming back to Ping later, the
   list is where the player left it.
 - **Draw it yourself.** When the kit has no widget for something, extend `Widget` (or `Clickable` for something that
