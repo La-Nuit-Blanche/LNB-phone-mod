@@ -1,0 +1,141 @@
+package fr.bde_teknantes.lnb.phone.client
+
+import fr.bde_teknantes.lnb.phone.LnbPhone
+import fr.bde_teknantes.lnb.phone.client.apps.AppRegistration
+import fr.bde_teknantes.lnb.phone.client.apps.AppRegistry
+import fr.bde_teknantes.lnb.phone.client.apps.LanguageWatch
+import fr.bde_teknantes.lnb.phone.client.apps.PhoneNavigator
+import fr.bde_teknantes.lnb.phone.client.icons.AppIconTextures
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotificationHandler
+import fr.bde_teknantes.lnb.phone.client.notifications.ClientNotifications
+import fr.bde_teknantes.lnb.phone.api.client.RegisterPhoneAppsEvent
+import fr.bde_teknantes.lnb.phone.client.settings.PhoneSettingsStore
+import fr.bde_teknantes.lnb.phone.client.settings.SettingsApp
+import fr.bde_teknantes.lnb.phone.client.shell.BadgeSource
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneBadges
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneInventoryButton
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneKeys
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneScreen
+import fr.bde_teknantes.lnb.phone.client.shell.PhoneShell
+import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.PlayerSkins
+import fr.bde_teknantes.lnb.phone.client.smooth.SmoothCanvas
+import fr.bde_teknantes.lnb.phone.client.smooth.SmoothResources
+import fr.bde_teknantes.lnb.phone.client.ui.SmoothTextures
+import fr.bde_teknantes.lnb.phone.client.smooth.SmoothShader
+import fr.bde_teknantes.lnb.phone.notifications.PhoneNotification
+import net.minecraft.client.Minecraft
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener
+import net.neoforged.bus.api.IEventBus
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent
+import net.neoforged.fml.loading.FMLPaths
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
+import net.neoforged.neoforge.client.event.ClientTickEvent
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
+import net.neoforged.neoforge.client.event.RegisterShadersEvent
+import net.neoforged.neoforge.client.event.RenderFrameEvent
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers
+import net.neoforged.neoforge.common.NeoForge
+
+/** Client-only listeners and state. Loaded only on the physical client. */
+object LnbPhoneClient {
+    /** The apps on the phone, complete once client setup is over. */
+    internal val apps = AppRegistry()
+
+    /** What the phone shows. Lives as long as the game: the phone reopens where it was left, until disconnection. */
+    internal val navigator = PhoneNavigator(apps) { Minecraft.getInstance().isSameThread }
+
+    // Sends the open app home when the language changes, so no screen shows the old one.
+    private val languageWatch = LanguageWatch(navigator)
+
+    /** The player's notifications, mirrored from the server: badges, LED, inventory button. */
+    internal val notifications = ClientNotifications { apps[it] != null }
+
+    /** The phone settings of the player on this computer: placement, sounds, notification preview. */
+    internal val settings = PhoneSettingsStore(FMLPaths.CONFIGDIR.get().resolve("lnbphone-client.json")) {
+        Minecraft.getInstance().user.profileId.toString()
+    }
+
+    // Takes the mod bus because client setup (key mappings, screens) is registered there, not on NeoForge's bus.
+    fun init(modBus: IEventBus) {
+        modBus.addListener(::onClientSetup)
+        // The phone's own app, on the phone's bus like any mod's apps.
+        modBus.addListener(RegisterPhoneAppsEvent::class.java, SettingsApp::register)
+        modBus.addListener(RegisterKeyMappingsEvent::class.java, PhoneKeys::register)
+        modBus.addListener(RegisterClientReloadListenersEvent::class.java) {
+            // The smooth layer's fonts and atlas, and the composed app icons, come from resources: drop them when
+            // resource packs change.
+            it.registerReloadListener(SmoothResources)
+            it.registerReloadListener(AppIconTextures)
+            // Which densities of the kit's icons exist may change with resource packs.
+            it.registerReloadListener(SmoothTextures)
+            // A new language is applied by a reload: screens built in the old one go.
+            it.registerReloadListener(ResourceManagerReloadListener { languageWatch.loaded(Minecraft.getInstance().languageManager.selected) })
+        }
+        modBus.addListener(RegisterShadersEvent::class.java, SmoothShader::register)
+        modBus.addListener(RegisterGuiLayersEvent::class.java) { event ->
+            // NeoForge hides only vanilla's layers with the HUD (F1): the phone's own check hideGui themselves.
+            // The phone while it slides, over the whole HUD; once it stands open, its screen draws it.
+            event.registerAboveAll(ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "phone")) { graphics, _ ->
+                val mc = Minecraft.getInstance()
+                if (!mc.options.hideGui && mc.screen !is PhoneScreen) PhoneShell.render(graphics, false, 0.0, 0.0)
+            }
+            // The peek of the closed phone, under the hotbar, hearts and food (art direction 10.2)...
+            event.registerBelow(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek")) { graphics, _ ->
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekDevice(graphics)
+            }
+            // ...and its banner above the chat, which would cover it; it never reaches the hotbar or the food row.
+            event.registerAbove(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "peek_banner")) { graphics, _ ->
+                if (!Minecraft.getInstance().options.hideGui) PhoneShell.renderPeekBanner(graphics)
+            }
+        }
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) {
+            PhoneSounds.tick()
+            PhoneKeys.discardClicks()
+            PhoneShell.tick()
+        }
+        NeoForge.EVENT_BUS.addListener(RenderFrameEvent.Pre::class.java) { PhoneShell.frame() }
+        // A canvas whose end() an exception skipped must not clip the next frame to the phone's viewport.
+        NeoForge.EVENT_BUS.addListener(RenderFrameEvent.Post::class.java) { SmoothCanvas.endAbandoned() }
+        NeoForge.EVENT_BUS.addListener(PhoneKeys::onKey)
+        NeoForge.EVENT_BUS.addListener(PhoneKeys::onMouseButton)
+        NeoForge.EVENT_BUS.addListener(RenderGuiLayerEvent.Pre::class.java) { event ->
+            // Other screens hide the crosshair under their dark background; the phone keeps the world clear, so it
+            // hides it itself while the cursor is free.
+            if (event.name == VanillaGuiLayers.CROSSHAIR && Minecraft.getInstance().screen is PhoneScreen) event.isCanceled = true
+        }
+        NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onInit)
+        NeoForge.EVENT_BUS.addListener(PhoneInventoryButton::onRender)
+        navigator.addListener(ClientNotificationHandler)
+        // The notifications drive the home badges, the LED and the inventory button, and what arrives while the player
+        // plays shows as a banner or a peek.
+        PhoneBadges.source = BadgeSource(notifications::unreadCount)
+        notifications.addListener(object : ClientNotifications.Listener {
+            override fun onArrived(notification: PhoneNotification) = PhoneShell.notificationArrived(notification)
+
+            override fun onChanged() = PhoneShell.notificationsChanged()
+        })
+        PhoneShell.init()
+    }
+
+    private fun onClientSetup(event: FMLClientSetupEvent) {
+        // Queued to the main thread after the parallel setup: apps register one mod after the other, in a fixed order.
+        event.enqueueWork { AppRegistration.fire(apps) }
+    }
+
+    private fun onLoggingOut(event: ClientPlayerNetworkEvent.LoggingOut) {
+        // The phone keeps its screens until the player disconnects (art direction 2.3); the notifications belong to
+        // the server just left. execute runs at once on the client thread, and queues there from any other.
+        Minecraft.getInstance().execute {
+            navigator.reset()
+            notifications.reset()
+            PhoneShell.reset()
+            PlayerSkins.clear()
+        }
+    }
+}

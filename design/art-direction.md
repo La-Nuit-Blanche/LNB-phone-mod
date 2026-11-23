@@ -1,32 +1,40 @@
 # LNB Phone: art direction
 
-Version 4. The user validates a storyboard canvas built from this document before any code is written; developers then build from it. Every value here is final unless the user changes it.
+Version 5. The user validated a storyboard canvas built from version 4, and ten development tasks then built the phone from it. Along the way developers and reviewers found passages that were wrong, contradicted each other, said nothing or could not be built as written, and decisions were made. Version 5 brings the document in line with what was built; where the two differ, the code is right. The Feed app (section 9) is not built yet and will be built from this document. Every value here is final unless the user changes it.
 
-## Changes since version 3
+## Changes since version 4
 
-- **Names swapped.** The bold name on a post is the player's real name from LNB Warden; the grey handle is `@` + the Minecraft username. Without a real name, the username is the bold name and there is no handle. The post header is now two lines (name line, handle line) so a long real name and a 16-character handle both fit (9.3).
-- **Pinning:** announcers and operators get a pin button in the action row of announcements; the operator command stays. Limit 3 pinned posts, with a confirmation when a 4th would replace the oldest (9.4).
-- **Deleting:** players can delete their own posts and replies; operators can delete any. Through a "more" menu and a confirmation dialog (9.9).
-- **Language rule:** English is the default; French for players whose game is in French (`fr_*`). Mockups stay in French (13.1).
-- **New section 17: interaction flows**, one numbered frame per step, for the storyboard canvas.
-- New kit components and states for the flows: danger button, button loading state, menu, dialog, tooltip, error snackbar, post highlight, over-limit highlight in the text area, "more" button, pin button (8.7).
-- Navigation rules made explicit: Esc closes the topmost menu or dialog, otherwise the phone; a click outside the device closes the phone; the phone reopens on the screen it was closed on (2.3).
-- Notification banner: the time is dropped (a banner is always "now"), the title names the event (`Nouvelle annonce`, `Nouvelle réponse`) and the text starts with the author's name (10.1).
-- Own anonymous posts show the author a private line "Publié anonymement par toi"; own posts with unseen replies show an accent marker on the reply count (9.3).
-- Feed error state renamed "Feed indisponible" (the problem is the Feed service, not the Minecraft server). New-post arrival specified for both feeds and for a list scrolled to the top (9.5).
-- Proofreading fixes: the stale "no mockup planned" line, stale cross-references, leftovers from the old name order, "unchanged" labels.
-- Sections from 17 on: 17 Interaction flows, 18 Mockup brief, 19 Open questions and assumptions.
+- **Rendering.** Shapes are computed at the screen's real resolution instead of coming from sprites (8.1, 16.2). Icons are exported at one density per GUI scale, now scales 2 to 9 (8.1, 16.2). The `person` icon exists at 12, 20 and 28 dp, one per avatar size (8.6, 16.2). App names are truncated when drawn instead of capped at 16 characters (7.2, 13.3).
+- **GUI scales 2 and up.** The phone supports every integer GUI scale from 2, not only 2 to 4: Minecraft's Auto picks 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K (Units, 8.1, 16.2). Scale 1 stays unsupported for apps; there, also no notification banner and no peek (the chime and the badge only), and Backspace goes home (8.1, 10.2, 2.3, P-15).
+- **Pixel rules at every scale.** Layout arithmetic of the shell rounds halves to even, the only rule that reproduces the positions of P-3.2 and P-12.4 (2.4, 14). A 1 dp hairline is 2 real pixels at GUI scale 3 and the 3 dp tab indicator is 4 pixels tall there (8.1, 8.7).
+- **Corner phone and hotbar.** The bottom-right phone overlaps the hotbar in any window narrower than about 474 GUI px, which includes the default 854 x 480 window at GUI scale 2. Accepted as it is (2.4).
+- **Keys.** The phone reacts once per real key press, never to key repeats; inside the phone, Esc, the phone key and Backspace act on the first press only, while a focused text field still receives repeats. While a text field has the focus the phone key and Backspace don't close or go back, and typed keys never leave the phone (2.3).
+- **Opening.** The device slides over the HUD for 250 ms and the screen opens when the slide ends; the player can still move during the slide. Another screen opening during the rise sends the phone back down. The crosshair is hidden while the phone is open, and F1 hides the sliding device (2.3, 14, P-1, P-2).
+- **Home pages.** The mouse wheel turns one page per whole notch (2.3).
+- **Inventory button.** With unread notifications the button opens the home screen only if the phone was put away on home or on an app's root screen; deeper in an app it reopens on that screen and shows the newest unread notification as the in-phone banner. This settles a contradiction with 2.3 (the phone keeps its screens and drafts until disconnect) in favour of drafts. Opening the phone closes the inventory properly (crafting grid and cursor items go back) and a fresh inventory opens when the phone closes. With the recipe book open the book covers most of the button: the covered part neither lights up nor takes a click, and the badge sits under the book. No button on the creative inventory (11, P-4, P-5, 19).
+- **Peek and banner.** The peek is two layers: the device stays below the hotbar, the banner is drawn above chat lines; F1 hides the peek and the sliding phone. No peek while another screen is open (chat, a container, the pause menu, the death screen): chime only, the badge waits; a screen opening during a peek sends it down. Several notifications at once: the last one shows and the chime plays once. A pressed banner freezes until released; a banner or peek whose notification the server clears goes away early; clicking the banner removes it at once (10.2, 10.3, 6.1).
+- **Read in place.** A notification whose target is already on screen gives no banner, the chime plays, and it counts as read. Reopening the phone onto an app left open keeps that app's badge, except for notifications the shown screen reports as visible, which are read in place. Notifications received while offline show as badges at login, with no peek and no chime (10.2, 10.3, 6.1).
+- **Banner text.** Each run of characters the fonts lack becomes one `?`, and emoji the emoji font lacks are dropped; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
+- **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
+- **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
+- **Text and keys in apps.** The 280-character limit counts code points after NFC normalisation (an accented letter is 1, an emoji 1, a flag 2); the counter and the Publier button use the same untrimmed count and the text is sent trimmed. Enter makes a new line in a text area and Ctrl+Enter submits; Backspace does nothing while a menu or dialog is open; Tab cycles a menu's or dialog's items; a menu that fits neither below nor above its button covers it; a double click selects a word; selected text has the new `selection` colour `#3A8DF066` (8.3, 8.7, 9.7, 9.8, 2.3).
+- **Feed details.** A 17-character handle does not always fit its line: `@` plus sixteen `W` is about 205 dp, wider than the 188 dp column, so the handle line truncates too (9.2, 9.3, 19). `heart_filled` is drawn filled and stroked so that it keeps the outline heart's size (8.6). Avatars: a face is resolved from the player's UUID and name, and the default skin shows until it is known and for players the session service does not know (8.7, 9.2).
+- **App glyphs and fonts.** A glyph that is not 16 x 16 is fitted: a square multiple of 16 is sampled down, a 16-wide strip shows its first frame, anything else shows the bare tile (7.2). Inter has no non-Latin glyphs: such characters show one missing-glyph box per grapheme in apps (8.4, 19).
+- **Emoji.** Emoji show in apps and in the banner, from a bundled single-colour emoji font (Noto Emoji, SIL OFL), drawn in the text's colour at the text's size and weight. Skin tones, joined sequences, flags and keycaps are composed when the font has them, and degrade to the base emoji or its parts otherwise; the caret, wrapping and truncation never split one. This settles the open question of version 5 (8.4, 10.1, 16.2, 19).
+- **Settings.** Section 12 places the rows 49 dp apart with separate dividers at `y 193` and `y 242`, and 8.7 says where a row's own divider sits. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer (2.4, 8.7, 12).
+- **Language.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch`; everything else gets English (13.1).
 
 ## History
 
+- **Version 4:** names swapped (bold real name, grey `@username` handle, two-line post header); pinning (3 at most) and deleting (own posts and replies, operators any); the language rule (English by default, French for French game languages, mockups in French); interaction flows in a new section 17, with the mockup brief and the open questions moved to 18 and 19; the kit components and states they need (danger button, loading button, menu, dialog, tooltip, error snackbar, post highlight, over-limit highlight, more and pin buttons); explicit navigation rules (Esc closes the topmost menu or dialog, otherwise the phone; a click outside closes it; the phone reopens where it was); the banner without a time and with an event title; private lines on own anonymous posts and the unseen-replies marker; the "Feed indisponible" state and new-post arrival in both feeds; proofreading fixes.
 - **Version 3:** Annonces / Global tabs with Annonces first; fixed 48 dp tab indicator; French and English string table; identity from LNB Warden; operator line on anonymous posts; like and reply confirmed; thread screen; announcers and the announcer badge.
 - **Version 2:** one look (Slate); pixel shell with a smooth app layer in dp; the Feed app; smooth notification banner; status bar matches the app background inside apps; moon moved; bottom-right placement by default with a Settings switch.
 - **Version 1:** three variants of the phone; the user chose C "Slate".
 
 ## Units and coordinates
 
-- **GUI px**: the unit Minecraft multiplies by the GUI scale (2x to 4x). Used for the pixel shell.
-- **dp**: the unit of the smooth app layer. **2 dp = 1 GUI px.** At GUI scale 2, 3 and 4, 1 dp is 1, 1.5 and 2 real screen pixels.
+- **GUI px**: the unit Minecraft multiplies by the GUI scale (2x and up: Minecraft's Auto setting gives 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K). Used for the pixel shell.
+- **dp**: the unit of the smooth app layer. **2 dp = 1 GUI px.** At GUI scale `s`, 1 dp is `s / 2` real screen pixels: 1, 1.5 and 2 at scales 2, 3 and 4, 2.5 to 4.5 at scales 5 to 9.
 - Colours are sRGB hex. `#RRGGBBAA` is a colour with alpha.
 - **window** `(wx, wy)`: GUI px, origin at the top-left of the game window. `W`, `H` are the window size in GUI px.
 - **device-local** `(dx, dy)`: GUI px, origin at the top-left pixel of the 140x228 device.
@@ -148,26 +156,30 @@ R F F F F F F F F F F R
 
 States: hover: R becomes `accent`. Pressed: R `accent`, F `body-lo`.
 
-The open phone is a normal game screen: the mouse cursor is free and the player does not move while it is open.
+The open phone is a normal game screen: the mouse cursor is free and the player does not move while it is open. That starts when the slide up ends. During the 250 ms of the slide the device is drawn over the HUD, the game keeps the mouse, the player can still move, and the phone's screen opens when the slide ends. Closing gives the mouse back at once, and the player can move while the device slides down. Any other screen that opens during the rise (chat, the pause menu, a container, the death screen) sends the phone back down behind it. The crosshair is hidden while the phone is open, and F1 (hidden HUD) hides the sliding device.
+
+**Key presses.** The phone reacts once per real key press, never to key repeats: holding the phone key opens the phone once and, held again, closes it once. Inside the phone, Esc, the phone key and Backspace act on the first press only. While a text field has the focus, the phone key and Backspace belong to the field: they neither close the phone nor go back, a held Backspace erases character after character, and no typed key goes on to the game or to other mods' key handlers. A focused text field still receives key repeats.
 
 | Input | Action |
 |---|---|
-| Up arrow (phone closed) | Open the phone on the screen it was closed on (home on the first open of a session) |
+| Up arrow (phone closed) | Open the phone on the screen it was closed on (home on the first open of a session). One press, never its repeats |
 | Up arrow during a peek | Open the phone on the notification's target screen |
-| Up arrow (phone open, no text field focused) | Close the phone |
-| Esc | Close the topmost menu or dialog if one is open; otherwise close the phone. The current screen is kept for the next open |
+| Up arrow (phone open, no text field focused) | Close the phone (first press only) |
+| Esc | Close the topmost menu or dialog if one is open; otherwise close the phone (first press only). The current screen is kept for the next open |
 | Click outside the device | Close the phone, in both placements (in the centred placement, a click on the scrim). Clicks on the bezel do nothing, except on the home button |
 | Home button click | Go to the home screen (instant) |
-| Header back button, or Backspace when no text field has focus | Back one screen in the current app. On an app's root screen Backspace does nothing |
-| Mouse wheel on home | Change page |
+| Header back button, or Backspace when no text field has focus | Back one screen in the current app (Backspace: first press only). On an app's root screen Backspace does nothing, and it does nothing while a menu or dialog is open. At GUI scale 1, where no app screen shows, Backspace goes to the home screen |
+| Mouse wheel on home | One page per whole notch; the fractions a trackpad sends add up to a notch, and turning back starts the count over |
 | Mouse wheel in an app | Scroll 36 dp per notch |
 | Ctrl+Enter | Publish in Compose, send in the reply composer |
+| Enter | In a single-line field: submit it. In a text area: a new line |
+| Tab, Shift+Tab | Move the focus; while a menu or dialog is open it moves among that menu's items or that dialog's buttons only |
 
-The phone keeps its screen, scroll positions and drafts until the player disconnects.
+While it is put away the phone keeps its screen, scroll positions and drafts until the player disconnects. The inventory button can show the home screen instead (section 11), but only when that loses nothing: never from deeper than an app's root screen.
 
 ### 2.4 Placements
 
-Same device, same size, same sprites in both. **Default: bottom-right.** Each player can switch to centred in the built-in Settings app (section 12). The choice is per player and stored client-side.
+Same device, same size, same sprites in both. **Default: bottom-right.** Each player can switch to centred in the built-in Settings app (section 12). The choice is per Minecraft account and stored on the player's computer (section 12).
 
 | Placement | Device top-left | Backdrop |
 |---|---|---|
@@ -175,6 +187,10 @@ Same device, same size, same sprites in both. **Default: bottom-right.** Each pl
 | Centred | `wx = floor((W - 140) / 2)`, `wy = floor((H - 228) / 2)` | full-window flat scrim `#0000004D`, no menu blur |
 
 At the minimum window 320 x 240: bottom-right puts the device at `(174, 6)`, centred at `(90, 6)`. In a 480 x 270 window (1920 x 1080 at GUI scale 4): bottom-right `(334, 36)`, centred `(170, 21)`. The notification peek always comes from the bottom-right, whatever the placement.
+
+In the bottom-right placement the device overlaps the hotbar in any window narrower than about 474 GUI px: the hotbar is 182 wide and centred, so its right edge `W / 2 + 91` is past the device's left edge `W - 146` when `W < 474`. That includes Minecraft's default 854 x 480 window at GUI scale 2 (427 x 240). Accepted as it is: the device is drawn over the hotbar there.
+
+**Rounding.** Positions of the pixel shell are whole GUI px. Layout arithmetic that has to land on one (a device mid-slide or mid-glide, a peek mid-rise, the scrim's alpha) rounds a half to the even neighbour (0.5 to 0, 1.5 to 2, 38.5 to 38). It is the only rule that reproduces this document's own example values: the scrim half-way in P-3.2 is `#00000026` (38.5 of `4D`'s 77; rounding halves up would give `#00000027`) and the device half-way in P-12.4 is at `y 28` (28.5; half up gives 29). The smooth layer's own rule is different and is in 8.1.
 
 ### 2.5 Home spacing grid (pixel)
 
@@ -343,6 +359,8 @@ Position: 9 x 9 at `(icon.x + 14, icon.y - 3)`; 15 x 9 at `(icon.x + 8, icon.y -
 
 An app's badge counts its unseen notifications. **It clears when the app is opened**, by any route (home icon, banner, peek). The LED is lit while any app has a badge.
 
+Reopening the phone onto an app that was left open keeps that app's badge (the app was not opened again), except for notifications whose target the shown screen reports as visible (the thread a notification points to): those are read in place, as one arriving there would be (10.3). Notifications received while the player was offline show as badges at login and nothing else: no peek, no chime (10.2).
+
 ---
 
 ## 7. App icon system (pixel)
@@ -364,7 +382,8 @@ On a 20 x 20 canvas:
 - 16 x 16 PNG, hard pixels, no partial alpha. Main shape inside the 12 x 12 safe area `(2,2)..(13,13)`; tails and beaks may reach the edge.
 - At most 4 inks from the list below. Do not draw shadows.
 - An ItemStack may replace the glyph (16 x 16 at `(2,2)`, no auto-shade).
-- App names: at most 16 characters, in both languages.
+- App names: 16 characters or fewer recommended, in both languages. The limit is not enforced: a name too long for the label line (section 6) is truncated when drawn.
+- A glyph that is not 16 x 16 is fitted, with a warning in the log: a square multiple of 16 (32 x 32, 48 x 48) is sampled down with nearest-neighbour, a strip 16 wide and a multiple of 16 tall shows its first frame, anything else shows the bare tile.
 
 | Ink | Hex |
 |---|---|
@@ -502,13 +521,14 @@ Every app, built-in or third-party, draws inside the 256 x 370 dp viewport with 
 
 ### 8.1 Rendering rules
 
-- Anti-aliased shapes, real alpha, true rounded corners. Rounded rects, pills and circles come from tinted white mask sprites (section 16.2), never computed per frame.
+- Anti-aliased shapes, real alpha, true rounded corners. Rounded rects, pills, circles and their strokes are coverage masks the drawing surface computes at the screen's real resolution, once per size and cached, never per frame. (Changed after the rendering spike: pre-made sprites at 2 px per dp made 1 dp strokes soft at GUI scale 3.)
+- Text is Inter rasterised at the exact pixel size for the current GUI scale, with the font's kerning; widths in dp, and so line breaks, are the same at every scale.
 - **No blur, no backdrop effects.** Shadows only from the pre-baked soft sprites: FAB, and the "sheet" shadow under the banner, snackbar, menu and dialog. No other element has a shadow.
 - No gradients in the kit.
-- All smooth sprites are exported at **2 px per dp** (the GUI scale 4 resolution) and drawn with linear filtering, no mipmaps.
-- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. Hairlines are 1 dp, rounded to the nearest whole real pixel and never below 1 real pixel.
+- Icons and the spinner are exported at **eight densities, 1 to 4.5 px per dp in steps of 0.5**, one per GUI scale from 2 to 9, and drawn 1:1. Shadows are exported at 2 px per dp and drawn with linear filtering, no mipmaps.
+- Put rect edges on **even dp values** (whole GUI px), so they stay crisp at every scale. At an odd GUI scale (3, 5, 7, 9) 1 dp is a half-integer of pixels, and an edge on an odd dp value is rounded half up to a whole pixel, the same way at every position: the 3 dp tab indicator at `y 41..43` is 4 real pixels tall at GUI scale 3, not 4.5. A line is its thickness in dp times `s / 2` pixels, rounded half up and at least 1: a 1 dp hairline is 1, 2, 2, 3, 3, 4, 4 and 5 real pixels at GUI scales 2 to 9.
 - The app layer is clipped to the viewport. The shell then paints its 4 screen corner pixels over it, giving the bottom corners a 1 GUI px notch on purpose.
-- GUI scale 1 is not supported for apps (1 dp would be half a pixel). At GUI scale 1 the shell and home screen work, and an opened app's viewport shows only the bitmap-font line `Échelle GUI : 2+` (string `gui.scale`), centred horizontally and vertically, in `#96A0B0`, on `bg`.
+- **Every integer GUI scale from 2 up is supported** (Auto gives 5, 6 or 9 on large screens). GUI scale 1 is not supported for apps (1 dp would be half a pixel). At GUI scale 1 the shell and home screen work, and an opened app's viewport shows only the bitmap-font line `Échelle GUI : 2+` (string `gui.scale`), centred horizontally and vertically, in `#96A0B0`, on `bg`. There the phone also shows no notification banner and no peek (the chime plays and the badge waits, 10.2), and Backspace goes to the home screen, the only way back there (2.3).
 
 ### 8.2 The seam between pixel status bar and smooth app
 
@@ -553,10 +573,11 @@ Inside apps the pixel status bar is painted in `status-bg-app` = `#12151B`, exac
 | `anon-bg` | `#3A4250` | anonymous avatar disc |
 | `banner-edge` | `#FFFFFF0F` | 1 dp inner stroke of the banner |
 | `focus-ring` | `#3A8DF080` | keyboard focus ring |
+| `selection` | `#3A8DF066` | background behind selected text in a field or area |
 
 ### 8.4 Type
 
-Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter-Regular.ttf` (400) and `Inter-SemiBold.ttf` (600). No other font and no other weights in apps. Text is rasterised at the real pixel size of each GUI scale, never as an upscaled texture.
+Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter-Regular.ttf` (400) and `Inter-SemiBold.ttf` (600). No other text font and no other weights in apps; emoji come from the emoji font below. Text is rasterised at the real pixel size of each GUI scale, never as an upscaled texture.
 
 **Minimum text size: 11 dp** (11 real px at GUI scale 2).
 
@@ -573,6 +594,26 @@ Font: **Inter** (Rasmus Andersson, SIL Open Font License 1.1), bundled as `Inter
 
 Text is left-aligned, sentence case. Every fixed-width slot is sized for the longer of the French and English strings (section 13.3). Single-line slots truncate with an ellipsis character. Post text wraps on word boundaries and is never truncated in the timeline.
 
+**Emoji.** Emoji come from **Noto Emoji** (Google, SIL Open Font License 1.1, version 3.002, Unicode emoji up to 15.1), a single-colour font: an emoji is a glyph like a letter, drawn in the text's colour (`text-1` in a post, `text-2` in the banner text), never in its own colours. It is drawn at the text's size: an emoji is about 1 em tall (13 dp in `body`), from a little below the baseline to a little above the capitals, centred where the capitals have their middle, inside the line box of every style, so a line with emoji is as tall as one without. Its advance is 1.27 em (16.5 dp in `body`). The font is variable and is drawn at weight 400 next to Regular text and 600 next to SemiBold, so its strokes match the words around it.
+
+Which font draws a character is decided per grapheme (what a reader sees as one character), never per code point:
+- emoji that are emoji by default (😀, 🎉, flags) and anything Inter lacks that the emoji font has (☺, ✔) are emoji;
+- symbols both fonts have (`©` `®` `™`, `♥`, `❤`, `☀`, `⚠`, `‼`, the emoji arrows `↔` `↕` `↖` `↩` `⬆`) stay Inter's in running text and become emoji only with the emoji variation selector (`❤️`, as emoji keyboards send it); with the text selector they stay Inter's. Symbols the emoji font lacks (`★`, the plain arrows `←` `↑` `→` `↓`) stay Inter's even with the selector;
+- digits, `#` and `*` stay Inter's, even with the selector: they become emoji only as a keycap (`1️⃣`).
+
+Sequences are composed when the font has them, and otherwise degrade, never to a row of boxes:
+
+| Sequence | Composed | Otherwise |
+|---|---|---|
+| Skin tone (👍🏽) | the emoji; a single-colour font has no skin colours, so it is the base emoji | the tone is dropped, no swatch. A tone with nothing to modify, at the start of a text or of a line, shows as its swatch, as Unicode intends; after a letter or a space, which it joins, it draws nothing |
+| Joined with ZWJ (👨‍👩‍👧, ❤️‍🔥, 🏳️‍🌈) | one glyph | its emoji side by side (👨👩👧); a part the font lacks is left out |
+| Flag (🇫🇷), subdivision flag (🏴󠁧󠁢󠁥󠁮󠁧󠁿) | one glyph | an unknown pair shows its two letters; unknown tags leave the black flag |
+| Keycap (1️⃣) | one glyph | |
+
+The caret steps over a grapheme whole, Backspace deletes it whole, and wrapping and truncation never cut one. One limit departs from Unicode, which joins any number of emoji with ZWJ: a grapheme holds at most five emoji joined that way, so a pasted chain of a hundred unrelated emoji becomes groups of five that wrap like words instead of one line 1,600 dp wide; no real sequence has more than four (a family). The 280-character count is unchanged: code points after NFC, so `👍🏽` counts 2 and a flag 2 (8.7).
+
+**Characters no font has.** Inter covers Latin, Greek and Cyrillic and the emoji font covers emoji; there is no CJK, Arabic or other script. In apps such a character shows one missing-glyph box per grapheme (an emoji newer than the font, with its skin tone, is one box); the text itself is never altered. The notification banner differs: it drops emoji the emoji font lacks and shows one `?` per run of other characters (10.1).
+
 ### 8.5 Spacing and radius
 
 - Spacing scale (dp): **2, 4, 8, 12, 16, 24, 32**.
@@ -583,10 +624,10 @@ Text is left-aligned, sentence case. Every fixed-width slot is sized for the lon
 
 ### 8.6 Line icons
 
-- Grids: **12 dp** (only the filled megaphone in the announcer badge), **16 dp** (action row, pin, lock, more, trash, alert, arrows; stroke 1.5 dp), **20 dp** (header and row icons; stroke 2 dp), **24 dp** (FAB; stroke 2 dp), **40 dp** (empty states; stroke 2.5 dp).
+- Grids: **12 dp** (the filled megaphone in the announcer badge, `person` in a 16 dp avatar), **16 dp** (action row, pin, lock, more, trash, alert, arrows; stroke 1.5 dp), **20 dp** (header and row icons; stroke 2 dp), **24 dp** (FAB; stroke 2 dp), **28 dp** (`person` in a 48 dp avatar; stroke 2 dp), **40 dp** (empty states; stroke 2.5 dp). `person` is drawn at 12, 20 and 28 dp, so the anonymous avatar's icon is exported at the size it is drawn.
 - Live area: grid minus 2 dp on every side (20 dp icon draws inside 16 dp).
 - Round caps, round joins, 2 dp corner radius on drawn rectangles.
-- Outline style. Filled variants only for active states (`heart_filled`, `pin_filled`).
+- Outline style. Filled variants only for active states (`heart_filled`, `pin_filled`). `heart_filled` is drawn filled and stroked, so that it keeps the outline heart's size (in the mockup the heart shrank when liked).
 - Exported white on transparent and tinted at draw time: `text-1` by default, `text-2` in action rows and meta, `on-accent` on accent.
 
 Icon set: `back` (chevron left), `close` (X), `compose` (pen nib with a short line under it), `heart`, `heart_filled`, `reply` (rounded speech bubble), `pin`, `pin_filled`, `lock` (padlock, private lines), `more` (three horizontal dots), `trash` (bin), `alert` (circle with an exclamation mark), `arrow_up`, `person` (head circle and shoulders, for the anonymous avatar), `globe`, `megaphone`, `megaphone_filled` (12 dp solid silhouette, announcer badge), `inbox`.
@@ -616,7 +657,7 @@ All positions are relative to the component unless stated. Hover tints are drawn
 | Inactive | label `text-2` |
 | Hover (inactive) | label `text-1`, whole tab `overlay-hover` |
 | Pressed (inactive) | label `text-1`, whole tab `overlay-pressed` |
-| Active | label `text-1`; indicator 3 dp tall pill at `y 41..43`, `accent`, **fixed width 48 dp for every tab**, centred on the tab (not on the label): with 2 tabs, `x 40..87` under the left tab and `x 168..215` under the right tab. The indicator never depends on label length |
+| Active | label `text-1`; indicator 3 dp tall pill at `y 41..43` (4 real pixels tall at GUI scale 3, see 8.1), `accent`, **fixed width 48 dp for every tab**, centred on the tab (not on the label): with 2 tabs, `x 40..87` under the left tab and `x 168..215` under the right tab. The indicator never depends on label length |
 | Unread dot | 6 dp `accent` circle, 4 dp right of the label, vertically centred on it (rule in 9.6) |
 | Bottom hairline | 1 dp at `y 43`, under the indicator |
 | Switch | indicator slides to the new tab in 150 ms; content swaps at once |
@@ -663,8 +704,12 @@ Minimum width 64 dp for primary, danger and secondary. Buttons in fixed layouts 
 | Counter | `caption`, right-aligned at 12 dp from the right edge, line box 22 dp above the bottom edge; format `142/280` |
 | Counter colour | 0 to 260 characters `text-2`; 261 to 280 `warning`; over 280 `danger`, and the counter shows the excess as `-5` |
 | Over the limit | characters after the 280th get a `danger-soft` background behind each glyph run |
+| Counting | characters are Unicode code points of the text in normalisation form C: `é` is 1 however it was typed, an emoji is 1, a flag (two code points) is 2. The counter and the send button use the same **untrimmed** count, spaces and line breaks included, so they always agree; the text is sent trimmed. An app's server counts the same way (`TextLimits`) |
+| Keys | Enter makes a new line; Ctrl+Enter submits (in a single-line text field, Enter submits) |
 | Placeholder | `body` `text-3` |
 | Sending | text `text-2`, no caret, not editable, border `stroke` |
+
+In both kinds of field, selected text has a `selection` background, and a double click selects a word.
 
 **Toggle** (switch, 36 x 20 dp, full radius)
 
@@ -688,7 +733,7 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Two-line, 56 dp | leading 32 dp avatar or 20 dp icon centred in a 32 dp box at `(12, 12)`; title `body-strong` at `x 56`, line box `y 10`; subtitle `caption` `text-2` at `x 56`, line box `y 30` |
 | Trailing | toggle, chevron, or `caption` `text-2` meta, right-aligned at `x 244`, vertically centred |
 | Hover / pressed | `overlay-hover` / `overlay-pressed` over the whole row |
-| Divider | hairline at the row bottom, from `x 56` (with leading) or `x 12` (without) to `x 256` |
+| Divider | hairline at the row bottom, inside its height (the last dp of the 48 or 56), from `x 56` (with leading) or `x 12` (without) to `x 256`. A screen that wants its hairline between rows 49 dp apart turns this one off and places a separate divider, as Settings does (12) |
 
 **Divider**: 1 dp `hairline`. Full width between sections; inset to `x 56` between rows with a leading avatar or icon.
 
@@ -700,7 +745,8 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 |---|---|
 | Sizes | **16, 32 or 48 dp only**. These give whole-number scaling of the 8 x 8 face at every GUI scale (32 dp at scale 3 is 48 px = 6x) |
 | Content | the player's 8 x 8 skin face, hat layer on top, scaled with nearest-neighbour |
-| Shape | circle, through the anti-aliased circle mask sprite; no ring, no border |
+| Which face | resolved from the player's UUID and name. A player on the server now: the skin the tab list has. Otherwise the profile is fetched once, in the background, from Mojang's session service by UUID, then by name if the UUID is unknown there, and kept for the session. Until it is known, and for players the session service doesn't know (offline-mode accounts, made-up names), the default skin Minecraft gives that UUID shows; the face changes by itself when the real one arrives |
+| Shape | circle, computed by the drawing surface (8.1); no ring, no border |
 | Anonymous | `anon-bg` disc with the `person` icon in `text-2` (20 dp icon on a 32 dp avatar, 12 dp on 16, 28 dp on 48) |
 
 **Badges (app layer)**: count badge 16 dp tall, full radius, minimum width 16 dp, padding 4 dp each side, fill `badge`, text `micro` `#FFFFFF`; `99+` above 99. Dot badge: 8 dp circle `badge`.
@@ -723,8 +769,8 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Shape | 168 dp wide, radius 10, fill `surface-3`, `shadow/sheet` under it; 4 dp padding top and bottom |
 | Item | 40 dp tall, icon 16 dp at `x 12` (vertically centred), label `body` at `x 40`; normal item `text-1`, destructive item icon and label `danger` |
 | Item hover / pressed | `overlay-hover` / `overlay-pressed` over the item |
-| Position | its top-right corner 4 dp under the bottom-right corner of the button that opened it; it opens upward instead (its bottom-right 4 dp above the button) when its bottom would pass `y 362` |
-| Closing | an item click, a click anywhere else (that click does nothing else), Esc |
+| Position | its top-right corner 4 dp under the bottom-right corner of the button that opened it; it opens upward instead (its bottom-right 4 dp above the button) when its bottom would pass `y 362`. A menu that fits neither below nor above the button covers the button, kept inside the viewport |
+| Closing | an item click, a click anywhere else (that click does nothing else), Esc. While it is open Tab and Shift+Tab cycle its items, and Backspace does nothing |
 | Timing | fades in 100 ms; closes at once |
 
 **Dialog** (confirmation)
@@ -737,7 +783,7 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 | Text | 8 dp under the title, `body` `text-2`, up to 3 lines |
 | Buttons | 16 dp under the text, right-aligned to the card's right padding: cancel (secondary, 88 dp) then, 8 dp to its right, confirm (primary or danger, 104 dp) |
 | Height | `16 + title + 8 + text + 16 + 32 + 16` dp |
-| Closing | cancel button, click on the scrim, Esc: same as cancel. The confirm button goes into its loading state until the server answers, then the dialog closes |
+| Closing | cancel button, click on the scrim, Esc: same as cancel. The confirm button goes into its loading state until the server answers, then the dialog closes. While it is open Tab and Shift+Tab cycle its buttons, and Backspace does nothing (the confirm button may be waiting for the server) |
 | Timing | scrim and card fade in 150 ms; fade out 100 ms |
 
 **Snackbar**
@@ -789,8 +835,8 @@ There is no registration. Everything comes from the game and from LNB Warden, th
 | Display name (bold) | the player's **real name** from LNB Warden, exactly the string the tab list shows (unchanged, may contain spaces and accents): `Alexandre Morel` |
 | Handle (grey) | `@` + the **Minecraft username**: `@Alex_Craft` |
 | No real name | when Warden has no real name for the player (hidden or guest), the **username is the display name** and there is **no handle**, so the same word is never printed twice: `SteveBuilds` |
-| Lengths | handles are at most 17 characters (`@` + 16). Real names are capped by Warden (`RealNamesPayload.MAX_NAME_LENGTH`); every layout is checked with a 32-character real name and truncates the real name |
-| Avatar | the face of the username's skin |
+| Lengths | handles are at most 17 characters (`@` + 16). Real names are capped by Warden (`RealNamesPayload.MAX_NAME_LENGTH`); every layout is checked with a 32-character real name and truncates the real name. The handle line truncates too (9.3) |
+| Avatar | the face of the player's skin, resolved from their UUID and name (8.7) |
 | Operators | players with op permission level 2 or higher |
 | Announcers | operators, plus players an admin has granted the right to by command. Only announcers can post in Annonces, pin, and see the destination choice in Compose |
 | Announcer badge | on every post and reply by an announcer, both feeds (8.7) |
@@ -821,7 +867,7 @@ x: 12        44 56                                 214    244
 | Avatar | 32 dp at `(12, 10)` |
 | Name line | line box `y 10`, 18 dp: display name `title-m` `text-1`; announcer badge 4 dp after the name, vertically centred; relative time `caption` `text-2` right-aligned to `x 244`, or to `x 214` when the more button shows |
 | Name truncation | the display name truncates so that badge + 8 dp + time always fit; badge and time never truncate |
-| Handle line | line box `y 28`, 16 dp: handle `caption` `text-2` at `x 56`. Absent when there is no real name, and on anonymous posts. A 17-character handle (about 106 dp) always fits |
+| Handle line | line box `y 28`, 16 dp: handle `caption` `text-2` at `x 56`. Absent when there is no real name, and on anonymous posts. The handle truncates with an ellipsis at `x 244`, like any single-line slot. A typical 17-character handle is about 106 dp and fits, but the worst case, `@` plus sixteen `W`, is about 205 dp in `caption`, wider than the 188 dp column |
 | More button | 28 x 28 dp icon button at `(220, 5)`, `more` icon 16 dp `text-2`; shown only when the viewer can delete the post (9.9) |
 | Private line | one optional 16 dp line after the header lines (see below) |
 | Reply-to line | in threads only, 16 dp, before the private line (9.7) |
@@ -935,7 +981,7 @@ y 306  ------------------------------------------------   composer (collapsed)
 |---|---|
 | Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre Morel…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. Hover: field hover state. Click: expands |
 | Expanded, 200 dp (`y 170..369`) | `En réponse à Alexandre Morel` (`post.reply_to`) in `caption` `text-2`, line box at `(12, 182)`; text area 232 x 112 at `(12, 202)` with the `n/280` counter (4 text lines visible, then it scrolls); at `y 326`: toggle at `(12, 332)` with label `Anonyme` (`reply.anonymous`) in `body-strong` at `x 56`, line box `y 333`; primary button `Répondre` (`reply.send`, 96 dp wide) right-aligned to `x 244`, `y 326` |
-| Répondre button | disabled while the text is empty (after trimming) or over 280 characters |
+| Répondre button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Sending | button in its loading state, text area in its sending state, toggle disabled |
 | Back while expanded | collapses the composer and keeps the draft (one draft per thread) |
 | Success | collapses, clears the draft and the toggle, the new reply appears at the end with the post highlight and is scrolled into view, snackbar `Réponse envoyée` (`reply.sent`) |
@@ -960,10 +1006,10 @@ y 96  +------------------------------------------------+
 | Element | Value |
 |---|---|
 | Header | close icon button (`close`) at `(6, 6)`; no title; primary button `Publier` (`compose.post`), **88 dp wide**, right-aligned to `x 244`, at `y 6` |
-| Publier button | disabled while the text is empty (after trimming) or over 280 characters |
+| Publier button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Author row | avatar 32 dp at `(12, 52)`; display name `title-m` at `x 56`, line box `y 52`; handle `caption` `text-2` at `x 56`, line box `y 70`. Without a real name: the username alone as display name, line box `y 59` (centred on the avatar) |
 | Author row, anonymous on | anonymous avatar; `Anonyme` in `title-m` `text-2` at line box `y 52`; `Masqué aux joueurs` (`compose.anon_sub`) in `caption` `text-2` at line box `y 70` |
-| Text area | at `(12, 96)`, 232 dp wide; **196 dp tall for players**, **152 dp for announcers**; placeholder `Quoi de neuf sur le serveur ?` (`compose.placeholder`); counter `n/280`; focused on open |
+| Text area | at `(12, 96)`, 232 dp wide; **196 dp tall for players**, **152 dp for announcers**; placeholder `Quoi de neuf sur le serveur ?` (`compose.placeholder`); counter `n/280`; focused on open; Enter makes a new line, Ctrl+Enter publishes |
 | Anonymous row | 44 dp, `x 12..244`, 12 dp under the text area: `Publier anonymement` (`compose.anonymous`) in `body-strong` (line box at row `y 4`), `Nom masqué aux joueurs` (`compose.anonymous.help`) in `caption` `text-2` (line box at row `y 22`), toggle right-aligned to `x 244`, centred at row `y 22`. Default off. **Hidden while Annonces is selected**; selecting Annonces also turns it off. The slot stays empty so nothing jumps |
 | Destination (announcers only) | segmented control 232 x 32 at `(12, 316)`: `Annonces` / `Global`, same order as the tabs; preselected from the FAB that opened Compose. Everyone else never sees it |
 | Bottom | both layouts end at `y 347` |
@@ -1019,6 +1065,8 @@ When several notifications are waiting, a click on the app icon follows the usua
 | Hover (phone open only) | fill `surface-3` |
 | Pressed (phone open only) | fill `surface-3` with `overlay-pressed` |
 
+**Text cleaning.** Title and text are drawn plain. Line breaks and tabs become spaces. Emoji stay, drawn as in apps (8.4), except those the emoji font lacks, which are dropped with their skin tones and joiners. Each run of other characters the fonts lack (CJK, Arabic and the like) becomes one `?`, so a name in an unsupported script still shows that a name is there (`田中 : salut` reads `? : salut`). The two lines above are the rule whatever the text: a longer one ends with an ellipsis on line 2, so the sample banner texts in the flows end earlier than the posts they quote.
+
 No time is shown: a banner always describes something that just happened. Feed contents are in 9.10; other apps give a title and a text.
 
 ### 10.2 Peek (phone closed)
@@ -1028,19 +1076,42 @@ No time is shown: a banner always describes something that just happened. Feed c
 | Horizontal position | `wx = W - 146`, same as the bottom-right placement |
 | Rise | **72 px**: device top at `wy = H - 72`; top bezel and screen rows `sy 0..59` visible |
 | Narrow windows | when `W < 476` the phone rises **112 px** (`wy = H - 112`) so the banner clears the hotbar and food rows |
-| Layering | HUD layer drawn below the hotbar, hearts and food |
+| Layering | two layers: the device is a HUD layer below the hotbar, hearts and food; the banner is drawn on its own layer above the chat lines, so a chat line never covers it. F1 (hidden HUD) hides the peek |
 | Screen content | wallpaper, home-style status bar, banner. No app icons |
 | Banner | screen-local `(4, 14)` GUI px = `sx 4..123`, `sy 14..51` |
 | LED | lit |
 | Interaction | not clickable (mouse captured). Up arrow during the peek opens the phone on the notification's target |
-| Queue | a new notification during the hold swaps the banner content in place and restarts the hold |
+| Queue | a new notification during the hold swaps the banner content in place, restarts the hold and chimes. Several notifications at once (the same tick): the last one shows and the chime plays once. While the device is still sliding down, a peek waits until it is away, then rises |
 | Preview off | no peek at all; the chime still plays (if sounds are on) and the badge waits on the home screen |
+| Another screen open | no peek while chat, a container, the pause menu, the death screen or any other screen is open: the chime plays and the badge waits. A screen that opens during a peek sends it back down |
+| GUI scale 1 | no peek: the chime plays and the badge waits (8.1) |
+| Cleared | a peek whose notification the server clears, or that is read, goes away early: the phone key would lead to a target that is gone |
+| At login | notifications received while the player was offline are not news: they show as badges and nothing else, with no peek and no chime |
 
 In a 480 x 270 window the peeking device sits at `(334, 198)`.
 
 ### 10.3 Banner while the phone is open
 
-Same banner at app-local `(8, 4)` dp (screen-local `(4, 13)` GUI px), over the current screen (home or any app), slid down from above the viewport and clipped to it. Click opens the notification's target with the forward transition. Auto-dismiss after 4000 ms (slides up). Not shown when the target is already on screen (the thread it points to, or the Annonces tab for a new announcement: there the post simply arrives, 9.5). The chime plays in both cases.
+Same banner at app-local `(8, 4)` dp (screen-local `(4, 13)` GUI px), over the current screen (home or any app), slid down from above the viewport and clipped to it. Click opens the notification's target with the forward transition and removes the banner at once. Auto-dismiss after 4000 ms (slides up). Several notifications at once: the last one shows, and the chime plays once.
+
+- **Pressed.** While the left button is down on the banner it freezes, content and timeline. Released on it, it opens what was pressed (a notification that arrived meanwhile stays a badge). Released elsewhere, it resumes, showing the newer notification if one came, with a fresh hold. The mouse wheel over the banner does not scroll the screen under it.
+- **Cleared.** A banner whose notification the server clears, or that is read, goes away early.
+- **Target already on screen** (the thread it points to, or the Annonces tab for a new announcement: there the post simply arrives, 9.5): no banner. The chime plays, and the notification counts as read, so it leaves no badge. The same reading in place happens when the phone reopens onto an app left open (6.1).
+- **GUI scale 1:** no banner (8.1).
+
+### 10.4 Storage and limits (server)
+
+Notifications are kept per player on the server and saved with the world. Apps send them through the phone's server API; the phone enforces these rules whatever the app passes in.
+
+| Rule | Value |
+|---|---|
+| Slots | 50 notifications per player, **shared by all apps**. When the list is full, the oldest notification of the mod that holds the most is dropped, so a busy app cannot push out the others' |
+| Lifetime | 30 days; an older notification is dropped |
+| Title | cut to 128 characters (never refused: an app forwarding the start of a long post gets the start), between graphemes: an emoji sequence that straddles the limit is left out whole, never split |
+| Text | cut to 320 characters, likewise. A banner shows far less (10.1) |
+| Rate | a backstop per player and per mod: a burst of 20, then one every 3 seconds; the rest are dropped and logged. Far above what a real app sends, it only stops a looping app from flooding a player |
+
+Opening an app clears that app's notifications (6.1), on the server too.
 
 ---
 
@@ -1052,14 +1123,17 @@ A miniature of the phone face on a side tab, under the quest book button.
 |---|---|
 | Size | 27 x 28 GUI px |
 | Position | `wx = guiLeft - 22` (5 px over the inventory edge), `wy = guiTop + 46` (4 px under the quest button's lower bracket, which ends at `guiTop + 41`) |
-| Recipe book | follows `guiLeft` every frame |
+| Recipe book | the button follows `guiLeft` every frame. With the book open it covers most of the button: the covered part neither lights up nor takes a click, the uncovered part works as usual, and the badge sits under the book (see below) |
 | Tooltip (vanilla) | `LNB Phone` (`inventory.tooltip`); when unread, a second line in `#3A8DF0`: `3 nouvelles notifications` (`inventory.tooltip.unread`) |
-| Click, no unread | the inventory closes and the phone opens on the screen it was closed on |
-| Click, unread | the inventory closes and the phone opens on the **home screen**, so the badges show which apps have news |
-| After closing the phone | the inventory reopens |
+| Click, no unread | the inventory closes, as its own close would (the crafting grid and the item on the cursor go back to the inventory), and the phone opens on the screen it was closed on |
+| Click, unread | the inventory closes as above. If the phone was put away on the home screen or on an app's root screen, it opens on the **home screen**, so the badges show which apps have news. If it was put away deeper in an app (a thread, Compose, a conversation with a draft), it reopens on that same screen, because 2.3 keeps screens and drafts and leaving would lose them: drafts win over the badges. The newest unread notification then shows as the in-phone banner (10.3), with no chime, so the news still shows |
+| After closing the phone | a fresh inventory opens, as the inventory key would open it (the creative inventory for a player now in creative); the old one is not kept |
+| Creative inventory | no button: that side belongs to the creative tabs, and the phone key works there |
 | Pressed | no separate sprite: the hover sprite stays until the phone starts opening |
 
 In a 480 x 270 window the survival inventory (176 x 166) has `guiLeft = 152`, `guiTop = 52`: the quest button is at `(130, 60)` and the phone button at `(130, 98)`.
+
+With the recipe book open, vanilla moves the inventory right and draws the book (147 x 166 at `((W - 147) / 2 - 86, (H - 166) / 2)`; centred over the inventory in a window narrower than 379 px) over the button. In the 480 x 270 window the inventory has `guiLeft = 229` and the button is at `(207, 98)`; the book covers `x 207..226` of the button's `x 207..233`, so only its right 7 px light up and take clicks.
 
 | Part (tab-local) | Pixels | Colour |
 |---|---|---|
@@ -1075,14 +1149,14 @@ In a 480 x 270 window the survival inventory (176 x 166) has `guiLeft = 152`, `g
 |---|---|---|
 | Normal | `screen-off`, glare `(17,5) (18,5) (18,6)` in `glare` | |
 | Normal hover | as normal | outline `accent` |
-| New notifications | `accent`; row `y 4` `accent-hi`; four 3 x 3 `#FFFFFF` dots at `x 9..11` / `x 14..16`, `y 7..9` / `y 12..14` | pixel badge (6.1) with the total unread count at `(x - 3, y - 3)`, above the tab and the quest bracket; pulses when the count rises |
+| New notifications | `accent`; row `y 4` `accent-hi`; four 3 x 3 `#FFFFFF` dots at `x 9..11` / `x 14..16`, `y 7..9` / `y 12..14` | pixel badge (6.1) with the total unread count at `(x - 3, y - 3)`, above the tab and the quest bracket but under the recipe book when it is open; pulses when the count rises |
 | New notifications hover | as above | outline `accent` |
 
 ---
 
 ## 12. Settings app and placement
 
-Built-in app, always last on the home grid, graphite gear icon (7.4). It holds the per-player placement switch. Settings are client-side, per player, applied at once.
+Built-in app, always last on the home grid, graphite gear icon (7.4). It holds the placement switch and two toggles. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer, never on the server, so two accounts on one computer each keep their own; they apply at once.
 
 | Element | Value (app-local, dp) |
 |---|---|
@@ -1091,8 +1165,11 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | Position label | `Position à l'écran` (`settings.position`) in `body-strong` at `x 12`, line box `y 76` |
 | Position control | segmented control 232 x 32 at `(12, 100)`: `Coin` / `Centre` (`settings.position.corner` / `.centre`); **default Coin** (bottom-right) |
 | Divider | full width at `y 144` |
-| Sounds row | one-line 48 dp row at `y 145`: `Sons` (`settings.sounds`), toggle (default on) |
-| Preview row | one-line 48 dp row at `y 194`: `Aperçu des notifications` (`settings.preview`), toggle (default on); off disables the peek only; banners inside the open phone, badges, LED and chime still work |
+| Sounds row | one-line 48 dp row at `y 145..192`: `Sons` (`settings.sounds`), toggle (default on) |
+| Divider | 1 dp `hairline` at `y 193`, from `x 12` to the right edge |
+| Preview row | one-line 48 dp row at `y 194..241`: `Aperçu des notifications` (`settings.preview`), toggle (default on); off disables the peek only; banners inside the open phone, badges, LED and chime still work |
+| Divider | 1 dp `hairline` at `y 242`, from `x 12` to the right edge |
+| Row spacing | the two rows are **49 dp apart**: each is 48 dp and the hairline between them is a separate divider, not the row's own (which 8.7 puts inside its 48 dp) |
 | Change of position | the device glides from the old position to the new one in 250 ms, ease-out; the centred scrim fades in or out over the same 250 ms |
 
 ---
@@ -1101,9 +1178,9 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 
 ### 13.1 Language rule
 
-- **English is the default.** Players whose game language is French (any `fr_*` locale) get French. Every other locale gets English.
+- **English is the default.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch` (the French locales of Minecraft 1.21.1); every other language gets English.
 - French remains the language the strings were written in and the language of the mockups, since most players are French.
-- Strings live in the mod's language files (`en_us.json` as the fallback, `fr_fr.json` for French locales). Third-party apps provide both languages too.
+- Strings live in the mod's language files (`en_us.json` as the fallback, `fr_fr.json` for French). Minecraft itself falls back to `en_us` only, so the build of this repository's mods copies `fr_fr.json` to `fr_ca.json` and `fr_ch.json` unless a mod ships its own. Third-party apps provide both languages too.
 - French typography: a no-break space (U+00A0) before `:` `?` `!` and inside `1,2 k`; the ellipsis character `…` in placeholders.
 - Player content (real names, usernames, post text) is never translated.
 
@@ -1210,20 +1287,20 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Empty-state texts (200 dp) | `Server announcements will show up here.` | wraps to 2 lines | up to 2 lines |
 | Dialog texts (200 dp) | `Its replies will be deleted too. This can't be undone.` | wraps to 2 lines | up to 3 lines |
 | Collapsed composer placeholder (208 dp) | `Répondre à` + a long name | truncates with `…` | |
-| Pixel label line (120 px) | `Réglages` / `Settings`, 8 characters | fits | app names max 16 characters |
+| Pixel label line (120 px) | `Réglages` / `Settings`, 8 characters | fits | app names of 16 characters or fewer recommended (7.2); the line cuts a longer name at 20 characters or 120 px |
 | Pixel `gui.scale` line (128 px) | `Échelle GUI : 2+`, 16 characters, about 92 px | fits | |
 
 ---
 
 ## 14. Motion
 
-The game ticks every 50 ms. Durations are whole ticks. Animations interpolate with `(tick + partialTick)`, use quadratic easing only. The pixel shell rounds positions to whole GUI px every frame. The smooth layer may use fractional dp positions and opacity.
+The game ticks every 50 ms. Durations are whole ticks. Animations interpolate with `(tick + partialTick)`, use quadratic easing only. The pixel shell rounds positions to whole GUI px every frame (halves to the even neighbour, 2.4). The smooth layer may use fractional dp positions and opacity.
 
 | Motion | Duration | Easing | Detail |
 |---|---|---|---|
-| Open | 250 ms | ease-out | device slides up from `wy = H` to its placement; the centred scrim fades in over the same time |
+| Open | 250 ms | ease-out | device slides up from `wy = H` to its placement; the centred scrim fades in over the same time. The phone's screen opens when the slide ends; the player can move during it (2.3) |
 | Open from a peek | 250 ms | ease-out | from the peek position to the open position |
-| Close | 200 ms | ease-in | slides down to `wy = H`; scrim fades out |
+| Close | 200 ms | ease-in | slides down to `wy = H`; scrim fades out. The mouse is back at once and the player can move |
 | Placement change | 250 ms | ease-out | old position to new |
 | Open screen / forward (app from home, thread, Compose, banner target) | 150 ms | ease-out | new screen slides in from `x +256 dp` over the current one |
 | Back | 150 ms | ease-in | current screen slides out to `x +256 dp`, revealing the previous one |
@@ -1258,17 +1335,19 @@ The game ticks every 50 ms. Durations are whole ticks. Animations interpolate wi
 
 ## 15. Sound
 
-Vanilla sound events, client-side. All muted when the Settings `Sons` toggle is off.
+The phone's sounds are the mod's own sound events (`sounds.json`, client-side), each reusing the vanilla sound the table names at the same volume and pitch. They are the phone's own so that subtitles can say what they are: **only the notification chime has a subtitle** (`Phone notification` / `Notification du téléphone`); the interface sounds have none, as vanilla's button click has none. All are muted when the Settings `Sons` toggle is off, and follow the Master volume slider.
 
-| Event | Sound event | Volume | Pitch |
-|---|---|---|---|
-| Open | `minecraft:item.spyglass.use` | 0.6 | 1.4 |
-| Close | `minecraft:item.spyglass.stop_using` | 0.6 | 1.4 |
-| Tap (icon, button, row, toggle, tab, pin, menu item) | `minecraft:block.note_block.hat` | 0.35 | 2.0 |
-| Like | `minecraft:block.note_block.chime` | 0.3 | 2.0 |
-| Post or reply sent | `minecraft:entity.experience_orb.pickup` | 0.4 | 1.2 |
-| Notification | `minecraft:block.note_block.chime`, twice, 100 ms apart | 0.6 | 1.26, then 1.68 |
-| Error snackbar / disabled tap | `minecraft:block.note_block.bass` | 0.3 | 0.7 |
+| Event | Phone sound event | Vanilla sound played | Volume | Pitch |
+|---|---|---|---|---|
+| Open | `lnbphone:phone.open` | `minecraft:item.spyglass.use` | 0.6 | 1.4 |
+| Close | `lnbphone:phone.close` | `minecraft:item.spyglass.stop_using` | 0.6 | 1.4 |
+| Tap (icon, button, row, toggle, tab, pin, menu item) | `lnbphone:ui.tap` | `minecraft:block.note_block.hat` | 0.35 | 2.0 |
+| Like | `lnbphone:ui.like` | `minecraft:block.note_block.chime` | 0.3 | 2.0 |
+| Post or reply sent | `lnbphone:ui.sent` | `minecraft:entity.experience_orb.pickup` | 0.4 | 1.2 |
+| Notification | `lnbphone:notification` | `minecraft:block.note_block.chime`, twice, 100 ms apart | 0.6 | 1.26, then 1.68 |
+| Error snackbar / disabled tap | `lnbphone:ui.error` | `minecraft:block.note_block.bass` | 0.3 | 0.7 |
+
+Notifications that arrive in the same tick chime once (10.3).
 
 ---
 
@@ -1298,29 +1377,31 @@ Code fills (no sprite): status strip, LED, battery fill, icon tile and bands, la
 
 ### 16.2 Smooth sprites (apps and banner)
 
-Folder `assets/lnbphone/textures/gui/smooth/`, exported at **2 px per dp**, linear filtering, no mipmaps. Shapes and icons are white with alpha and tinted at draw time. Nine-slice borders are given in dp (px = 2 x dp).
+Folder `assets/lnbphone/textures/gui/smooth/`. Standalone textures with linear filtering and no mipmaps, not GUI atlas sprites. All of them are drawn by the generator in `tools/sprites`.
+
+Shapes (rounded rects, pills, circles, strokes, the avatar's circle) are not sprites: the drawing surface computes them at the screen's real resolution (section 8.1).
+
+Shadows, at 2 px per dp, black with the 45% opacity baked in:
 
 | Sprite | Size dp (px) | Nine-slice border dp | Content |
 |---|---|---|---|
-| `shape/r10` | 24 x 24 (48 x 48) | 10 | filled rounded rect, radius 10 |
-| `shape/r10_stroke1` | 24 x 24 (48 x 48) | 10 | 1 dp inner stroke, radius 10 |
-| `shape/r10_stroke2` | 24 x 24 (48 x 48) | 10 | 2 dp inner stroke, radius 10 |
-| `shape/r14` | 32 x 32 (64 x 64) | 14 | filled, radius 14 |
-| `shape/r14_stroke1` | 32 x 32 (64 x 64) | 14 | 1 dp inner stroke, radius 14 |
-| `shape/pill` | 48 x 48 (96 x 96) | 24 | filled circle; stretched into pills; also discs, the FAB and the announcer badge |
-| `shape/pill_stroke1` | 48 x 48 (96 x 96) | 24 | 1 dp inner stroke |
-| `shape/pill_stroke2` | 48 x 48 (96 x 96) | 24 | 2 dp inner stroke (focus ring) |
-| `shape/avatar_mask` | 48 x 48 (96 x 96) | none, scaled to 16 / 32 / 48 dp | circle alpha mask |
-| `shadow/fab` | 72 x 72 (144 x 144) | none | soft round shadow for a 48 dp circle: 8 dp blur, `#000000` at 45% |
-| `shadow/sheet` | 48 x 48 (96 x 96) | 22 | soft shadow for radius 10 to 14 rects (banner, snackbar, menu, dialog): 8 dp blur, 2 dp down, `#000000` at 45%; drawn 8 dp larger than the element on each side |
-| `icon12/megaphone_filled` | 12 x 12 (24 x 24) | none | solid silhouette, announcer badge |
-| `icon16/reply`, `heart`, `heart_filled`, `pin`, `pin_filled`, `lock`, `more`, `trash`, `alert`, `arrow_up` | 16 x 16 (32 x 32) each | none | stroke 1.5 dp |
-| `icon20/back`, `close`, `person`, `globe`, `megaphone`, `inbox` | 20 x 20 (40 x 40) each | none | stroke 2 dp |
-| `icon24/compose` | 24 x 24 (48 x 48) | none | stroke 2 dp |
-| `icon40/inbox`, `megaphone`, `globe` | 40 x 40 (80 x 80) each | none | stroke 2.5 dp, empty and error states |
-| `spinner` | 20 x 20 (40 x 40) | none | 90 degree arc on a 25% ring, 2 dp stroke, rotated at draw time (drawn at 16 dp inside buttons) |
+| `shadow/fab` | 72 x 72 (144 x 144) | none | soft round shadow for a 48 dp circle: 8 dp blur. Drawn centred on the circle and 2 dp lower |
+| `shadow/sheet` | 48 x 48 (96 x 96) | 22 | soft shadow for radius 10 to 14 rects (banner, snackbar, menu, dialog): 8 dp blur, the 2 dp drop baked in; drawn 8 dp larger than the element on each side |
 
-Fonts: `assets/lnbphone/font/inter_regular.ttf`, `assets/lnbphone/font/inter_semibold.ttf`, with the OFL licence text alongside.
+Icons and the spinner, white with alpha and tinted at draw time, at `<density>/icon<grid>/<name>.png` and `<density>/spinner.png`, where `<density>` is the pixels per dp: `1x`, `1_5x`, `2x`, `2_5x`, `3x`, `3_5x`, `4x` or `4_5x`, for GUI scale 2 to 9. An icon's size in pixels is its grid times the density, and it is drawn 1:1.
+
+| Icons | Grid dp | Content |
+|---|---|---|
+| `icon12/megaphone_filled` | 12 | solid silhouette, announcer badge |
+| `icon12/person` | 12 | stroke 1.5 dp, anonymous avatar at 16 dp |
+| `icon16/reply`, `heart`, `heart_filled`, `pin`, `pin_filled`, `lock`, `more`, `trash`, `alert`, `arrow_up` | 16 | stroke 1.5 dp. `heart_filled` is filled and stroked, so it keeps the outline heart's size |
+| `icon20/back`, `close`, `person`, `globe`, `megaphone`, `inbox` | 20 | stroke 2 dp |
+| `icon24/compose` | 24 | stroke 2 dp |
+| `icon28/person` | 28 | stroke 2 dp, anonymous avatar at 48 dp |
+| `icon40/inbox`, `megaphone`, `globe` | 40 | stroke 2.5 dp, empty and error states |
+| `spinner` | 20 | 90 degree arc on a 25% ring, 2 dp stroke, rotated at draw time (drawn at 16 dp inside buttons) |
+
+Fonts: `assets/lnbphone/font/inter_regular.ttf`, `assets/lnbphone/font/inter_semibold.ttf` and `assets/lnbphone/font/noto_emoji.ttf` (Noto Emoji 3.002, the variable `wght` 300 to 700 file, unmodified), each with its OFL licence text alongside (`inter_ofl.txt`, `noto_emoji_ofl.txt`). A resource pack may replace any of them; a broken emoji font costs the emoji only (they become missing-glyph boxes), never the text.
 
 ---
 
@@ -1351,7 +1432,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | W | normal play, HUD, phone closed | no cursor | Playing. The player presses the Up arrow. |
-| 2 | W | device mid-slide at `(334, 153)`, home screen on it | no cursor | The phone slides up from the bottom edge (250 ms, ease-out). |
+| 2 | W | device mid-slide at `(334, 153)`, home screen on it | no cursor | The phone slides up from the bottom edge (250 ms, ease-out). The player can still move: the screen opens, and the mouse becomes free, when the slide ends. |
 | 3 | W | device open at `(334, 36)`, home screen, nothing hovered | `(240, 135)` | Open on the home screen. The mouse is free; the player stands still. |
 
 **P-2 Close the phone** (4 steps)
@@ -1360,7 +1441,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | open on home | `(240, 135)` | Three ways to close: Esc, the Up arrow again, or a click outside the phone. |
 | 2 | W | open on home, click marker on the world | `(120, 100)`, pressed | A click anywhere outside the device closes it. Clicks on the bezel do nothing. |
-| 3 | W | device mid-slide at `(334, 153)` | no cursor | The phone slides down (200 ms, ease-in). |
+| 3 | W | device mid-slide at `(334, 153)` | no cursor | The phone slides down (200 ms, ease-in). The mouse is back at once. |
 | 4 | W | normal play | no cursor | Closed. It will reopen on the screen it was closed on. |
 
 **P-3 Open and close in the centred placement** (4 steps)
@@ -1378,9 +1459,9 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | survival inventory open; quest button at `(130, 60)`, phone button `inventory/button` at `(130, 98)` | `(240, 200)` | The phone button sits under the quest book button. |
 | 2 | W | phone button `inventory/button_hover`, vanilla tooltip `LNB Phone` | `(143, 112)` | Hover: accent outline and tooltip. |
-| 3 | W | inventory gone, device mid-slide at `(334, 153)` showing the Feed Global screen (last screen) | no cursor | Click: the inventory closes and the phone slides up (250 ms). |
+| 3 | W | inventory gone, device mid-slide at `(334, 153)` showing the Feed Global screen (last screen) | no cursor | Click: the inventory closes (its crafting grid and cursor items go back) and the phone slides up (250 ms). |
 | 4 | P | Feed, Global, as it was left | `(128, 200)` | The phone opens on the screen it was closed on. |
-| 5 | W | inventory open again, phone closed | `(240, 200)` | Closing the phone (Esc) brings the inventory back. |
+| 5 | W | inventory open again, phone closed | `(240, 200)` | Closing the phone (Esc) brings a fresh inventory back. |
 
 **P-5 Open from the inventory button, with news** (3 steps)
 
@@ -1388,7 +1469,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | inventory open, phone button `inventory/button_new` with the pixel badge `3` at `(127, 95)` | `(240, 200)` | Unread notifications: the mini screen lights up and a red count appears. |
 | 2 | W | `inventory/button_new_hover`, tooltip `LNB Phone` / `3 nouvelles notifications` (second line `#3A8DF0`) | `(143, 112)` | Hover shows how many. |
-| 3 | P | home screen, Feed icon badge `3`, LED lit | `(128, 200)` | With news, the phone opens on the home screen so the badges show where it is (250 ms slide). |
+| 3 | P | home screen, Feed icon badge `3`, LED lit | `(128, 200)` | With news, the phone opens on the home screen so the badges show where it is (250 ms slide), when it was put away on home or on an app's root screen. Put away deeper in an app, it reopens there with the newest notification as a banner (11). |
 
 **P-6 Home: hover, press, open an app** (5 steps)
 
@@ -1420,7 +1501,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | normal play, phone closed | no cursor | A new announcement is posted while the player is playing. |
 | 2 | W | device mid-rise at `(334, 234)`, peek screen (wallpaper, home status bar, banner) | no cursor | The phone rises 72 px from the bottom-right with the chime (200 ms). |
-| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Lune Garnier : La saison 2 commence samedi à 18:00. L'End sera…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
+| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Lune Garnier : La saison 2 commence samedi à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
 | 4 | W | device mid-sink at `(334, 234)` | no cursor | Nothing pressed: the phone sinks away (200 ms). |
 | 5 | W | later, after Up: device open at `(334, 36)` on home (the screen it was closed on), Feed badge `1`, LED lit | `(240, 135)` | Opening the phone later: a red badge on Feed and the LED blinking. |
 | 6 | P | home, hover Feed with badge `1`, label `Feed` | GUI px `(16, 29)` | Hover the badged app. |
@@ -1442,15 +1523,15 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 1 | P | home, nothing hovered | GUI px `(70, 120)` | Phone open on the home screen. |
 | 2 | P | banner mid-slide at app-local `y -36` (half visible), over the icons | same | A notification: the banner slides down from the top (150 ms), with the chime. |
 | 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika Laurent : Je l'ai vu près du moulin, côté est !`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
-| 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. |
-| 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the thread opens (150 ms slide) and the badge clears. |
+| 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. Pressed, the banner would freeze until released. |
+| 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the banner goes at once, the thread opens (150 ms slide) and the badge clears. |
 
 **P-11 Notification while another app is open** (4 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Settings screen | `(128, 300)` | Phone open in Settings. |
-| 2 | P | banner at `(8, 4)` over the Settings header: `Nouvelle annonce` / `Kael_Builder : Événement PvP dimanche à 15:00…` | same | The banner appears over any app. |
+| 2 | P | banner at `(8, 4)` over the Settings header: `Nouvelle annonce` / `Kael_Builder : Événement PvP dimanche à 15:00 à…` | same | The banner appears over any app. |
 | 3 | P | banner mid-slide up at `y -36` | same | Not clicked: after 4 s it slides up (150 ms). |
 | 4 | P | home (after the home button), Feed badge `1` | GUI px `(70, 218)` | The news waits as a badge on the home screen. |
 
@@ -1491,7 +1572,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P1 | home at GUI scale 1, hover Feed | GUI px `(16, 29)` | At GUI scale 1 the phone and its home screen still work. |
 | 2 | P1 | Feed opened: status bar, viewport `bg` with the bitmap line `Échelle GUI : 2+` centred in `#96A0B0` | same | Apps need GUI scale 2 or more; the app area says so. |
-| 3 | P1 | home button pressed, home screen | GUI px `(70, 218)` | The home button still works. |
+| 3 | P1 | home button pressed, home screen | GUI px `(70, 218)` | The home button still works, and so does Backspace. A notification here gives no banner and no peek, only the chime and the badge (10.2). |
 
 ### 17.2 Feed flows
 
@@ -1835,14 +1916,18 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 1. Without a real name, the Minecraft username becomes the bold name and no handle is shown.
 2. Deleting is in version 1: players delete their own posts and replies, operators delete anything, with a confirmation. Deleting a post deletes its replies. Nothing can be restored.
 3. Pinning: limit of 3 pinned announcements; pinning a 4th asks to replace the oldest.
-4. The player cannot walk while the phone is open in version 1 (it is a normal game screen).
+4. The player cannot walk while the phone is open in version 1 (it is a normal game screen). They can still move during the 250 ms slide that precedes it (2.3).
 
 **Shown on the storyboard canvas and not objected to** (built this way unless the user says otherwise):
 
-1. The post header is two lines (name, then `@handle`), because a real name, a 16-character handle and the time do not fit on one line in 188 dp. Long real names truncate; the handle never does. Warden caps real names at 64 characters.
+1. The post header is two lines (name, then `@handle`), because a real name, a 16-character handle and the time do not fit on one line in 188 dp. Long real names truncate; the handle truncates only in the worst case, sixteen wide letters after the `@` (9.3). Warden caps real names at 64 characters.
 2. Any announcer can pin or unpin any announcement.
-3. Esc closes the phone even inside an app (after closing a menu or dialog); the phone reopens on the same screen. With unread notifications, the inventory button opens the home screen instead.
+3. Esc closes the phone even inside an app (after closing a menu or dialog); the phone reopens on the same screen. With unread notifications, the inventory button opens the home screen instead, but only from home or an app's root screen; from deeper in an app it reopens that screen, since drafts win over badges (11).
 4. A Feed badge clears when Feed is opened. Replies to your own posts stay marked in the feed (blue reply count) until you open the thread.
+
+**Open for the Feed phase** (found while building the phone; to settle when Feed is designed in detail):
+
+1. Other scripts. Inter has no CJK, Arabic or other non-Latin glyphs (8.4), so such characters show one missing-glyph box per grapheme in the apps and one `?` per run in the banner. Emoji are settled: the user chose to bundle an emoji font so that they show in the apps (8.4).
 
 **Known slips in the Feed sample data** (found while drawing the canvas; to fix before the Feed app is built, they do not affect the phone):
 

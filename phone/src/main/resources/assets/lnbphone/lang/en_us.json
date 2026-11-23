@@ -1,0 +1,20 @@
+{
+  "fml.menu.mods.info.description.lnbphone": "A phone for LNB's Minecraft server, which other mods add apps to.",
+  "key.categories.lnbphone": "LNB Phone",
+  "key.lnbphone.open": "Open the phone",
+  "gui.lnbphone.title": "LNB Phone",
+  "gui.lnbphone.scale": "GUI scale: 2+",
+  "app.lnbphone.settings": "Settings",
+  "settings.lnbphone.section.phone": "PHONE",
+  "settings.lnbphone.position": "Position on screen",
+  "settings.lnbphone.position.corner": "Corner",
+  "settings.lnbphone.position.centre": "Centre",
+  "settings.lnbphone.sounds": "Sounds",
+  "settings.lnbphone.preview": "Notification preview",
+  "gui.lnbphone.inventory": "LNB Phone",
+  "gui.lnbphone.inventory.unread.one": "1 new notification",
+  "gui.lnbphone.inventory.unread": "%s new notifications",
+  "subtitles.lnbphone.notification": "Phone notification",
+  "gui.lnbphone.dialog.cancel": "Cancel",
+  "gui.lnbphone.dialog.confirm": "OK"
+}

@@ -1,0 +1,24 @@
+{
+  "phone.open": {
+    "sounds": [{ "name": "minecraft:item.spyglass.use", "type": "event" }]
+  },
+  "phone.close": {
+    "sounds": [{ "name": "minecraft:item.spyglass.stop_using", "type": "event" }]
+  },
+  "ui.tap": {
+    "sounds": [{ "name": "minecraft:block.note_block.hat", "type": "event" }]
+  },
+  "ui.like": {
+    "sounds": [{ "name": "minecraft:block.note_block.chime", "type": "event" }]
+  },
+  "ui.sent": {
+    "sounds": [{ "name": "minecraft:entity.experience_orb.pickup", "type": "event" }]
+  },
+  "ui.error": {
+    "sounds": [{ "name": "minecraft:block.note_block.bass", "type": "event" }]
+  },
+  "notification": {
+    "sounds": [{ "name": "minecraft:block.note_block.chime", "type": "event" }],
+    "subtitle": "subtitles.lnbphone.notification"
+  }
+}
