@@ -350,6 +350,20 @@ object WriteScenarios {
         waitTicks(10)
         away()
         shot("pin_05_group")
+
+        // English at GUI scale 2: the announcer's destination, `Announcements` whole in its segment (8.7, 13.3).
+        key(GLFW.GLFW_KEY_ESCAPE)
+        waitTicks(10)
+        language("en_us")
+        guiScale(2)
+        run { FeedClient.session.clear() }
+        openPhone()
+        openFeed()
+        waitTicks(40)
+        click(220, 334)
+        waitTicks(10)
+        away()
+        shot("compose_14_announcer_english_gui2")
     }
 
     /** The centre of the pin button of the main post of the announcement starting with [start], in its thread. */
