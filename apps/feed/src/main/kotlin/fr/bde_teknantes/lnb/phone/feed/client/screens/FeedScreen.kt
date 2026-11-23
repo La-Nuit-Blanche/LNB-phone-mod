@@ -35,6 +35,7 @@ import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.model.Outcome
 import fr.bde_teknantes.lnb.phone.feed.model.PostView
 import java.time.ZoneId
+import kotlin.math.abs
 import java.util.UUID
 
 /**
@@ -412,7 +413,8 @@ class FeedScreen(
                 }
             }
             list.layoutRows()
-            if (kept != null && keptAt != null && kept.parent === list) list.scrollTo(kept.y - keptAt)
+            // Only when the rows above really moved: scrolling would stop the pill's scroll under way and flash the bar.
+            if (kept != null && keptAt != null && kept.parent === list && abs(kept.y - keptAt - list.offset) > 0.01f) list.scrollTo(kept.y - keptAt)
         }
 
         private fun newCard(id: UUID) = PostCard({ session.post(id) }, strings, this@FeedScreen).apply { time = ::timeOf }

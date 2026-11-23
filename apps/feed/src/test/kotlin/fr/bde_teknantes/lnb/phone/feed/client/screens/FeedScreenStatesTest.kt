@@ -545,6 +545,37 @@ class FeedScreenStatesTest {
     }
 
     @Test
+    fun `counts changing while the pill's scroll runs don't stop it`() {
+        val t = open(FeedKind.GLOBAL)
+        r.state()
+        val ten = posts(10)
+        answer(FeedKind.GLOBAL, ten)
+        t.frame()
+        session.feed(FeedKind.GLOBAL).scroll.offset = 300f
+        t.frame()
+        session.onLive(listOf(post(minutesAgo = 0, author = LUNE, text = "n1")))
+        t.frame()
+        t.tick(4)
+        t.click(128f, 66f)
+        assertTrue(session.feed(FeedKind.GLOBAL).waiting.isEmpty())
+        t.tick(2)
+        session.onCounts(listOf(CountUpdate(ten[5].id, likes = 3, replies = 0)))
+        t.tick(10)
+        assertEquals(0f, session.feed(FeedKind.GLOBAL).scroll.offset)
+    }
+
+    @Test
+    fun `a change that moves nothing doesn't bring the scroll bar out`() {
+        val t = open()
+        scrolledAnnonces(t)
+        t.moveTo(-10f, 200f)
+        t.advance(2000)
+        session.onCounts(listOf(CountUpdate(shown[6].id, likes = 3, replies = 0)))
+        t.frame()
+        assertFalse(t.shapes.any { it.kind == DrawnShape.Kind.ROUND_RECT && it.width == 4f })
+    }
+
+    @Test
     fun `a post deleted above the view doesn't move what the player reads`() {
         val t = open()
         val y = scrolledAnnonces(t)
