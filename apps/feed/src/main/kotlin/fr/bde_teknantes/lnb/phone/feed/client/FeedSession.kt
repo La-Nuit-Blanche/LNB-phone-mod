@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.feed.client
 
 import fr.bde_teknantes.lnb.phone.api.TextLimits
+import fr.bde_teknantes.lnb.phone.api.client.ui.SnackbarHandle
 import fr.bde_teknantes.lnb.phone.feed.Feed
 import fr.bde_teknantes.lnb.phone.feed.model.Availability
 import fr.bde_teknantes.lnb.phone.feed.model.CountUpdate
@@ -137,6 +138,12 @@ class FeedSession(
 
     // Live replies whose marker was raised, so that a reply delivered twice raises it once.
     private val raisedFor = BoundedSet(GONE_REMEMBERED)
+
+    /**
+     * The `Connexion perdue` snackbar showing, kept here rather than by the screen that showed it, so that whichever
+     * Feed screen hears that Feed is back ([FeedNotice.ConnectionBack]) takes that one away, and no other.
+     */
+    var connectionSnackbar: SnackbarHandle? = null
 
     private var landing: UUID? = null
     private var notice: FeedNotice? = null
@@ -697,6 +704,7 @@ class FeedSession(
         raisedFor.clear()
         landing = null
         notice = null
+        connectionSnackbar = null
         viewing = null
         viewingThread = null
         threadSeenSent = null

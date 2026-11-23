@@ -67,7 +67,6 @@ class FeedScreen(
     private val fab = addFloating(Fab { compose(tab) })
 
     private var opened = false
-    private var connectionLostAt = Float.NaN
 
     init {
         // The app is open from now until this root screen closes: the session's timers run all that time.
@@ -183,14 +182,12 @@ class FeedScreen(
 
     private fun report(notice: FeedNotice) {
         when (notice) {
-            FeedNotice.ConnectionLost -> {
+            FeedNotice.ConnectionLost -> session.connectionSnackbar =
                 showErrorSnackbar(strings.get("feed.connection_lost"), SnackbarAction(strings.get("error.retry")) { session.retryConnection() })
-                connectionLostAt = now
-            }
-            // Back with no message: a `Connexion perdue` still showing goes.
-            FeedNotice.ConnectionBack -> if (now - connectionLostAt < CONNECTION_SNACKBAR_MS) {
-                dismissSnackbar()
-                connectionLostAt = Float.NaN
+            // Back with no message: that `Connexion perdue` goes if it still shows, wherever it was shown; any other stays.
+            FeedNotice.ConnectionBack -> {
+                session.connectionSnackbar?.dismiss()
+                session.connectionSnackbar = null
             }
             FeedNotice.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             is FeedNotice.TooFast -> showErrorSnackbar(strings.get("snackbar.too_fast", notice.seconds))
@@ -425,8 +422,5 @@ class FeedScreen(
         const val FAB_ROOM = 72f
         const val RETRY_WIDTH = 104f
         const val WRITE_WIDTH = 136f
-
-        /** A `Connexion perdue` snackbar, with its action, is gone after this. */
-        private const val CONNECTION_SNACKBAR_MS = 6300f
     }
 }

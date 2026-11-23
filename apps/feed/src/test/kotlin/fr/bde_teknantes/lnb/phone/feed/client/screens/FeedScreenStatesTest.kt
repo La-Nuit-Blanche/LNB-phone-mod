@@ -465,6 +465,25 @@ class FeedScreenStatesTest {
     // ---- Connection lost (9.12) ----
 
     @Test
+    fun `Feed back takes away its Connexion perdue only, not a snackbar that replaced it`() {
+        val t = open(FeedKind.GLOBAL)
+        r.state()
+        answer(FeedKind.GLOBAL, posts(2))
+        t.frame()
+        r.state(available = Availability.UNAVAILABLE)
+        t.tick(4)
+        assertTrue(t.texts.any { it.text.startsWith("feed.conn") })
+        // A like refused meanwhile: its snackbar replaces Connexion perdue, and stays when Feed is back.
+        session.toggleLike(session.feed(FeedKind.GLOBAL).posts.first())
+        session.onResult(ResultPayload(r.last<LikePayload>().requestId, Outcome.UNAVAILABLE))
+        t.tick(2)
+        assertTrue(t.shows("snackbar.action_failed"))
+        r.state()
+        t.tick(2)
+        assertTrue(t.shows("snackbar.action_failed"))
+    }
+
+    @Test
     fun `the session's clock runs while Feed is open, from its root screen's creation until it closes`() {
         val t = open()
         assertTrue(session.isAppOpen)
