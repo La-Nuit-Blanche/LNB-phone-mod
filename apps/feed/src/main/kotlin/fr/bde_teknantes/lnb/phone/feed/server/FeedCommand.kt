@@ -63,20 +63,22 @@ object FeedCommand {
 
     /**
      * Who runs the command, from where it came ([originIsPlayer]: the command source that started it, which `execute`
-     * never changes), whether it still runs as that player ([runsAsOrigin]: `execute as` changes the entity, not the
-     * origin) and the permission level. A player acts only as themselves: `execute as <moderator>` run by an
-     * operator, a command block or a function can't borrow a moderator's name. Nothing below level 4 reaches the
-     * console's path, whatever it runs as, since `execute` never raises the level.
+     * never changes), whether that player is the one the server's player list holds for their UUID ([listed]: a mod's
+     * fake player made with a moderator's UUID is not), whether it still runs as that player ([runsAsOrigin]:
+     * `execute as` changes the entity, not the origin) and the permission level. A player acts only as themselves:
+     * `execute as <moderator>` run by an operator, a command block or a function can't borrow a moderator's name.
+     * Nothing below level 4 reaches the console's path, whatever it runs as, since `execute` never raises the level.
      */
-    internal fun actor(originIsPlayer: Boolean, runsAsOrigin: Boolean, level4: Boolean): Actor = when {
-        originIsPlayer -> if (runsAsOrigin) Actor.PLAYER else Actor.NONE
+    internal fun actor(originIsPlayer: Boolean, listed: Boolean, runsAsOrigin: Boolean, level4: Boolean): Actor = when {
+        originIsPlayer -> if (listed && runsAsOrigin) Actor.PLAYER else Actor.NONE
         level4 -> Actor.CONSOLE
         else -> Actor.NONE
     }
 
     private fun actor(source: CommandSourceStack): Actor {
         val origin = source.source
-        return actor(origin is ServerPlayer, source.entity === origin, source.hasPermission(4))
+        val listed = origin is ServerPlayer && origin.server.playerList.getPlayer(origin.uuid) === origin
+        return actor(origin is ServerPlayer, listed, source.entity === origin, source.hasPermission(4))
     }
 
     /** The player running the command for themselves, or null for the console. Only after [actor] said either. */
