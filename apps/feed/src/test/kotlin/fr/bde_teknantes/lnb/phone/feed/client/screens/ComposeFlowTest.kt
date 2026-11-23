@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
 
@@ -369,10 +368,6 @@ class ComposeFlowTest {
     }
 
     @Test
-    @Disabled(
-        "Design and code disagree: art direction 9.8 and F-13 keep the destination with the draft when Compose is " +
-            "closed, but ComposeScreen's init sets it again from the button that opened Compose",
-    )
     fun `an announcer's cancelled draft keeps the destination chosen when Compose opens again`() {
         val t = feed(FeedKind.ANNOUNCEMENTS, ANNOUNCER)
         t.clickFab()
@@ -386,27 +381,28 @@ class ComposeFlowTest {
     }
 
     @Test
-    fun `an announcer who loses the right while Compose is open is refused an announcement, keeps the draft, and can post on Global`() {
+    fun `an announcer who loses the right while Compose is open falls back to Global, the text and the toggle kept`() {
         val t = feed(FeedKind.ANNOUNCEMENTS, ANNOUNCER)
         t.clickFab()
         t.type("annonce")
+        // The anonymous row under the announcer's 152 dp area.
+        t.click(128f, 96f + 152f + 12f + 22f)
+        assertTrue(draft.anonymous)
+        assertEquals(FeedKind.ANNOUNCEMENTS, draft.destination)
         r.state(PLAYER)
         t.tick()
-        t.clickPublish()
-        val refused = r.last<CreatePostPayload>()
-        answer(Outcome.NOT_ALLOWED)
-        t.tick()
-        assertTrue(t.showsStart("snackbar.action"))
+        // The destination control went, the destination is Global, the area has the player's 196 dp.
+        assertFalse(t.showsStart("tab."))
+        assertEquals(FeedKind.GLOBAL, draft.destination)
+        assertFalse((t.screen as ComposeScreen).announcer)
+        assertEquals(196f, (t.screen as ComposeScreen).area.height)
         assertEquals("annonce", draft.text.text)
-        assertInstanceOf(ComposeScreen::class.java, t.screen)
-        // Global, from the destination control still there.
-        t.click(186f, 332f)
+        assertTrue(draft.anonymous)
         t.click(128f, 150f)
         t.clickPublish()
-        val again = r.last<CreatePostPayload>()
-        assertEquals(FeedKind.ANNOUNCEMENTS, refused.feed)
-        assertEquals(FeedKind.GLOBAL, again.feed)
-        assertFalse(refused.key == again.key)
+        val sent = r.last<CreatePostPayload>()
+        assertEquals(FeedKind.GLOBAL, sent.feed)
+        assertTrue(sent.anonymous)
         // Compose opened again as a player: no destination, Global.
         answer(Outcome.UNAVAILABLE)
         t.tick()

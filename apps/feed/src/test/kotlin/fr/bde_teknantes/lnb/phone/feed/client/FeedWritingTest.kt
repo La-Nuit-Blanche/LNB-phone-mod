@@ -38,6 +38,17 @@ class FeedWritingTest {
     }
 
     @Test
+    fun `Compose's destination is the draft's when started, the button's when fresh, Global for a player`() {
+        val a = fr.bde_teknantes.lnb.phone.feed.model.FeedKind.ANNOUNCEMENTS
+        val g = fr.bde_teknantes.lnb.phone.feed.model.FeedKind.GLOBAL
+        assertEquals(a, FeedWriting.destinationOnOpen("", false, g, a, announcer = true))
+        assertEquals(g, FeedWriting.destinationOnOpen("texte", false, g, a, announcer = true))
+        assertEquals(g, FeedWriting.destinationOnOpen("", true, g, a, announcer = true))
+        assertEquals(g, FeedWriting.destinationOnOpen("texte", false, a, a, announcer = false))
+        assertEquals(g, FeedWriting.destinationOnOpen("", false, a, a, announcer = false))
+    }
+
+    @Test
     fun `the pin button is an announcement's main post's alone, whatever the view says`() {
         val announcement = post(fr.bde_teknantes.lnb.phone.feed.model.FeedKind.ANNOUNCEMENTS, text = "a", canPin = true)
         assertTrue(FeedWriting.showsPin(announcement))

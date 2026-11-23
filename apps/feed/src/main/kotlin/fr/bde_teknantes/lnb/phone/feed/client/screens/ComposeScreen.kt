@@ -47,8 +47,12 @@ class ComposeScreen(
     /** How the session's notices are told here, as on the feed and the thread. */
     private val actions = PostActions(this, session, strings)
 
-    /** Announcers choose where it goes; everyone else posts on Global. */
-    val announcer: Boolean = session.canCompose(FeedKind.ANNOUNCEMENTS)
+    /**
+     * Announcers choose where it goes; everyone else posts on Global. An announcer who loses the right while Compose is
+     * open falls back to Global: the destination control goes, the text and the toggle stay.
+     */
+    var announcer: Boolean = session.canCompose(FeedKind.ANNOUNCEMENTS)
+        private set
 
     private val close = IconButton(Icon.CLOSE) { phone.pop() }
     private val publish = Button(strings.get("compose.post")) { send() }.apply { fixedWidth = PUBLISH_WIDTH }
@@ -73,7 +77,8 @@ class ComposeScreen(
         // An answer that came while no Compose was open (the player left Feed while it was sent) was for a screen that
         // is gone: this one wasn't waiting for it, and doesn't tell it.
         draft.takeOutcome()
-        draft.destination = if (announcer) destination else FeedKind.GLOBAL
+        // A draft already written keeps its destination; a fresh one takes the tab whose button opened Compose (9.8).
+        draft.destination = FeedWriting.destinationOnOpen(draft.text.text, draft.anonymous, draft.destination, destination, announcer)
         destinationControl.selected = draft.destination.ordinal
         add(FrameHook { refresh() })
         add(Header(null).apply {
@@ -111,6 +116,16 @@ class ComposeScreen(
         destinationControl.enabled = !sending
         destinationControl.selected = draft.destination.ordinal
         close.enabled = !sending
+        if (announcer && !sending && session.state != null && !session.canCompose(FeedKind.ANNOUNCEMENTS)) dropDestination()
+    }
+
+    /** The announcer right went: Global, without the destination control, in the player's layout (9.8). */
+    private fun dropDestination() {
+        announcer = false
+        draft.destination = FeedKind.GLOBAL
+        remove(destinationControl)
+        area.at(12f, AREA_Y, 232f, AREA_PLAYER)
+        anonymous.at(12f, AREA_Y + AREA_PLAYER + 12f, 232f, 44f)
     }
 
     private fun send() {

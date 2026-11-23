@@ -24,6 +24,17 @@ object FeedWriting {
      */
     fun showsPin(post: PostView): Boolean = post.canPin && post.feed == FeedKind.ANNOUNCEMENTS && !post.isReply
 
+    /**
+     * Where a Compose opened from [button]'s tab sends its post (art direction 9.8, F-13): Global for whoever isn't an
+     * [announcer]; the destination [kept] with a draft already started (some [text], or the anonymous toggle on), as
+     * cancelling keeps it; the tab whose button opened Compose for a fresh draft.
+     */
+    fun destinationOnOpen(text: String, anonymous: Boolean, kept: FeedKind, button: FeedKind, announcer: Boolean): FeedKind = when {
+        !announcer -> FeedKind.GLOBAL
+        text.isNotEmpty() || anonymous -> kept
+        else -> button
+    }
+
     /** The display name others see for [post]: null when it is anonymous (`Anonyme`), even to a moderator. */
     fun publicName(post: PostView): String? = if (post.anonymous) null else post.author?.displayName
 
