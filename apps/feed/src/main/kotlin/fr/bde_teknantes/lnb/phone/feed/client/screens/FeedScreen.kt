@@ -387,7 +387,7 @@ class FeedScreen(
             if (mode != Mode.LIST) return
             val ids = feed.pinned + feed.posts
             val shown = ids.toHashSet()
-            for (id in cards.keys.toList()) if (id !in shown) cards.remove(id)?.let(list::remove)
+            for (id in cards.keys.toList()) if (id !in shown) cards.remove(id)
             val desired = ArrayList<Widget>(ids.size + 2)
             for (id in ids) {
                 val card = cards.getOrPut(id) { newCard(id) }
@@ -400,8 +400,9 @@ class FeedScreen(
                 else -> loadingRow
             }
             desired += spacer
-            // The first row in view keeps its place on screen while rows change above it.
-            val kept = if (anchor) list.children.firstOrNull { it.y + it.height > list.offset } else null
+            // The first row in view that stays keeps its place on screen while rows change above it: measured before
+            // anything leaves, as the list closes up at once.
+            val kept = if (anchor) list.children.firstOrNull { it.y + it.height > list.offset && it in desired } else null
             val keptAt = kept?.let { it.y - list.offset }
             for (row in list.children.toList()) if (row !in desired) list.remove(row)
             desired.forEachIndexed { i, row ->

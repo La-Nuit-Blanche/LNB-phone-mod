@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.ZoneOffset
 
@@ -546,11 +545,6 @@ class FeedScreenStatesTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: FeedTabView.syncRows removes the cards that left the list before it takes the row to keep in place, " +
-            "so the list has already closed up when the anchor is measured: a post deleted above the view makes " +
-            "what the player reads jump up by that card's height (101 dp here).",
-    )
     fun `a post deleted above the view doesn't move what the player reads`() {
         val t = open()
         val y = scrolledAnnonces(t)
