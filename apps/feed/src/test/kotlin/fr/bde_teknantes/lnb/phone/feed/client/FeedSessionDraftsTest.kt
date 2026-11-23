@@ -317,15 +317,17 @@ class FeedSessionDraftsTest {
     }
 
     @Test
-    fun `a reply to a thread with later pages unloaded waits for its page, the draft cleared`() {
+    fun `a reply to a thread with later pages unloaded shows at its end ahead of them, the draft cleared`() {
         r.state()
         val replies = (1..2).map { replyIn(main, minutesAgo = 9 - it.toLong()) }
         r.loadThread(main, replies, next = "t1")
         reply()
         val mine = replyIn(main, minutesAgo = 0, mine = true)
         session.onResult(ResultPayload(r.last<CreateReplyPayload>().requestId, Outcome.OK, post = mine))
-        assertEquals(replies.map { it.id }, session.thread(main.id).replies)
-        assertNull(session.takeThreadReveal(main.id))
+        // Art direction 9.7: at the end at once, scrolled into view; the pages before it load into the gap.
+        assertEquals(replies.map { it.id } + mine.id, session.thread(main.id).replies)
+        assertEquals(setOf(mine.id), session.thread(main.id).ahead)
+        assertEquals(mine.id, session.takeThreadReveal(main.id))
         assertEquals("", session.replyDraft(main.id).text.text)
     }
 

@@ -115,6 +115,14 @@ class ThreadState internal constructor(val id: UUID) {
     /** The replies loaded, oldest first. */
     val replies: List<UUID> get() = replyIds
 
+    internal val aheadIds = LinkedHashSet<UUID>()
+
+    /**
+     * The player's own replies shown at the end before the pages that come before them were loaded (art direction
+     * 9.7): the list has a gap before them, which the screen fills by loading those pages.
+     */
+    val ahead: Set<UUID> get() = aheadIds
+
     /** Whether the main post and a first page of replies arrived. */
     var loaded = false
         internal set

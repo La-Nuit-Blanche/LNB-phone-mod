@@ -303,14 +303,22 @@ class ThreadScreen(
             if (!thread.loaded) {
                 desired += if (thread.firstError != null) firstRetryRow else loadingRow
             } else {
+                // The spinner (or retry) row of the pages still to load stands where they go: at the end, or before
+                // the player's own replies shown ahead of them.
+                val moreRow = if (thread.moreFailed) moreRetryRow else loadingRow
+                var moreRowPlaced = !thread.hasMore
                 for (id in replies) {
                     val post = session.post(id) ?: continue
+                    if (!moreRowPlaced && id in thread.ahead) {
+                        desired += moreRow
+                        moreRowPlaced = true
+                    }
                     val card = cards.getOrPut(id) { newCard(id) }
                     card.look = CardLook(more = post.canDelete && writes, pin = false, replyTo = FeedWriting.replyToLine(post, strings))
                     desired += card
                 }
                 if (replies.isEmpty() && !thread.hasMore) desired += noRepliesRow
-                if (thread.hasMore) desired += if (thread.moreFailed) moreRetryRow else loadingRow
+                if (!moreRowPlaced) desired += moreRow
             }
         }
         desired += spacer
@@ -362,8 +370,9 @@ class ThreadScreen(
         }
         for ((id, card) in cards) if (card.parent === list && session.takeHighlight(id)) card.highlight()
         mainCard?.let { if (session.takeHighlight(threadId)) it.highlight() }
-        // The spinner row in view: the next 50 replies.
-        if (thread.hasMore && loadingRow.parent === list && loadingRow.y < list.offset + visibleHeight()) session.loadMoreReplies(threadId)
+        // The spinner row in view, or a gap before the player's own reply to fill: the next 50 replies.
+        val gap = thread.ahead.isNotEmpty()
+        if (thread.hasMore && loadingRow.parent === list && (gap || loadingRow.y < list.offset + visibleHeight())) session.loadMoreReplies(threadId)
     }
 
     /** Scrolls the least that shows the reply [id] fully above the dock. */

@@ -22,7 +22,9 @@ import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
+import fr.bde_teknantes.lnb.phone.api.client.ui.SpinnerRow
+import fr.bde_teknantes.lnb.phone.feed.client.widgets.PostCard
+import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
 import org.junit.jupiter.api.Test
 import org.lwjgl.glfw.GLFW
 import java.time.ZoneOffset
@@ -188,10 +190,6 @@ class ReplyComposerTest {
     }
 
     @Test
-    @Disabled(
-        "Design and code disagree: art direction 9.7 has the own reply appear at the end of the thread, scrolled into " +
-            "view; with later pages not loaded yet, FeedSession.replyAnswered keeps it out of the thread until they are",
-    )
     fun `an own reply in a thread whose later pages aren't loaded still shows at its end`() {
         val many = (1..50).map { reply(main, minutesAgo = 25L - it / 3).copy(text = "r$it") }
         // The first page only: the spinner row waits at the end.
@@ -202,6 +200,32 @@ class ReplyComposerTest {
         t.tick(5)
         t.frame()
         assertTrue(t.shows("fin"))
+    }
+
+    @Test
+    fun `the pages before an own reply shown ahead of them load into the gap, the reply staying last`() {
+        val many = (1..50).map { reply(main, minutesAgo = 25L - it / 3).copy(text = "r$it") }
+        val t = open(many, next = "c1")
+        t.type("fin")
+        t.clickSend()
+        val mine = reply(main, mine = true, author = CAMILLE).copy(text = "fin")
+        answer(Outcome.OK, post = mine)
+        t.tick(5)
+        t.frame()
+        // The gap before it is being filled: the next page was asked, and the spinner row stands before the reply.
+        val asked = r.last<LoadThreadPayload>()
+        assertEquals("c1", asked.after)
+        val rows = t.rows()
+        assertTrue(rows.indexOfFirst { it is SpinnerRow } < rows.indexOfFirst { it is PostCard && it.current()?.id == mine.id })
+        val later = (1..3).map { reply(main, minutesAgo = 1).copy(text = "tard$it") }
+        session.onThread(ThreadPayload(asked.requestId, Outcome.OK, null, later + mine, null))
+        t.tick(2)
+        t.frame()
+        val ids = session.thread(main.id).replies
+        assertEquals(mine.id, ids.last())
+        assertEquals(54, ids.size)
+        assertTrue(session.thread(main.id).ahead.isEmpty())
+        assertFalse(t.showsSpinnerRow())
     }
 
     // ---- Every answer (feed-app.md 5.3) ----

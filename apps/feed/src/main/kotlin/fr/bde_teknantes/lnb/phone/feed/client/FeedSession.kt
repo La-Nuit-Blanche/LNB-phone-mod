@@ -728,12 +728,20 @@ class FeedSession(
             thread.loadingMore = false
             if (payload.outcome == Outcome.OK && thread.loaded) {
                 for (reply in payload.replies) {
-                    if (reply.threadId != thread.id || reply.id in gone || reply.id in thread.replyIds) continue
+                    if (reply.threadId != thread.id || reply.id in gone) continue
+                    if (reply.id in thread.replyIds) {
+                        // Shown ahead of the pages (an own reply): the pages reached it.
+                        thread.aheadIds.remove(reply.id)
+                        continue
+                    }
                     posts[reply.id] = incoming(reply)
                     thread.replyIds += reply.id
                 }
                 thread.next = payload.next
                 thread.hasMore = payload.next != null
+                // Replies shown ahead of the pages stay last, the pages filling the gap before them.
+                if (!thread.hasMore) thread.aheadIds.clear()
+                thread.replyIds.sortWith(compareBy { posts[it]?.createdAt ?: Instant.MAX })
             } else if (payload.outcome == Outcome.NOT_FOUND) {
                 threadGone(thread.id)
             } else if (payload.outcome == Outcome.RATE_LIMITED) {
@@ -1140,6 +1148,7 @@ class FeedSession(
         thread.loadingFirst = false
         thread.loadingMore = false
         thread.replyIds.clear()
+        thread.aheadIds.clear()
         gone += threadId
         for (list in feeds.values) list.removeId(threadId)
         posts.remove(threadId)
@@ -1229,7 +1238,12 @@ class FeedSession(
         if (reply.id in gone || reply.threadId != request.threadId) return
         val thread = threads[request.threadId] ?: return
         posts[reply.id] = incoming(reply)
-        if (thread.loaded && !thread.hasMore && reply.id !in thread.replyIds) thread.replyIds += reply.id
+        if (thread.loaded && reply.id !in thread.replyIds) {
+            thread.replyIds += reply.id
+            // Later pages not loaded yet: the reply shows at the end at once (art direction 9.7), ahead of them, and
+            // the screen loads them into the gap ([ThreadState.ahead]).
+            if (thread.hasMore) thread.aheadIds += reply.id
+        }
         if (reply.id in thread.replyIds) {
             highlights += reply.id
             threadReveals[thread.id] = reply.id
