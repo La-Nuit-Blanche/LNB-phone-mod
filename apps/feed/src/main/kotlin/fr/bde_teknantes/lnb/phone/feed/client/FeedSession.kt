@@ -126,6 +126,9 @@ class FeedSession(
 
     private val requests = HashMap<Int, PendingRequest>()
     private val draftsAwaitingState = HashMap<Any, Int>()
+
+    // Threads reloaded because a reply was answered NOT_FOUND: if they are gone, their draft hears it.
+    private val threadsToCheck = HashSet<UUID>()
     private val ids = RequestIds()
     private val pendingLikes = HashMap<UUID, PendingLike>()
     private val pendingPins = HashMap<UUID, List<Pin>>()
@@ -649,6 +652,7 @@ class FeedSession(
             thread.loadingFirst = false
             when {
                 payload.outcome == Outcome.OK && main != null && main.id == thread.id && !main.isReply -> {
+                    threadsToCheck.remove(thread.id)
                     posts[main.id] = incoming(main)
                     mergeThreadPage(thread, payload.replies, payload.next)
                     thread.firstError = null
@@ -656,7 +660,10 @@ class FeedSession(
                     if (thread.stale) thread.reloadNotBefore = 0
                     if (viewingThread == thread.id) markThreadSeen(thread.id)
                 }
-                payload.outcome == Outcome.NOT_FOUND -> threadGone(thread.id)
+                payload.outcome == Outcome.NOT_FOUND -> {
+                    if (threadsToCheck.remove(thread.id)) replyDrafts[thread.id]?.outcome = DraftOutcome.ThreadGone
+                    threadGone(thread.id)
+                }
                 payload.outcome == Outcome.RATE_LIMITED -> thread.reloadNotBefore = ticks + READ_RETRY_TICKS
                 thread.loaded -> thread.reloadNotBefore = ticks + AUTO_RETRY_TICKS
                 else -> thread.firstError = if (payload.outcome == Outcome.OK) Outcome.UNAVAILABLE else payload.outcome
@@ -765,6 +772,7 @@ class FeedSession(
         pendingPins.clear()
         pinsMovedSince.clear()
         draftsAwaitingState.clear()
+        threadsToCheck.clear()
         deleting.clear()
         highlights.clear()
         reveals.clear()
@@ -1142,9 +1150,14 @@ class FeedSession(
         draft?.sending = false
         val reply = payload.post
         if (payload.outcome == Outcome.NOT_FOUND) {
-            draft?.outcome = DraftOutcome.ThreadGone
-            removePost(request.threadId)
-            collect()
+            // The site says so when the thread went, and also when only the reply answered went: the thread is loaded
+            // again, and leaves only if that reload says it is gone ([DraftOutcome.ThreadGone] then follows).
+            draft?.outcome = DraftOutcome.ActionFailed
+            threads[request.threadId]?.takeIf { it.loaded }?.let {
+                it.stale = true
+                it.reloadNotBefore = 0
+                threadsToCheck += it.id
+            }
             return
         }
         if (payload.outcome != Outcome.OK || reply == null) {

@@ -8,6 +8,8 @@ import fr.bde_teknantes.lnb.phone.feed.model.RemovedItem
 import fr.bde_teknantes.lnb.phone.feed.network.CreatePostPayload
 import fr.bde_teknantes.lnb.phone.feed.network.CreateReplyPayload
 import fr.bde_teknantes.lnb.phone.feed.network.ResultPayload
+import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
+import fr.bde_teknantes.lnb.phone.feed.network.LoadThreadPayload
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -328,15 +330,34 @@ class FeedSessionDraftsTest {
     }
 
     @Test
-    fun `a reply answered NOT_FOUND leaves the thread, deleted`() {
+    fun `a reply answered NOT_FOUND reloads the thread, which leaves only if the reload says it is gone`() {
         r.state()
         r.firstPage(FeedKind.GLOBAL, listOf(main))
         r.loadThread(main, emptyList())
         reply()
         session.onResult(ResultPayload(r.last<CreateReplyPayload>().requestId, Outcome.NOT_FOUND))
+        assertEquals(DraftOutcome.ActionFailed, session.replyDraft(main.id).takeOutcome())
+        assertFalse(session.thread(main.id).deleted)
+        assertEquals("J'arrive !", session.replyDraft(main.id).text.text)
+        assertTrue(session.thread(main.id).stale)
+        session.loadThreadIfNeeded(main.id)
+        session.onThread(ThreadPayload.failed(r.last<LoadThreadPayload>().requestId, Outcome.NOT_FOUND))
         assertEquals(DraftOutcome.ThreadGone, session.replyDraft(main.id).takeOutcome())
         assertTrue(session.thread(main.id).deleted)
         assertTrue(global.posts.isEmpty())
+    }
+
+    @Test
+    fun `a reply answered NOT_FOUND whose thread is still there keeps the thread`() {
+        r.state()
+        r.firstPage(FeedKind.GLOBAL, listOf(main))
+        r.loadThread(main, emptyList())
+        reply()
+        session.onResult(ResultPayload(r.last<CreateReplyPayload>().requestId, Outcome.NOT_FOUND))
+        // Only the reply it answered went: the thread reloads and stays.
+        r.loadThread(main, emptyList())
+        assertFalse(session.thread(main.id).deleted)
+        assertEquals(listOf(main.id), global.posts)
     }
 
     @Test
