@@ -59,6 +59,36 @@ class ThreadSeenTest {
         assertEquals(FeedNotice.Deleted(own.id, reply = true), session.takeNotice())
     }
 
+    /** A thread with a first page and more, and the player's own reply shown ahead of the pages not loaded. */
+    private fun ownReplyAhead(): Pair<fr.bde_teknantes.lnb.phone.feed.model.PostView, fr.bde_teknantes.lnb.phone.feed.model.PostView> {
+        r.state()
+        val main = post(text = "x")
+        r.loadThread(main, listOf(replyIn(main, minutesAgo = 9)), next = "t1")
+        session.replyDraft(main.id).text.text = "moi"
+        session.sendReply(main.id)
+        val mine = replyIn(main, minutesAgo = 0, mine = true)
+        session.onResult(ResultPayload(r.last<fr.bde_teknantes.lnb.phone.feed.network.CreateReplyPayload>().requestId, Outcome.OK, post = mine))
+        assertEquals(setOf(mine.id), session.thread(main.id).ahead)
+        return main to mine
+    }
+
+    @Test
+    fun `an own reply shown ahead of the pages and deleted leaves no gap to fill`() {
+        val (main, mine) = ownReplyAhead()
+        session.onRemoved(listOf(RemovedItem(mine.id, FeedKind.GLOBAL, main.id)))
+        assertTrue(session.thread(main.id).ahead.isEmpty())
+    }
+
+    @Test
+    fun `a merge after a reset with no next page closes the gap`() {
+        val (main, mine) = ownReplyAhead()
+        session.onReset()
+        session.loadThreadIfNeeded(main.id)
+        session.onThread(ThreadPayload(r.last<LoadThreadPayload>().requestId, Outcome.OK, main, listOf(replyIn(main, minutesAgo = 9), mine), null))
+        assertTrue(session.thread(main.id).ahead.isEmpty())
+        assertFalse(session.thread(main.id).hasMore)
+    }
+
     @Test
     fun `a pin waits for its answer`() {
         r.state(FeedFixtures.ANNOUNCER)

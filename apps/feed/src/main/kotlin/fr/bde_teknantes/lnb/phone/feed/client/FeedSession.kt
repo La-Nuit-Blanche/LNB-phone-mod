@@ -1135,6 +1135,9 @@ class FeedSession(
         // pages skip what is held already. Keeping an older end would leave them out.
         thread.next = next
         thread.hasMore = next != null
+        // Own replies shown ahead of pages not loaded: gone with the replies dropped, reached by the page, or with no
+        // page left to load, there is no gap before them any more.
+        if (next == null) thread.aheadIds.clear() else thread.aheadIds.retainAll { it in thread.replyIds && it !in inPage }
     }
 
     private fun livePost(view: PostView) {
@@ -1250,7 +1253,11 @@ class FeedSession(
     private fun removePost(id: UUID) {
         gone += id
         for (list in feeds.values) list.removeId(id)
-        for (thread in threads.values) thread.replyIds.remove(id)
+        for (thread in threads.values) {
+            thread.replyIds.remove(id)
+            // An own reply shown ahead of the pages, deleted: no gap left to fill for it.
+            thread.aheadIds.remove(id)
+        }
         if (threads.containsKey(id)) threadGone(id)
         pendingLikes.remove(id)
         pendingPins.remove(id)
