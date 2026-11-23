@@ -73,6 +73,17 @@ abstract class AppScreen {
             "${javaClass.name} isn't on the phone yet: use `phone` from onShown or later, not in the constructor",
         )
 
+    /**
+     * Whether the screen is on the phone now: given to it (by a factory, [Phone.push] or [Phone.replace]) and neither
+     * closed nor failed. Shown or not, and the phone put away or not: a screen under another one, or of an app put away,
+     * is on the phone. False before the phone has the screen, and for good once it closed or threw.
+     *
+     * For an app that keeps something running for as long as its screens are open: [onClosed] is not called on a screen
+     * that threw, nor on one built for a stack that never opened (another screen of the stack failed while being
+     * created), so this is the way to find out that such a screen is gone. Available from phone 0.2.0.
+     */
+    val isOnPhone: Boolean get() = !failed && host?.let { !it.closed } == true
+
     /** The screen became the one the player sees. Also the place to start what needs [phone] (it isn't set yet in the constructor). */
     open fun onShown() {}
 
