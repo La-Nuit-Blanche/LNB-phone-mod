@@ -44,8 +44,9 @@ cd lnb-warden
 cp build/libs/lnbwarden-*.jar <this repository>/apps/feed/libs/
 ```
 
-`libs/` is ignored by git. Without the jar, the repository still builds, but leaves Feed out (Gradle says so with a
-warning). Then, from the repository's root: `./gradlew :apps:feed:build`.
+`libs/` is ignored by git. Without the jar, a local build still builds the phone but leaves Feed out (Gradle says so
+with a warning); on CI (`CI=true`) a missing jar fails the build. The CI builds Warden from its public repository
+first. Then, from the repository's root: `./gradlew :apps:feed:build`.
 
 ## Running without a site
 

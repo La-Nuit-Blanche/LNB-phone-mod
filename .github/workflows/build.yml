@@ -24,6 +24,21 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # LNB Warden is in no Maven repository and is never committed: Feed compiles against a jar built from its
+      # public repository, as lnb-economy's CI does. Without it the build fails here (settings.gradle.kts).
+      - name: Checkout LNB Warden
+        uses: actions/checkout@v4
+        with:
+          repository: Charles-Mahoudeau/lnb-warden
+          path: lnb-warden
+
+      - name: Build LNB Warden
+        working-directory: lnb-warden
+        run: |
+          ./gradlew jar
+          mkdir -p ../apps/feed/libs
+          cp build/libs/lnbwarden-*.jar ../apps/feed/libs/
+
       # On a tag v1.2.3, the jar is built as version 1.2.3.
       - name: Build and test
         run: |
