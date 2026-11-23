@@ -470,7 +470,7 @@ class FeedSession(
         val liked = !post.liked
         val pending = pendingLikes.getOrPut(postId) { PendingLike(post.liked, post.likes) }
         posts[postId] = post.copy(liked = liked, likes = (post.likes + if (liked) 1 else -1).coerceAtLeast(0))
-        pending.latest = request(PendingRequest.Like(postId)) { LikePayload(it, postId, liked) }
+        pending.outstanding += request(PendingRequest.Like(postId)) { LikePayload(it, postId, liked) }
         changed()
         return LikeAttempt.SENT
     }
@@ -1063,30 +1063,35 @@ class FeedSession(
         posts.remove(threadId)
     }
 
+    /**
+     * The answer to one click on a heart. The site's state is the last one an `OK` answered (by request order, however
+     * the answers arrive); the heart shows it once every click is answered, until then what the player clicked. A
+     * refusal says so only for the last click: an earlier one is overtaken by it.
+     */
     private fun likeAnswered(request: PendingRequest.Like, payload: ResultPayload) {
-        val pending = pendingLikes[request.postId] ?: return
-        val latest = pending.latest == payload.requestId
+        val id = request.postId
+        val pending = pendingLikes[id] ?: return
+        pending.outstanding -= payload.requestId
+        val liked = payload.liked
+        val likes = payload.likes
         if (payload.outcome == Outcome.OK) {
-            val liked = payload.liked ?: return
-            val likes = payload.likes ?: return
-            pending.confirmedLiked = liked
-            pending.confirmedLikes = likes
-            if (latest) {
-                pendingLikes.remove(request.postId)
-                posts[request.postId]?.let { posts[request.postId] = it.copy(liked = liked, likes = likes) }
+            // An OK without its fields (a broken server) confirms nothing, and freezes nothing either.
+            if (liked != null && likes != null && payload.requestId > pending.confirmedBy) {
+                pending.confirmedLiked = liked
+                pending.confirmedLikes = likes
+                pending.confirmedBy = payload.requestId
             }
-            return
-        }
-        // Only the last click decides: an earlier one that failed is overtaken by it.
-        if (!latest) return
-        pendingLikes.remove(request.postId)
-        posts[request.postId]?.let { posts[request.postId] = it.copy(liked = pending.confirmedLiked, likes = pending.confirmedLikes) }
-        if (payload.outcome == Outcome.NOT_FOUND) {
-            removePost(request.postId)
+        } else if (payload.outcome == Outcome.NOT_FOUND) {
+            pendingLikes.remove(id)
+            removePost(id)
             collect()
-        } else {
+            return
+        } else if (pending.outstanding.none { it > payload.requestId }) {
             notice = actionNotice(payload)
         }
+        if (pending.outstanding.isNotEmpty()) return
+        pendingLikes.remove(id)
+        posts[id]?.let { posts[id] = it.copy(liked = pending.confirmedLiked, likes = pending.confirmedLikes) }
     }
 
     private fun postAnswered(payload: ResultPayload) {
@@ -1213,7 +1218,11 @@ class FeedSession(
 
     /** A like shown before the server answered: what to put back if the last click fails. */
     private class PendingLike(var confirmedLiked: Boolean, var confirmedLikes: Int) {
-        var latest = 0
+        /** The clicks not answered yet. */
+        val outstanding = HashSet<Int>()
+
+        /** The request whose `OK` gave the confirmed state: an earlier one answered later doesn't overwrite it. */
+        var confirmedBy = 0
     }
 
     /** A set that forgets its oldest entries past [max]. */

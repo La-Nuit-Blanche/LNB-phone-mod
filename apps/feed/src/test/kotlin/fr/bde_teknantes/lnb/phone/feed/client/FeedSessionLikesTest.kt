@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
@@ -90,11 +89,6 @@ class FeedSessionLikesTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: the last click refused before the answer to an earlier one that went through puts back the state from " +
-            "before both clicks; the earlier answer then finds nothing pending and is dropped, so the heart shows unliked " +
-            "while the site holds the like (until a reload).",
-    )
     fun `the last click refused before an earlier one's success - the success stands`() {
         val like = click()
         val unlike = click()
@@ -129,10 +123,6 @@ class FeedSessionLikesTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (a broken server only): an OK answer to a like without `likes` or `liked` leaves the like pending for " +
-            "ever, so later `counts` never change the count shown.",
-    )
     fun `an OK like answer missing its fields doesn't freeze the count`() {
         click()
         session.onResult(ResultPayload(r.last<LikePayload>().requestId, Outcome.OK))
