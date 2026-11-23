@@ -3,7 +3,6 @@ package fr.bde_teknantes.lnb.phone.feed.server.backend.site
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -94,17 +93,12 @@ class SiteJsonBoundsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (broken site only): SiteJson accepts any date Instant.parse takes, but the payloads carry epoch milliseconds in a long. A " +
-            "date past year 292,278,994 (\"+300000000-01-01T00:00:00Z\") passes SiteJson, then Instant.toEpochMilli throws " +
-            "while the payload is encoded, which drops the connection of the player it goes to (of every watcher for a " +
-            "pins event) instead of making the call Unavailable. Seen: PostView and PinsPayload encoding throw " +
-            "ArithmeticException for such a date.",
-    )
     fun `a date past what epoch milliseconds hold is refused before it reaches a payload`() {
         val far = "\"+300000000-01-01T00:00:00Z\""
         assertThrows(SiteFormatException::class.java) { SiteJson.post(SiteJson.parse(post(createdAt = far))) }
         assertThrows(SiteFormatException::class.java) { SiteJson.post(SiteJson.parse(post(pinnedAt = far))) }
         assertThrows(SiteFormatException::class.java) { SiteJson.pins(SiteJson.parse("""{ "pinned": [ { "id": "$id", "pinnedAt": $far } ] }""")) }
+        val farPast = "\"-300000000-01-01T00:00:00Z\""
+        assertThrows(SiteFormatException::class.java) { SiteJson.post(SiteJson.parse(post(createdAt = farPast))) }
     }
 }

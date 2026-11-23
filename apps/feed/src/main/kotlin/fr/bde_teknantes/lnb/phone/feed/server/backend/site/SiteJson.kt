@@ -270,10 +270,19 @@ object SiteJson {
         }
     }
 
-    private fun JsonObject.instant(name: String): Instant = try {
-        Instant.parse(string(name, 64)).truncatedTo(ChronoUnit.MILLIS)
-    } catch (e: java.time.format.DateTimeParseException) {
-        throw SiteFormatException("$name: not a date")
+    /** A date the payloads can carry: they hold epoch milliseconds in a long, which a far date overflows. */
+    private fun JsonObject.instant(name: String): Instant {
+        val instant = try {
+            Instant.parse(string(name, 64)).truncatedTo(ChronoUnit.MILLIS)
+        } catch (e: java.time.format.DateTimeParseException) {
+            throw SiteFormatException("$name: not a date")
+        }
+        try {
+            instant.toEpochMilli()
+        } catch (e: ArithmeticException) {
+            throw SiteFormatException("$name: out of range")
+        }
+        return instant
     }
 
     private fun JsonObject.instantOrNull(name: String): Instant? = if (isNull(name)) null else instant(name)
