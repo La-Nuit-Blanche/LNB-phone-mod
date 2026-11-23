@@ -69,6 +69,21 @@ class AppVisitTest {
     }
 
     @Test
+    fun `a root that threw before any tick saw it doesn't linger, and the next visit's end ends the visit`() {
+        r.state()
+        r.page(FeedKind.GLOBAL, listOf(post(text = "x")))
+        // Registered, then off the phone before the client's tick ever read it.
+        session.appOpened(Any()) { false }
+        val next = Any()
+        session.appOpened(next)
+        r.state(available = Availability.UNAVAILABLE)
+        // The next visit closes: nothing of the first is left, so the visit ends and its notices go.
+        session.appClosed(next)
+        assertFalse(session.isAppOpen)
+        assertNull(session.takeNotice())
+    }
+
+    @Test
     fun `open goes once per visit, and again for the next one`() {
         val t = PhoneTester(feedApp(session, FeedKind.GLOBAL)).also { tester = it }
         assertEquals(1, r.all<OpenPayload>().size)

@@ -349,6 +349,10 @@ class FeedSession(
      * a screen that threw and never hears it closed. A visit sends `open` once ([openOnce]).
      */
     fun appOpened(owner: Any, alive: () -> Boolean = { true }) {
+        // Roots already off the phone go: one that threw before a tick saw it on the phone, or one whose stack never
+        // opened, would otherwise stay listed (never counted as open, but never ending the visit either). A stack is
+        // built and attached in one go, so no root registered earlier is still waiting to be put on the phone.
+        openApps.values.removeAll { !it.alive() }
         openApps[owner] = AppOwner(alive)
         openSent = false
     }
