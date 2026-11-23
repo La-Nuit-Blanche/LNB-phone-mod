@@ -352,7 +352,9 @@ abstract class KitScreen : AppScreen() {
             if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) focus(null)
             return false
         }
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && target !is Overlay) focus(target.takeIf { it.focusable })
+        // A press on something disabled does nothing, the focus included: the field being typed in keeps it, so the
+        // next Backspace still erases (it would go back a screen without a text focus).
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && target !is Overlay && target.isEnabled) focus(target.takeIf { it.focusable })
         var w: Widget? = target
         while (w != null && w !is Root) {
             // Set before the call: a press that navigates hides the screen, which must find the capture to drop.
