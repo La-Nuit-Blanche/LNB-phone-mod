@@ -59,6 +59,7 @@ jobs:
         with:
           name: lnbphone
           path: phone/build/libs/lnbphone-*.jar
+          if-no-files-found: error
 
       - name: Upload Feed's jar
         uses: actions/upload-artifact@v4
@@ -69,8 +70,17 @@ jobs:
 
       # The phone's jar and Feed's are published together: the demo app is built to check it compiles, never shipped.
       # LNB Warden is not ours and is not part of the release: the server installs its own copy.
+      # A re-run on the same tag (a failed step, or "Re-run jobs") finds the release already there: `gh release create`
+      # would fail on it, so the jars are uploaded to it instead, replacing those of the same names (the tag fixes the
+      # version, so they are the same files rebuilt). The release's title and notes are left as they are.
       - name: Publish the release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" phone/build/libs/lnbphone-*.jar apps/feed/build/libs/lnbphone_feed-*.jar --title "$GITHUB_REF_NAME" --generate-notes
+        run: |
+          jars=(phone/build/libs/lnbphone-*.jar apps/feed/build/libs/lnbphone_feed-*.jar)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${jars[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${jars[@]}" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
