@@ -81,7 +81,7 @@ class FeedSessionStateTest {
     }
 
     @Test
-    fun `each tab's block is its own - Feed back loads only the tab whose Retry was clicked`() {
+    fun `Feed back loads the tab whose Retry was clicked, and lifts the other tab's block to load when shown`() {
         for (kind in FeedKind.entries) {
             session.loadIfNeeded(kind)
             session.onPage(PagePayload.failed(r.last<LoadFeedPayload>().requestId, Outcome.DISABLED, kind))
@@ -89,7 +89,11 @@ class FeedSessionStateTest {
         session.retryFirst(FeedKind.GLOBAL)
         r.state()
         assertTrue(global.loadingFirst)
-        assertEquals(Outcome.DISABLED, session.feed(FeedKind.ANNOUNCEMENTS).firstError)
+        val announcements = session.feed(FeedKind.ANNOUNCEMENTS)
+        assertNull(announcements.firstError)
+        assertFalse(announcements.loadingFirst)
+        session.loadIfNeeded(FeedKind.ANNOUNCEMENTS)
+        assertTrue(announcements.loadingFirst)
     }
 
     @Test

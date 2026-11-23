@@ -460,6 +460,23 @@ class FeedScreenStatesTest {
     // ---- Connection lost (9.12) ----
 
     @Test
+    fun `a Feed indisponible block left from an earlier failure goes when Feed is back`() {
+        val t = open()
+        failLast(FeedKind.ANNOUNCEMENTS, Outcome.UNAVAILABLE)
+        t.frame()
+        assertTrue(t.shows("feed.unavailable.title"))
+        val loads = r.all<LoadFeedPayload>().size
+        // Feed back (the 15-second open, or the server's own state): the list loads again, no Retry needed.
+        r.state()
+        t.tick()
+        assertEquals(loads + 1, r.all<LoadFeedPayload>().size)
+        answer(FeedKind.ANNOUNCEMENTS, posts(1, FeedKind.ANNOUNCEMENTS))
+        t.frame()
+        assertFalse(t.shows("feed.unavailable.title"))
+        assertTrue(t.shows("p1"))
+    }
+
+    @Test
     fun `Feed back takes away its Connexion perdue only, not a snackbar that replaced it`() {
         val t = open(FeedKind.GLOBAL)
         r.state()

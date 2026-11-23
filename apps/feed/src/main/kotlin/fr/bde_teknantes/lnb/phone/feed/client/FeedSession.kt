@@ -593,6 +593,9 @@ class FeedSession(
                 list.firstError = null
                 loadFirst(list)
             }
+            // A block left by an earlier failure goes too: the list loads again when shown, without a Retry.
+            for (list in feeds.values) if (!list.loaded && !list.loadingFirst) list.firstError = null
+            for (thread in threads.values) if (!thread.loaded && !thread.deleted && !thread.loadingFirst) thread.firstError = null
         } else {
             if (hasLoadedContent && (!wasLost || manualRetry)) {
                 notice = FeedNotice.ConnectionLost
