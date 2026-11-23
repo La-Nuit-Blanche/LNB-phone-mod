@@ -1121,7 +1121,8 @@ class FeedSession(
         // Always at its place, scrolled into view (art direction 9.5): the posts waiting before it come along.
         list.waitingIds.remove(post.id)
         releaseWaiting(post.feed)
-        if (!list.holds(post.id)) list.postIds.add(0, post.id)
+        // At its date: a post of someone else that came live meanwhile may be newer.
+        if (!list.holds(post.id)) insertByDate(list, post.id)
         highlights += post.id
         reveals[post.feed] = post.id
     }

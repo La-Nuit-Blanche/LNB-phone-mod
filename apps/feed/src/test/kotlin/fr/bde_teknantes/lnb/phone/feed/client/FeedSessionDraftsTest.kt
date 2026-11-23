@@ -165,10 +165,6 @@ class FeedSessionDraftsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (low): postAnswered puts the own post at index 0 after releasing the waiting posts, above a post of " +
-            "someone else that is newer (it arrived live before the answer). The list is no longer newest first.",
-    )
     fun `one's own post answered after a newer live post keeps the list newest first`() {
         r.state()
         r.firstPage(FeedKind.GLOBAL, listOf(post(minutesAgo = 30)))
