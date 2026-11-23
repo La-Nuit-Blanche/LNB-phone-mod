@@ -19,7 +19,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.demo.client.smooth.SampleSkins
 
 /**
- * Emoji in the kit (task 13): the same French text with common emoji in a text area (caret after an emoji), a field,
+ * Emoji in the kit: the same French text with common emoji in a text area (caret after an emoji), a field,
  * a post card, list rows and a snackbar; every kind of emoji sequence in each text style, Regular and SemiBold; and a
  * page of many distinct emoji for the glyph atlas at high GUI scales.
  */

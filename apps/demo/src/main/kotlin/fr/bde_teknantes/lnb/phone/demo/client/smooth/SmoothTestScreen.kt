@@ -15,7 +15,7 @@ import org.lwjgl.opengl.GL11
 import kotlin.math.max
 
 /**
- * Test sheet for the smooth layer (task 3), laid out in 640 x 480 dp so it fits the window at GUI scale 4: a Feed
+ * Test sheet for the smooth layer, laid out in 640 x 480 dp so it fits the window at GUI scale 4: a Feed
  * column at the real viewport width (header, two post cards, a clipping test) and, on the right, the type ramp, text
  * rendering variants, shapes, avatars, icons, and native masks next to the art direction's 2x sprites.
  */

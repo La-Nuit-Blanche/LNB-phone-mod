@@ -6,8 +6,8 @@ import fr.bde_teknantes.lnb.phone.client.debug.CaptureHooks
 import org.lwjgl.glfw.GLFW
 
 /**
- * Task 8: the Settings app in the real phone, in a world, through the game's own input path, step by step through
- * art direction 17's flows P-12 (placement), P-13 (sounds) and P-14 (preview, the steps this branch can show). Run without
+ * `settings`: the Settings app in the real phone, in a world, through the game's own input path, step by step through
+ * art direction 17's flows P-12 (placement), P-13 (sounds) and P-14 (preview, the steps it can show). Run without
  * `-PdemoApps`: Settings is then the fifth icon of row 0, as in P-12.1 (after Hello, the kit, the post sample and Ping).
  *
  * [settings] plays the flows at GUI scale 2, 3 and 4 in French, shows the screen in English at each scale, and ends
@@ -106,7 +106,7 @@ internal object SettingsScenarios {
         shot(name("p13_2_sounds_off_hover"))
         log("P-13 sounds off at GUI $s")
 
-        // P-14: preview, steps 1 and 2 (the peek and the banner are task 7's).
+        // P-14: preview, steps 1 and 2 (the peek and the banner are in the `notifications` scenario).
         mouseToApp(226, 218)
         waitTicks(3)
         shot(name("p14_1_preview_on_hover"))

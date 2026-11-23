@@ -16,11 +16,12 @@ import org.junit.jupiter.params.provider.MethodSource
  *
  * Sources: 10.2 (peek; "Preview off": no peek, chime, badge waits), 10.3 (banner over any screen; not shown when the
  * target is on screen, "The chime plays in both cases"), 12 (preview "disables the peek only"), 15 (all sounds muted
- * with Sons off), P-8, P-10, P-11, P-13.3, P-14.3, P-14.5; the task's decisions 1 (GUI scale 1), 3 (sliding open counts
- * as open, sliding closed the peek waits), 4 (another screen open: chime only) and 5 (a new notification swaps the
- * peek's content).
+ * with Sons off), P-8, P-10, P-11, P-13.3, P-14.3, P-14.5; and four decisions taken while the notifications were built,
+ * recorded since in 10.2 and 10.3, which the rows cite by number: 1 (GUI scale 1), 3 (sliding open counts as open,
+ * sliding closed the peek waits), 4 (another screen open: chime only) and 5 (a new notification swaps the peek's
+ * content). A notification of an app this client lacks raises no alert at all (`NotificationAlerts`).
  *
- * A peek already showing with the preview then turned off was never decided: those rows are left out (see the report).
+ * A peek already showing with the preview then turned off was never decided: those rows are left out.
  */
 internal class ShellAlertsTableTest : AlertsTestBase() {
     /** What the phone looks like when the notification arrives, and which notification arrives. */
@@ -117,10 +118,10 @@ internal class ShellAlertsTableTest : AlertsTestBase() {
             Row(Setup.GUI_SCALE_1_OPEN_ON_HOME, OFF, Shown.NOTHING, KEPT, "decision 1"),
             Row(Setup.GUI_SCALE_1_OPEN_ON_THE_TARGET, ON, Shown.NOTHING, KEPT, "decision 1: not read where it can't be seen"),
             Row(Setup.GUI_SCALE_1_OPEN_ON_THE_TARGET, OFF, Shown.NOTHING, KEPT, "decision 1"),
-            Row(Setup.APP_NOT_INSTALLED_CLOSED, ON, Shown.NOTHING, KEPT, "task 6: no alert for an app this client lacks"),
-            Row(Setup.APP_NOT_INSTALLED_CLOSED, OFF, Shown.NOTHING, KEPT, "task 6"),
-            Row(Setup.APP_NOT_INSTALLED_OPEN_ON_HOME, ON, Shown.NOTHING, KEPT, "task 6"),
-            Row(Setup.APP_NOT_INSTALLED_OPEN_ON_HOME, OFF, Shown.NOTHING, KEPT, "task 6"),
+            Row(Setup.APP_NOT_INSTALLED_CLOSED, ON, Shown.NOTHING, KEPT, "no alert for an app this client lacks"),
+            Row(Setup.APP_NOT_INSTALLED_CLOSED, OFF, Shown.NOTHING, KEPT, "app not installed"),
+            Row(Setup.APP_NOT_INSTALLED_OPEN_ON_HOME, ON, Shown.NOTHING, KEPT, "app not installed"),
+            Row(Setup.APP_NOT_INSTALLED_OPEN_ON_HOME, OFF, Shown.NOTHING, KEPT, "app not installed"),
         )
 
         @JvmStatic

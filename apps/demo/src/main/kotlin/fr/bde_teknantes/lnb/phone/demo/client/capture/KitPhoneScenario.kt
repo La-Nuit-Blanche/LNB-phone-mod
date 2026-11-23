@@ -8,7 +8,7 @@ import fr.bde_teknantes.lnb.phone.demo.client.kit.KitPages
 import org.lwjgl.glfw.GLFW
 
 /**
- * Task 5: the UI kit inside the real phone, in a world, driven through the game's own input path (the mouse, the
+ * `kit-phone`: the UI kit inside the real phone, in a world, driven through the game's own input path (the mouse, the
  * keys, the character callback), at GUI scale 2, 3 and 4, in French: the gallery with hover tints, a slide between
  * two screens held half way, the post sample scrolled, a menu, a dialog, Compose typed into (accents and a dead key
  * included), sent, and back on the feed with its snackbar. Home icons: Hello, UI kit, Post sample.

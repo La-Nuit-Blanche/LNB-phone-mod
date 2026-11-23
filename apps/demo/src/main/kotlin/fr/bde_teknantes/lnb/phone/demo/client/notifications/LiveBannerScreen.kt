@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation
 /**
  * Shows what the client's notification store holds right now, for the end-to-end capture: the newest notification as
  * a banner, the unread count and the target, over the world. Proves the path command, server store, network, client
- * store and translation without the phone's screen (task 4).
+ * store and translation without the phone's screen.
  *
  * The store is internal to the phone, so this development screen reads it by reflection; nothing shipped does.
  */
