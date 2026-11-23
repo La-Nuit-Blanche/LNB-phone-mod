@@ -495,10 +495,6 @@ class ReplyComposerTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (low): a reply answered after the player left its thread keeps its outcome in the draft, and the " +
-            "thread opened again later plays the sent sound and shows Reply sent as if it had just gone (ReplyDraft.outcome)",
-    )
     fun `a reply answered after the player left its thread says nothing when the thread is opened again`() {
         val t = openFromFeed()
         t.type("en route")

@@ -419,10 +419,6 @@ class ComposeFlowTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: an answer that comes after the player left Feed (home) stays in the draft, and the next Compose " +
-            "opened takes it as just published and closes at once with Posted (ComposeScreen.onTick, ComposeDraft.outcome)",
-    )
     fun `a post answered after the player left Feed doesn't close the next Compose opened`() {
         val t = feed(FeedKind.GLOBAL)
         t.clickFab()

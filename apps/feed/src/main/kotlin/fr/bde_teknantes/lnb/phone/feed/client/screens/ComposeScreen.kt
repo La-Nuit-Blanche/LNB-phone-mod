@@ -70,6 +70,9 @@ class ComposeScreen(
     }
 
     init {
+        // An answer that came while no Compose was open (the player left Feed while it was sent) was for a screen that
+        // is gone: this one wasn't waiting for it, and doesn't tell it.
+        draft.takeOutcome()
         draft.destination = if (announcer) destination else FeedKind.GLOBAL
         destinationControl.selected = draft.destination.ordinal
         add(FrameHook { refresh() })

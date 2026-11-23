@@ -91,6 +91,9 @@ class ThreadScreen(
     private var openEnded = false
 
     init {
+        // An answer that came while this thread wasn't open (the player left it while the reply was sent) was for a
+        // screen that is gone: this one wasn't waiting for it, and doesn't tell it.
+        draft.takeOutcome()
         // From a card or a reply button, the thread opens at its top; from a notification, at the reply.
         if (landOn == null) thread.scroll.offset = 0f
         composer.visible = false
