@@ -160,7 +160,7 @@ guests = []          # usernames that are guests (read only)
 rateLimits = true
 ```
 
-Changed only by a restart.
+Changed only by a restart. The site backend runs on a dedicated server only: a single-player or LAN world with `kind = "site"` calls nothing and Feed says it is unavailable there, as LNB Warden never calls the site from one either. The memory backend works in any world.
 
 ## 4. The server side
 

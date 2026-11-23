@@ -6,6 +6,7 @@ import fr.bde_teknantes.lnb.phone.feed.network.OpenPayload
 import fr.bde_teknantes.lnb.phone.feed.network.SeenFeedPayload
 import fr.bde_teknantes.lnb.phone.feed.network.SeenThreadPayload
 import fr.bde_teknantes.lnb.phone.feed.server.backend.FeedBackend
+import fr.bde_teknantes.lnb.phone.feed.server.backend.UnavailableBackend
 import fr.bde_teknantes.lnb.phone.feed.server.backend.memory.MemoryBackend
 import fr.bde_teknantes.lnb.phone.feed.server.backend.memory.MemoryPlayers
 import fr.bde_teknantes.lnb.phone.feed.server.backend.memory.SampleContent
@@ -91,10 +92,25 @@ object FeedServer {
         current?.handleSeenThread(player.uuid, payload.threadId)
     }
 
+    /** Which backend runs: the site's on a dedicated server only, as LNB Warden calls the site only there. */
+    internal enum class Choice { SITE, MEMORY, NONE }
+
+    internal fun choose(kind: FeedConfig.Kind, dedicated: Boolean): Choice = when (kind) {
+        FeedConfig.Kind.MEMORY -> Choice.MEMORY
+        FeedConfig.Kind.SITE -> if (dedicated) Choice.SITE else Choice.NONE
+    }
+
     private fun createBackend(server: MinecraftServer): FeedBackend {
-        if (FeedConfig.kind == FeedConfig.Kind.SITE) {
-            FeedMod.LOGGER.info("Feed uses LNB's website (api.url in lnbwarden-server.toml)")
-            return SiteBackend()
+        when (choose(FeedConfig.kind, server.isDedicatedServer)) {
+            Choice.SITE -> {
+                FeedMod.LOGGER.info("Feed uses LNB's website (api.url in lnbwarden-server.toml)")
+                return SiteBackend()
+            }
+            Choice.NONE -> {
+                FeedMod.LOGGER.info("Feed calls LNB's website from dedicated servers only: unavailable in this world")
+                return UnavailableBackend("not a dedicated server")
+            }
+            Choice.MEMORY -> Unit
         }
         val clock = fixedClock() ?: Clock.systemUTC()
         val backend = MemoryBackend(clock, MemoryPlayers(server), FeedConfig.guests, FeedConfig.rateLimits)
