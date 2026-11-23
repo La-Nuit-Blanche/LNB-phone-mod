@@ -44,7 +44,8 @@ jobs:
           mkdir -p ../apps/feed/libs
           cp build/libs/lnbwarden-*.jar ../apps/feed/libs/
 
-      # On a tag v1.2.3, the jar is built as version 1.2.3.
+      # On a tag v1.2.3, every jar is built as version 1.2.3: the phone's, and Feed's, whose dependency on the phone
+      # then reads [1.2.3,2) (written by the lnbphone.app plugin), so the two jars of a release load together.
       - name: Build and test
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
@@ -53,15 +54,23 @@ jobs:
             ./gradlew build
           fi
 
-      - name: Upload the jar
+      - name: Upload the phone's jar
         uses: actions/upload-artifact@v4
         with:
           name: lnbphone
           path: phone/build/libs/lnbphone-*.jar
 
-      # Only the phone's jar is published: the demo app is built to check it compiles, never shipped.
+      - name: Upload Feed's jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: lnbphone_feed
+          path: apps/feed/build/libs/lnbphone_feed-*.jar
+          if-no-files-found: error
+
+      # The phone's jar and Feed's are published together: the demo app is built to check it compiles, never shipped.
+      # LNB Warden is not ours and is not part of the release: the server installs its own copy.
       - name: Publish the release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" phone/build/libs/lnbphone-*.jar --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" phone/build/libs/lnbphone-*.jar apps/feed/build/libs/lnbphone_feed-*.jar --title "$GITHUB_REF_NAME" --generate-notes
