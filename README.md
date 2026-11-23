@@ -40,7 +40,11 @@ sides too. The phone depends on nothing else. Each player's settings are in `con
 computer.
 
 Feed (`lnbphone_feed`) is installed with the phone, on the server and on every client, and also needs LNB Warden
-(0.5.0 or later, not part of this repository). `apps/feed/README.md` has the details and Feed's configuration.
+(0.5.0 or later, not part of this repository). Warden has no releases: build its jar from
+`https://github.com/Charles-Mahoudeau/lnb-warden` with `./gradlew jar` (the commands are under [Building](#building)), or
+get it from whoever runs the server's mods. Feed is built and tested against Warden 0.5.0 at commit `5a9dba1`, the
+commit CI pins (`ref` in `.github/workflows/build.yml`). `apps/feed/README.md` has the details and Feed's
+configuration.
 
 ## Layout
 
@@ -76,11 +80,13 @@ building it from Warden's public repository, once:
 ```
 git clone https://github.com/Charles-Mahoudeau/lnb-warden
 cd lnb-warden
+git checkout 5a9dba1
 ./gradlew jar
 cp build/libs/lnbwarden-*.jar <this repository>/apps/feed/libs/
 ```
 
-(`apps/feed/libs/` is ignored by git; create it if it isn't there. CI builds Warden at a pinned commit the same way.)
+(`apps/feed/libs/` is ignored by git; create it if it isn't there. `5a9dba1` is Warden 0.5.0, the commit CI pins and
+builds the same way.)
 Without that jar a local build leaves Feed out, with a warning, and builds the rest. Feed's jar is
 `apps/feed/build/libs/lnbphone_feed-<version>.jar`.
 

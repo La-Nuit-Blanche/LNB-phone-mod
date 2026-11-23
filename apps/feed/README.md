@@ -19,12 +19,24 @@ Feed is required on the server and on every client, with the same three mods as 
 | --- | --- | --- |
 | LNB Feed (`lnbphone_feed-<version>.jar`) | the same version as the phone | the GitHub release of this repository |
 | LNB Phone (`lnbphone-<version>.jar`) | 0.2.0 up to, not including, 0.3 (for Feed 0.2.0; the build writes the range) | the same release |
-| LNB Warden | 0.5.0 or newer | Warden's own releases (it is not part of this repository) |
+| LNB Warden (`lnbwarden-<version>.jar`) | 0.5.0 or newer; Feed is built and tested against 0.5.0, commit `5a9dba1` | Warden has no releases: build it (below), or get it from whoever runs the server's mods |
 | Kotlin for Forge | 5.12 or newer | as for the phone |
 
 A release holds the phone's jar and Feed's jar, built from the same tag so that they load together. A client that lacks
 one of them is refused at the connection with a message naming it. A player's own settings stay in the phone
 (`config/lnbphone-client.json` on their computer); Feed has none.
+
+LNB Warden is built from its public repository, `https://github.com/Charles-Mahoudeau/lnb-warden`, with Java 21:
+
+```
+git clone https://github.com/Charles-Mahoudeau/lnb-warden
+cd lnb-warden
+git checkout 5a9dba1
+./gradlew jar
+```
+
+The jar is `build/libs/lnbwarden-0.5.0.jar`. `5a9dba1` is the commit Feed is built and tested against, the one this
+repository's CI pins (`ref` in `.github/workflows/build.yml`); a newer Warden is allowed but untested.
 
 Feed shows nothing until the website has its own side switched on: the `feed` flag on the site (it ships switched off),
 and `feed.writing` to let players write.
@@ -135,6 +147,7 @@ LNB Warden is in no Maven repository and is never committed. Build its jar and p
 ```
 git clone https://github.com/Charles-Mahoudeau/lnb-warden
 cd lnb-warden
+git checkout 5a9dba1
 ./gradlew jar
 cp build/libs/lnbwarden-*.jar <this repository>/apps/feed/libs/
 ```
@@ -142,8 +155,9 @@ cp build/libs/lnbwarden-*.jar <this repository>/apps/feed/libs/
 `libs/` is ignored by git, so create it if it is missing. Without the jar, a local build still builds the phone but leaves
 Feed out (Gradle says so with a warning); on CI (`CI=true`) a missing jar fails the build. CI builds Warden from its
 public repository at a pinned commit (`.github/workflows/build.yml`: to move it, build Warden at the new commit, check
-Feed with `./gradlew build`, then set `ref` there, and `lnbwarden_version_range` in `gradle.properties` if Feed now needs
-the newer Warden). Then, from the repository's root:
+Feed with `./gradlew build`, then set `ref` there and the commit in the `git checkout` lines of this page and of the
+root `README.md`, and `lnbwarden_version_range` in `apps/feed/gradle.properties` if Feed now needs the newer Warden).
+Then, from the repository's root:
 
 ```
 ./gradlew :apps:feed:build
