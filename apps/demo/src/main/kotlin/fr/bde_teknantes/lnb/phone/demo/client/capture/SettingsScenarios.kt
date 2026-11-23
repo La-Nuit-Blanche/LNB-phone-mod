@@ -8,7 +8,7 @@ import org.lwjgl.glfw.GLFW
 /**
  * Task 8: the Settings app in the real phone, in a world, through the game's own input path, step by step through
  * art direction 17's flows P-12 (placement), P-13 (sounds) and P-14 (preview, the steps this branch can show). Run without
- * `-PdemoApps`: Settings is then the fifth icon of row 0, as in P-12.1 (after Hello, the kit, the sample Feed and Ping).
+ * `-PdemoApps`: Settings is then the fifth icon of row 0, as in P-12.1 (after Hello, the kit, the post sample and Ping).
  *
  * [settings] plays the flows at GUI scale 2, 3 and 4 in French, shows the screen in English at each scale, and ends
  * with the phone centred and its sounds off, saved. [window] is the next launch, in a 480 x 270 window

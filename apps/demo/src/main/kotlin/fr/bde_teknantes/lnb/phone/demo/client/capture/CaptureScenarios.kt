@@ -81,7 +81,7 @@ object CaptureScenarios {
     }
 
     /**
-     * Task 5: the UI kit's gallery and the composed Feed screens, two viewports per shot, in French (the mockups'
+     * Task 5: the UI kit's gallery and the post sample's screens, two viewports per shot, in French (the mockups'
      * language) at each GUI scale of [scales]; then Global in English at GUI scale 2 (art direction 18.2, sheet 5).
      */
     private fun kit(scales: IntRange) = CaptureScript().apply {

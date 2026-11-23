@@ -10,7 +10,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.ScrollList
 import fr.bde_teknantes.lnb.phone.api.client.ui.Colors
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 
-/** Every page of the gallery and the composed Feed screens, in the order they are shown and captured. */
+/** Every page of the gallery and the post sample's screens, in the order they are shown and captured. */
 object KitPages {
     val gallery: List<HostedPage> = listOf(
         HostedPage("Headers, icon buttons") { Gallery.headers() },

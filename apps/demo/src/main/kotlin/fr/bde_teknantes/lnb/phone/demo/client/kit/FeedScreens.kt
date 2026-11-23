@@ -32,7 +32,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.at
 /** What a Feed list shows. */
 enum class FeedContent { LOADING, LOADED, EMPTY, ERROR, ERROR_RETRYING }
 
-/** What a sample Feed keeps for the session, as Feed would: the tab, each tab's scroll, the Compose draft. */
+/** What the post sample keeps for the session, as a feed app would: the tab, each tab's scroll, the Compose draft. */
 class FeedSession {
     var tab = 0
     val scrolls = listOf(ScrollState(), ScrollState())
@@ -40,8 +40,8 @@ class FeedSession {
 }
 
 /**
- * Feed's two tabs (art direction 9.4 and 9.5) with sample posts, built from the kit to check that a Feed screen is
- * short to write. What lasts (the tab, the scroll) lives in a [FeedSession] kept by the caller.
+ * The post sample's two tabs (art direction 9.4 and 9.5) with made-up posts, built from the kit to check that a feed
+ * screen is short to write. It is the kit's showcase, written before the Feed app (`apps/feed`), which does not use it. What lasts (the tab, the scroll) lives in a [FeedSession] kept by the caller.
  */
 class FeedScreen(
     private val session: FeedSession = FeedSession(),
@@ -179,7 +179,7 @@ class FeedScreen(
     fun scrollTo(offset: Float) = list.scrollTo(offset)
 }
 
-/** A thread opened from a card: the post on its own, for the sample (the real thread is Feed's, 9.7). */
+/** A thread opened from a card: the post on its own, for the sample (the real thread is the Feed app's, 9.7). */
 class ThreadScreen(post: Post) : KitScreen() {
     init {
         add(Header(tr("thread.title")).at(0f, 0f))

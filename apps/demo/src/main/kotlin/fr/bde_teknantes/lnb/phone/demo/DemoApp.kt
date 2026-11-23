@@ -11,7 +11,8 @@ import net.neoforged.neoforge.common.NeoForge
  * The demo mod, for development only (never shipped). It holds two things, kept apart:
  *
  * - Ping (package `ping`), the example app that `docs/writing-an-app.md` walks through;
- * - the development tools: the Hello app, the UI kit's gallery, the sample Feed, the test sheets, `/phonedemo` and
+ * - the development tools: the Hello app, the UI kit's gallery, the post sample (a feed of made-up posts built from the kit; the
+ * real Feed app is `apps/feed`), the test sheets, `/phonedemo` and
  *   the screenshot harness (package `client` and [DemoCommands]).
  */
 @Mod(DemoApp.ID)

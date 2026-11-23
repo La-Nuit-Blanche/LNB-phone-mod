@@ -10,8 +10,8 @@ import org.lwjgl.glfw.GLFW
 /**
  * Task 5: the UI kit inside the real phone, in a world, driven through the game's own input path (the mouse, the
  * keys, the character callback), at GUI scale 2, 3 and 4, in French: the gallery with hover tints, a slide between
- * two screens held half way, the sample Feed scrolled, a menu, a dialog, Compose typed into (accents and a dead key
- * included), sent, and back on the feed with its snackbar. Home icons: Hello, UI kit, Feed (sample).
+ * two screens held half way, the post sample scrolled, a menu, a dialog, Compose typed into (accents and a dead key
+ * included), sent, and back on the feed with its snackbar. Home icons: Hello, UI kit, Post sample.
  */
 internal object KitPhoneScenario {
     fun script() = CaptureScript().apply {
@@ -55,7 +55,7 @@ internal object KitPhoneScenario {
         page(s, KitPages.all.indexOfFirst { it.caption.startsWith("List rows") }, "05_rows", 128, 140)
         page(s, KitPages.all.indexOfFirst { it.caption.startsWith("Toggles") }, "06_toggles", 128, 300)
 
-        // The sample Feed: Annonces scrolled with the wheel, a card under the pointer.
+        // The post sample: Annonces scrolled with the wheel, a card under the pointer.
         click { device(70, 218) }
         waitTicks(4)
         click { icon(2) }

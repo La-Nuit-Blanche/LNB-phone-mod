@@ -51,7 +51,7 @@ object DemoAppClient {
             val tile = TileColor.entries[n % TileColor.entries.size]
             event.register(app("sample_$n", Component.translatable("app.lnbphone_demo.sample.filler", n), glyphIcon(tile, glyph)))
         }
-        // The UI kit's gallery and the composed Feed screens (task 5).
+        // The UI kit's gallery.
         event.register(
             PhoneApp(
                 id = ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "kit"),
@@ -59,12 +59,14 @@ object DemoAppClient {
                 icon = AppIcon.Glyph(TileColor.VIOLET, ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "textures/gui/hello.png")),
             ) { KitIndexScreen() },
         )
-        // Feed's two tabs and Compose, rebuilt from the kit with sample data, to click, type and scroll in the game.
+        // "Post sample": two tabs of made-up posts, a thread and Compose, built from the kit, to click, type and scroll in
+        // the game. A showcase of the kit, not the Feed app (`apps/feed`, mod `lnbphone_feed`), hence its own name and tile.
+        // It borrows the phone's own sprite for the Feed glyph, as the demo may: only the app Feed must ship its own.
         event.register(
             PhoneApp(
                 id = ResourceLocation.fromNamespaceAndPath(DemoApp.ID, "feed_sample"),
                 name = Component.translatable("app.lnbphone_demo.feed_sample"),
-                icon = AppIcon.Glyph(TileColor.AZURE, ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/feed.png")),
+                icon = AppIcon.Glyph(TileColor.TEAL, ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/feed.png")),
             ) { FeedScreen(FEED_SESSION) },
         )
     }
@@ -76,7 +78,7 @@ object DemoAppClient {
     private fun glyphIcon(tile: TileColor, glyph: String) =
         AppIcon.Glyph(tile, ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/$glyph.png"))
 
-    /** The sample Feed's tab, scroll positions and draft, kept for the game session as Feed would keep them. */
+    /** The post sample's tab, scroll positions and draft, kept for the game session as a real feed app would keep them. */
     val FEED_SESSION = FeedSession()
 
     private val EXAMPLES = listOf(
