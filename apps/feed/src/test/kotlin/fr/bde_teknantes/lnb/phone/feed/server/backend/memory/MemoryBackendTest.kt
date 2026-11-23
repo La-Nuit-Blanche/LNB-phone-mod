@@ -233,6 +233,17 @@ class MemoryBackendTest {
         backend.pin(LUNE, post(MIKA).id, true, false).refused(409, "notPinnable")
         backend.pin(LUNE, dReply.id, true, false).refused(409, "notPinnable")
 
+        // Unpinning what isn't pinned changes nothing and answers the group, a Global post and a reply included.
+        val pinsBefore = events.pins.size
+        val global = post(MIKA)
+        for (id in listOf(global.id, dReply.id, a)) {
+            val group = backend.pin(LUNE, id, false, false).ok()
+            assertEquals(listOf(d, b), group.pinned.map { it.id })
+            assertNull(group.unpinned)
+        }
+        assertEquals(pinsBefore, events.pins.size, "no pins event for an unpin that changes nothing")
+        backend.pin(MIKA, global.id, false, false).refused(403, "notAllowed")
+
         events.clear()
         backend.delete(LUNE, d).ok()
         assertEquals(listOf(listOf(d, dReply.id)), events.deleted.map { items -> items.map { it.id } })

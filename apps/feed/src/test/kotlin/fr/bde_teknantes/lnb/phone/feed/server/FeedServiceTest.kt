@@ -168,6 +168,11 @@ class FeedServiceTest {
         assertEquals(Outcome.PIN_LIMIT, limit.outcome)
         assertEquals(pinned[0], limit.oldestPin)
 
+        // An unpin that changes nothing is a success, even for a Global post.
+        val global = write(LUNE).post!!
+        service.handleRequest(LUNE, PinPayload(300, global.id, pinned = false, replace = false))
+        assertEquals(Outcome.OK, host.received<ResultPayload>(LUNE).single { it.requestId == 300 }.outcome)
+
         backend.setWriting(false)
         assertEquals(Outcome.DISABLED, write(CAMILLE).outcome)
         assertFalse(service.rights.state(CAMILLE)!!.writing)

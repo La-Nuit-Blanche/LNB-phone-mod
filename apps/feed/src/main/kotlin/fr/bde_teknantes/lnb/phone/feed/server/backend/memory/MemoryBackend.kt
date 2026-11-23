@@ -288,7 +288,9 @@ class MemoryBackend(
         linkedIdentity(player) ?: return@answer refused(404, "notLinked")
         if (!rightsOf(player).announce) return@answer refused(403, "notAllowed")
         val post = posts[postId]?.takeIf { !it.deleted } ?: return@answer notFound()
-        if (!post.isMain || post.feed != FeedKind.ANNOUNCEMENTS) return@answer refused(409, "notPinnable")
+        // Only pinning refuses a reply or a Global post: unpinning what isn't pinned changes nothing and answers the
+        // group, whatever the post (feed-mod.md 4.8).
+        if (pinned && (!post.isMain || post.feed != FeedKind.ANNOUNCEMENTS)) return@answer refused(409, "notPinnable")
         var unpinned: UUID? = null
         var changed = false
         if (pinned && post.pinnedAt == null) {
