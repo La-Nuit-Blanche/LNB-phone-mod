@@ -128,6 +128,9 @@ class FeedSession(
     private val pendingLikes = HashMap<UUID, PendingLike>()
     private val pendingPins = HashMap<UUID, List<Pin>>()
     private val deleting = HashSet<UUID>()
+
+    // Which deletes in flight are of replies: the relay's `removed` can come before the answer and take the view.
+    private val deletingReplies = HashSet<UUID>()
     private val highlights = HashSet<UUID>()
     private val reveals = EnumMap<FeedKind, UUID>(FeedKind::class.java)
     private val threadReveals = HashMap<UUID, UUID>()
@@ -457,6 +460,7 @@ class FeedSession(
     fun delete(postId: UUID): Boolean {
         if (postId in deleting || posts[postId]?.canDelete != true) return false
         deleting += postId
+        if (posts[postId]?.isReply == true) deletingReplies += postId
         request(PendingRequest.Delete(postId)) { DeletePayload(it, postId) }
         changed()
         return true
@@ -674,6 +678,7 @@ class FeedSession(
         pendingLikes.clear()
         pendingPins.clear()
         deleting.clear()
+        deletingReplies.clear()
         highlights.clear()
         reveals.clear()
         threadReveals.clear()
@@ -1048,8 +1053,9 @@ class FeedSession(
 
     private fun deleteAnswered(request: PendingRequest.Delete, payload: ResultPayload) {
         deleting -= request.postId
+        val wasReply = deletingReplies.remove(request.postId)
         if (payload.outcome == Outcome.OK || payload.outcome == Outcome.NOT_FOUND) {
-            val reply = posts[request.postId]?.isReply == true
+            val reply = wasReply || posts[request.postId]?.isReply == true
             removePost(request.postId)
             collect()
             if (payload.outcome == Outcome.OK) notice = FeedNotice.Deleted(request.postId, reply)

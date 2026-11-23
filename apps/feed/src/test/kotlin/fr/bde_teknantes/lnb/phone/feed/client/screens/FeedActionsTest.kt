@@ -121,6 +121,28 @@ class FeedActionsTest {
     }
 
     @Test
+    fun `scrolled, a post whose removed comes before the answer still folds away`() {
+        val first = post(text = "premier", minutesAgo = 1)
+        val own = post(text = "mien", mine = true, canDelete = true, minutesAgo = 2)
+        val rest = (3..8).map { post(text = "p$it", minutesAgo = it.toLong()) }
+        val t = open(FeedKind.GLOBAL, listOf(first, own) + rest)
+        t.scroll(128f, 200f, -2f)
+        t.frame()
+        val more = t.texts.first { it.text == "mien" }.y - 46f + 19f
+        t.click(234f, more)
+        t.clickText("menu.delete")
+        t.confirmDialog()
+        session.onRemoved(listOf(fr.bde_teknantes.lnb.phone.feed.model.RemovedItem(own.id, FeedKind.GLOBAL, null)))
+        t.frame()
+        assertTrue(t.shows("mien"))
+        session.onResult(ResultPayload(r.last<DeletePayload>().requestId, Outcome.OK))
+        t.tick()
+        assertTrue(t.shows("mien"))
+        t.tick(5)
+        assertFalse(t.shows("mien"))
+    }
+
+    @Test
     fun `a delete refused closes the dialog and the post stays`() {
         val own = post(text = "mien", mine = true, canDelete = true)
         val t = open(FeedKind.GLOBAL, listOf(own))

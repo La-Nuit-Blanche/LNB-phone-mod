@@ -2,6 +2,8 @@ package fr.bde_teknantes.lnb.phone.feed.client
 
 import fr.bde_teknantes.lnb.phone.feed.client.FeedFixtures.post
 import fr.bde_teknantes.lnb.phone.feed.model.Outcome
+import fr.bde_teknantes.lnb.phone.feed.model.RemovedItem
+import fr.bde_teknantes.lnb.phone.feed.network.DeletePayload
 import fr.bde_teknantes.lnb.phone.feed.network.LoadThreadPayload
 import fr.bde_teknantes.lnb.phone.feed.network.PinPayload
 import fr.bde_teknantes.lnb.phone.feed.network.ResultPayload
@@ -40,6 +42,21 @@ class ThreadSeenTest {
         session.onThread(ThreadPayload(r.last<LoadThreadPayload>().requestId, Outcome.OK, main, emptyList(), null))
         r.state(FeedFixtures.GUEST)
         assertTrue(r.all<SeenThreadPayload>().isEmpty())
+    }
+
+    @Test
+    fun `a reply deleted whose removed came before the answer still says Reply deleted`() {
+        r.state()
+        val main = post(text = "x")
+        session.showThread(main.id)
+        session.loadThreadIfNeeded(main.id)
+        val own = FeedFixtures.reply(main, mine = true)
+        session.onThread(ThreadPayload(r.last<LoadThreadPayload>().requestId, Outcome.OK, main, listOf(own), null))
+        assertTrue(session.delete(own.id))
+        // The relay's `removed` reaches the client before the answer to `delete`.
+        session.onRemoved(listOf(RemovedItem(own.id, FeedKind.GLOBAL, main.id)))
+        session.onResult(ResultPayload(r.last<DeletePayload>().requestId, Outcome.OK))
+        assertEquals(FeedNotice.Deleted(own.id, reply = true), session.takeNotice())
     }
 
     @Test
