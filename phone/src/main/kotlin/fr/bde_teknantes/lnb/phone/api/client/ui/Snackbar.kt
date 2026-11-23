@@ -69,7 +69,8 @@ internal class Snackbar(
         canvas.fillRoundRect(0f, 0f, width, height, Radius.SMALL, Colors.SURFACE_3)
         val textX = if (error) 38f else 14f
         if (error) canvas.drawIcon(Icon.ALERT, 14f, 12f, Colors.DANGER, 16f)
-        val right = actionButton?.let { it.x - 8f } ?: (width - 14f)
+        // The text button's own 8 dp padding is the gap before its label (art direction 8.7): no more is added.
+        val right = actionButton?.x ?: (width - 14f)
         canvas.drawTextTruncated(text, textX, 11f, right - textX, TextStyle.BODY, Colors.TEXT_1)
     }
 

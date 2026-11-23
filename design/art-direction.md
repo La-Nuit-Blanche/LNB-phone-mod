@@ -1336,7 +1336,7 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Empty-state texts (200 dp) | `Server announcements will show up here.` | wraps to 2 lines | up to 2 lines |
 | Dialog texts (200 dp) | `Its replies will be deleted too. This can't be undone.` | wraps to 2 lines | up to 3 lines |
 | Collapsed composer placeholder (208 dp) | `Répondre à` + a long name | truncates with `…` | |
-| Error snackbar text beside `Réessayer` (about 112 dp from `x 38`) | `Connexion perdue` / `Échec de l'envoi`, about 109 dp | fits, tight | no longer `Feed indisponible` (about 116 dp) in a snackbar |
+| Error snackbar text beside `Réessayer` (about 116 dp from `x 38`) | `Connexion perdue` / `Échec de l'envoi`, about 113 dp | fits, tight | no longer `Feed indisponible` (about 116 dp) in a snackbar |
 | Plain snackbar text (212 dp from `x 14`) | `Compte LNB requis`, about 120 dp; `Écriture bloquée (sanction)`, about 185 dp | fits | |
 | Error snackbar text without an action (188 dp from `x 38`) | `Écriture bloquée (sanction)` about 185 dp; `Doucement ! Attends 10 s` about 165 dp | fits, tight | |
 | Guest strip text (208 dp from `x 36`) | `Compte LNB requis pour répondre`, about 197 dp; `Écriture bloquée (sanction)`, about 185 dp | fits, tight | truncates with an ellipsis |
