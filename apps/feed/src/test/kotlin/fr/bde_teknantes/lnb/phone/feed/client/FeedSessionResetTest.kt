@@ -274,6 +274,24 @@ class FeedSessionResetTest {
     }
 
     @Test
+    fun `a reload failing again says nothing more, and Feed back says so once`() {
+        r.state()
+        r.firstPage(FeedKind.GLOBAL, listOf(post()))
+        session.show(FeedKind.GLOBAL)
+        session.onReset()
+        repeat(3) {
+            val reload = r.sendsLoad(FeedKind.GLOBAL) { session.loadIfNeeded(FeedKind.GLOBAL) }
+            session.onPage(PagePayload.failed(reload.requestId, Outcome.UNAVAILABLE, FeedKind.GLOBAL))
+            if (it == 0) assertEquals(FeedNotice.ConnectionLost, session.takeNotice()) else assertNull(session.takeNotice())
+            repeat(FeedSession.AUTO_RETRY_TICKS) { session.tick() }
+        }
+        // The 15-second open went out meanwhile; its answer brings Feed back.
+        assertTrue(r.sent.count { it == fr.bde_teknantes.lnb.phone.feed.network.OpenPayload } >= 2)
+        r.state()
+        assertEquals(FeedNotice.ConnectionBack, session.takeNotice())
+    }
+
+    @Test
     fun `a reload refused as too frequent tries again after 2 seconds, without a snackbar`() {
         r.state()
         r.firstPage(FeedKind.GLOBAL, listOf(post()))

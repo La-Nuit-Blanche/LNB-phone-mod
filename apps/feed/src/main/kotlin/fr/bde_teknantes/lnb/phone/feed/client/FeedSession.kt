@@ -564,7 +564,7 @@ class FeedSession(
             } else if (list.loaded) {
                 // A stale list that couldn't reload stays readable, and tries again later.
                 list.reloadNotBefore = ticks + AUTO_RETRY_TICKS
-                if (payload.outcome == Outcome.UNAVAILABLE || payload.outcome == Outcome.DISABLED) notice = FeedNotice.ConnectionLost
+                if (payload.outcome == Outcome.UNAVAILABLE || payload.outcome == Outcome.DISABLED) connectionLost(payload.outcome)
             } else {
                 list.firstError = payload.outcome
             }
@@ -721,6 +721,17 @@ class FeedSession(
     }
 
     // ---- Inside ----
+
+    /**
+     * A load says Feed can't be reached: `Connexion perdue` once, as a `state` says it (not again at each reload that
+     * fails), and the 15-second `open` takes over until Feed is back.
+     */
+    private fun connectionLost(outcome: Outcome) {
+        if (availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED) return
+        availability = if (outcome == Outcome.DISABLED) FeedAvailability.DISABLED else FeedAvailability.UNAVAILABLE
+        notice = FeedNotice.ConnectionLost
+        nextAutoRetry = ticks + AUTO_RETRY_TICKS
+    }
 
     private fun changed() {
         revision++
