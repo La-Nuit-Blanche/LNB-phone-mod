@@ -20,10 +20,17 @@ object FeedTargetScreens {
                 session.land(parsed.postId)
                 listOf(FeedScreen(session, strings, FeedKind.ANNOUNCEMENTS, fromHome = true, zone = zone))
             }
-            is FeedTarget.Reply -> listOf(
-                FeedScreen(session, strings, parsed.feed, fromHome = false, zone = zone),
-                ThreadScreen(session, strings, parsed.threadId, landOn = parsed.replyId, zone = zone),
-            )
+            is FeedTarget.Reply -> {
+                val root = FeedScreen(session, strings, parsed.feed, fromHome = false, zone = zone)
+                val thread = try {
+                    ThreadScreen(session, strings, parsed.threadId, landOn = parsed.replyId, zone = zone)
+                } catch (e: Throwable) {
+                    // The stack never opens (the phone says the app failed): its root is no visit of Feed.
+                    session.appClosed(root)
+                    throw e
+                }
+                listOf(root, thread)
+            }
             null -> emptyList()
         }
 }

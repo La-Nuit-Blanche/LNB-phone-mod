@@ -76,8 +76,8 @@ class FeedTargetScreensTest {
         assertInstanceOf(FeedScreen::class.java, t.screen)
         assertEquals(FeedKind.ANNOUNCEMENTS, (t.screen as FeedScreen).tab)
         assertEquals(FeedKind.ANNOUNCEMENTS, r.last<LoadFeedPayload>().feed)
-        // One `open` from the thread, which showed first, and one from the feed: no more.
-        assertEquals(2, r.all<OpenPayload>().size)
+        // One `open` for the visit, from the thread, which showed first: the feed under it sends none.
+        assertEquals(1, r.all<OpenPayload>().size)
         // The feed's own landing rules don't apply to a reply.
         assertFalse(t.screen!!.showsTarget(target))
     }

@@ -195,7 +195,8 @@ class FeedSession(
 
     /** How many `reset`s came: a page asked before the last one answers with what the site held before it. */
     private var resets = 0
-    private val openApps = HashSet<Any>()
+    private val openApps = LinkedHashMap<Any, AppOwner>()
+    private var openSent = false
     private var nextAutoRetry = 0
     private var manualRetry = false
     private var retryDeadline = 0
@@ -319,22 +320,60 @@ class FeedSession(
     // ---- What the screens tell ----
 
     /**
-     * Feed's root screen [owner] is on the phone (from its creation until it closes): the app is open, and
-     * [FeedClient][fr.bde_teknantes.lnb.phone.feed.client.FeedClient] ticks the session ([tick]) whatever screen shows.
+     * Feed's root screen [owner] was made for the phone (a visit of the app starts): the app is open while [alive] says
+     * so (the screen is on the phone), and [FeedClient][fr.bde_teknantes.lnb.phone.feed.client.FeedClient] ticks the
+     * session ([tick]) whatever screen shows. [appClosed] ends it; so does [alive] turning false once it was true, for
+     * a screen that threw and never hears it closed. A visit sends `open` once ([openOnce]).
      */
-    fun appOpened(owner: Any) {
-        openApps += owner
+    fun appOpened(owner: Any, alive: () -> Boolean = { true }) {
+        openApps[owner] = AppOwner(alive)
+        openSent = false
     }
 
     /** [owner] left the phone for good. */
     fun appClosed(owner: Any) {
-        openApps -= owner
-        // Nothing is left to tell them on: they would show stale at the next opening.
-        if (openApps.isEmpty()) notices.clear()
+        if (openApps.remove(owner) != null && openApps.isEmpty()) appGone()
     }
 
-    /** Whether Feed is open on the phone (shown or not): its timers run. */
-    val isAppOpen: Boolean get() = openApps.isNotEmpty()
+    /**
+     * Whether Feed is open on the phone (shown or not): its timers run. A root screen that left the phone without
+     * saying so (it threw) no longer counts, nor one made for a stack that never opened.
+     */
+    val isAppOpen: Boolean
+        get() {
+            var dropped = false
+            val entries = openApps.values.iterator()
+            while (entries.hasNext()) {
+                val owner = entries.next()
+                if (owner.alive()) {
+                    owner.seen = true
+                } else if (owner.seen) {
+                    entries.remove()
+                    dropped = true
+                }
+            }
+            if (dropped && openApps.isEmpty()) appGone()
+            return openApps.values.any { it.alive() }
+        }
+
+    /** No screen of Feed is left: nothing to tell notices on, nothing shown, and the next visit sends `open`. */
+    private fun appGone() {
+        // They would show stale at the next opening.
+        notices.clear()
+        viewing = null
+        viewingThread = null
+        openSent = false
+    }
+
+    /**
+     * Feed was opened (its first screen shown, the root or a notification's thread over it): the player becomes a
+     * watcher and gets their state, with `open` sent once per visit of the app however many screens show.
+     */
+    fun openOnce() {
+        if (openSent) return
+        openSent = true
+        open()
+    }
 
     /** The feed screen shows [kind] (or nothing, null): live posts elsewhere light that tab's dot. */
     fun show(kind: FeedKind?) {
@@ -888,6 +927,9 @@ class FeedSession(
         notice = null
         connectionSnackbar = null
         carriedSnackbar = null
+        // Whatever Feed screens were open belong to the server just left; one that threw can no longer stay "open".
+        openApps.clear()
+        openSent = false
         viewing = null
         viewingThread = null
         threadSeenSent = null
@@ -1442,6 +1484,11 @@ class FeedSession(
     }
 
     /** A like shown before the server answered: what to put back if the last click fails. */
+    /** A root screen of Feed, open while [alive]; [seen] once it was, so that a screen not yet on the phone counts as not. */
+    private class AppOwner(val alive: () -> Boolean) {
+        var seen = false
+    }
+
     private class PendingLike(var confirmedLiked: Boolean, var confirmedLikes: Int) {
         /** The clicks not answered yet. */
         val outstanding = HashSet<Int>()

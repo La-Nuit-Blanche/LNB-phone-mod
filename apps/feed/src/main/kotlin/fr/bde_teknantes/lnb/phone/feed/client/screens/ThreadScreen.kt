@@ -106,7 +106,7 @@ class ThreadScreen(
         if (!shownOnce) {
             shownOnce = true
             // Opened from a notification, the feed under it hasn't been shown: the player becomes a watcher here.
-            if (landing != null) session.open()
+            if (landing != null) session.openOnce()
             // The composer shows once the main post is known: the focus goes to it then (sync).
             if (expand && session.writeBlock() == null) {
                 composer.expand(focus = false)

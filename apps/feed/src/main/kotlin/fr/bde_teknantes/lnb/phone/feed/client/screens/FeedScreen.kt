@@ -69,14 +69,12 @@ class FeedScreen(
     private val pill = add(NewPostsPill().apply { onClick = { releaseFromPill() } })
     private val fab = addFloating(Fab { compose(tab) })
 
-    private var opened = false
-
     /** The more menu, the delete and pin dialogs and their snackbars, shared with the thread. */
     private val actions = PostActions(this, session, strings)
 
     init {
-        // The app is open from now until this root screen closes: the session's timers run all that time.
-        session.appOpened(this)
+        // The app is open from now until this root screen leaves the phone: the session's timers run all that time.
+        session.appOpened(this) { isOnPhone }
         if (fromHome) session.feed(initialTab).scroll.offset = 0f
         for ((kind, view) in views) view.visible = kind == tab
     }
@@ -85,10 +83,7 @@ class FeedScreen(
 
     override fun onScreenShown() {
         session.show(tab)
-        if (!opened) {
-            opened = true
-            session.open()
-        }
+        session.openOnce()
         session.loadIfNeeded(tab)
     }
 
