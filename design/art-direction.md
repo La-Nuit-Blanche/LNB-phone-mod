@@ -717,7 +717,7 @@ In both kinds of field, selected text has a `selection` background, and a double
 
 The knob slides in 100 ms. The whole row around a toggle is clickable.
 
-**Segmented control** (32 dp tall, full radius): track fill `surface` with 1 dp inner border `stroke`; equal segments; the selected segment is a pill inset 3 dp, fill `surface-3`, label `label` `text-1`; unselected labels `text-2`, hover `text-1`. The selected pill slides in 150 ms.
+**Segmented control** (32 dp tall, full radius): track fill `surface` with 1 dp inner border `stroke`; equal segments; the selected segment is a pill inset 3 dp, fill `surface-3`, label `label` `text-1`; unselected labels `text-2`, hover `text-1`. A label is centred on its segment and has the room of the pill less 2 dp each side (the segment's width less 10 dp: 106 dp in each half of a 232 dp control); a longer one ends with an ellipsis. The selected pill slides in 150 ms.
 
 **List row** (full width)
 
@@ -1326,6 +1326,7 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Dialog confirm `Supprimer`, `Épingler` | `Supprimer`, about 66 dp | button **104 dp** | fixed |
 | Menu item (168 dp, label from `x 40`) | `Supprimer`, about 62 dp | fits | |
 | Settings segments (116 dp each) | `Corner` / `Centre`, about 46 dp | fits | fixed by the control |
+| Compose destination segments (116 dp each, label room 106 dp) | `Announcements`, about 104 dp | fits, tight | fixed by the control (8.7) |
 | Compose toggle label (184 dp) | `Publier anonymement`, about 139 dp | fits | |
 | Compose helper (184 dp) | `Name hidden from players`, about 150 dp | fits on one line | |
 | Settings row label (184 dp) | `Aperçu des notifications`, about 175 dp | fits | |
