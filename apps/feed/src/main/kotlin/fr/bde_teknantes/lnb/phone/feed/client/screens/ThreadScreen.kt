@@ -294,12 +294,12 @@ class ThreadScreen(
 
     private fun syncRows(main: PostView?, showBlock: Boolean) {
         val desired = ArrayList<Widget>()
-        val writes = session.writeBlock() == null
+        // The more and pin buttons follow the views, writing switched off included (art direction 9.11).
         if (main != null) {
             val card = mainCard ?: newCard(threadId).also { mainCard = it }
             card.look = CardLook(
-                more = main.canDelete && writes,
-                pin = FeedWriting.showsPin(main) && writes,
+                more = main.canDelete,
+                pin = FeedWriting.showsPin(main),
                 time = false,
                 fullTime = FeedFormat.fullTime(main.createdAt, session.clock(), zone, strings),
                 hover = false,
@@ -325,7 +325,7 @@ class ThreadScreen(
                         moreRowPlaced = true
                     }
                     val card = cards.getOrPut(id) { newCard(id) }
-                    card.look = CardLook(more = post.canDelete && writes, pin = false, replyTo = FeedWriting.replyToLine(post, strings))
+                    card.look = CardLook(more = post.canDelete, pin = false, replyTo = FeedWriting.replyToLine(post, strings))
                     desired += card
                 }
                 if (replies.isEmpty() && !thread.hasMore) desired += noRepliesRow

@@ -82,7 +82,7 @@ class DeletePinTest {
     // ---- Who gets the more button ----
 
     @Test
-    fun `the more button shows on what the viewer can delete, and never for a guest, a banned player or writing off`() {
+    fun `the more button shows on what the viewer's view lets them delete, writing switched off included`() {
         val own = post(text = "mien", mine = true, canDelete = true, minutesAgo = 1)
         val other = post(text = "autre", minutesAgo = 2)
         val t = feed(FeedKind.GLOBAL, PLAYER, listOf(own, other))
@@ -92,13 +92,21 @@ class DeletePinTest {
         session.onLive(listOf(other.copy(canDelete = true)))
         t.frame()
         assertTrue(t.card("autre").more.visible)
-        for (blocked in listOf(GUEST, PLAYER.copy(banned = true), PLAYER.copy(writing = false))) {
-            r.state(blocked)
+        // Writing off, or a banned player: the view decides, since the site still deletes then (9.11). A guest's views
+        // never allow it.
+        for (state in listOf(PLAYER.copy(writing = false), PLAYER.copy(banned = true))) {
+            r.state(state)
             t.tick()
             t.frame()
-            assertFalse(t.card("mien").more.visible, "$blocked")
-            assertFalse(t.card("autre").more.visible, "$blocked")
+            assertTrue(t.card("mien").more.visible, "$state")
+            assertTrue(t.card("autre").more.visible, "$state")
         }
+        r.state(GUEST)
+        session.onLive(listOf(own.copy(canDelete = false, mine = false), other.copy(canDelete = false)))
+        t.tick()
+        t.frame()
+        assertFalse(t.card("mien").more.visible)
+        assertFalse(t.card("autre").more.visible)
     }
 
     @Test
@@ -110,11 +118,14 @@ class DeletePinTest {
         assertTrue(t.card("fil").more.visible)
         assertTrue(t.card("moi").more.visible)
         assertFalse(t.card("lui").more.visible)
-        r.state(GUEST)
+        // Writing switched off: the strip takes the composer's place, the more buttons stay.
+        r.state(moderator.copy(writing = false))
         t.tick()
         t.frame()
-        assertFalse(t.card("fil").more.visible)
-        assertFalse(t.card("moi").more.visible)
+        assertTrue(t.card("fil").more.visible)
+        assertTrue(t.card("moi").more.visible)
+        assertFalse(t.card("lui").more.visible)
+        assertTrue(t.shows("snackbar.writing_off"))
     }
 
     // ---- The dialog ----
@@ -288,12 +299,17 @@ class DeletePinTest {
         val t = feed(FeedKind.ANNOUNCEMENTS, ANNOUNCER, listOf(a))
         assertTrue(t.card("annonce").pin.visible)
         t.card("annonce").pin.let { assertFalse(it.active) }
-        for (blocked in listOf(GUEST, ANNOUNCER.copy(banned = true), ANNOUNCER.copy(writing = false))) {
-            r.state(blocked)
-            t.tick()
-            t.frame()
-            assertFalse(t.card("annonce").pin.visible, "$blocked")
-        }
+        // Writing switched off: the site still pins, the button stays (9.11).
+        r.state(ANNOUNCER.copy(writing = false))
+        t.tick()
+        t.frame()
+        assertTrue(t.card("annonce").pin.visible)
+        // A view that doesn't allow pinning (a guest's never does): no button.
+        r.state(GUEST)
+        session.onLive(listOf(a.copy(canPin = false)))
+        t.tick()
+        t.frame()
+        assertFalse(t.card("annonce").pin.visible)
         r.state(ANNOUNCER)
         (t.screen as FeedScreen).showTab(FeedKind.GLOBAL)
         r.answerFeed(FeedKind.GLOBAL, listOf(post(text = "global", canPin = true)))
@@ -483,6 +499,80 @@ class DeletePinTest {
         t.frame()
         assertFalse(t.shows("annonce"))
         assertTrue(t.shows("autre"))
+    }
+
+    // ---- Writing switched off: deleting and pinning go on (9.11) ----
+
+    @Test
+    fun `writing off, an author deletes their own post with the usual dialog and Post deleted`() {
+        val own = post(text = "mien", mine = true, canDelete = true)
+        val t = feed(FeedKind.GLOBAL, PLAYER.copy(writing = false), listOf(own, post(text = "autre", minutesAgo = 5)))
+        t.clickOn(t.card("mien").more)
+        t.clickStart("menu.delete")
+        assertTrue(t.showsStart("dialog.delete_post"))
+        t.confirmDialog()
+        assertEquals(own.id, r.last<DeletePayload>().postId)
+        session.onResult(ResultPayload(r.last<DeletePayload>().requestId, Outcome.OK))
+        session.onRemoved(listOf(RemovedItem(own.id, FeedKind.GLOBAL, null)))
+        t.tick()
+        assertTrue(t.showsStart("delete.post_done"))
+        t.tick(8)
+        t.frame()
+        assertFalse(t.shows("mien"))
+    }
+
+    @Test
+    fun `writing off, a moderator deletes someone else's reply with the usual dialog and Reply deleted`() {
+        val main = post(text = "fil", minutesAgo = 30)
+        val other = reply(main, minutesAgo = 1).copy(text = "lui", canDelete = true)
+        val t = thread(moderator.copy(writing = false), main, listOf(other))
+        t.clickOn(t.card("lui").more)
+        t.clickStart("menu.delete")
+        assertTrue(t.showsStart("dialog.delete_reply"))
+        t.confirmDialog()
+        session.onResult(ResultPayload(r.last<DeletePayload>().requestId, Outcome.OK))
+        session.onRemoved(listOf(RemovedItem(other.id, FeedKind.GLOBAL, main.id)))
+        t.tick()
+        assertTrue(t.showsStart("delete.reply_done"))
+    }
+
+    @Test
+    fun `writing off, an announcer pins and unpins with Post pinned and Post unpinned`() {
+        val a = announcement("annonce")
+        val t = feed(FeedKind.ANNOUNCEMENTS, ANNOUNCER.copy(writing = false), listOf(a))
+        t.clickOn(t.card("annonce").pin)
+        val pin = r.last<PinPayload>()
+        assertTrue(pin.pinned)
+        session.onResult(ResultPayload(pin.requestId, Outcome.OK, pinned = listOf(Pin(a.id, NOW))))
+        t.tick()
+        assertTrue(t.showsStart("pin.done"))
+        t.clickOn(t.card("annonce").pin)
+        val unpin = r.last<PinPayload>()
+        assertFalse(unpin.pinned)
+        session.onResult(ResultPayload(unpin.requestId, Outcome.OK, pinned = emptyList()))
+        t.tick()
+        assertTrue(t.showsStart("pin.removed"))
+    }
+
+    @Test
+    fun `writing off, a delete or a pin refused says what it says otherwise, and the heart still says writing is paused`() {
+        val a = announcement("annonce", canPin = true).copy(canDelete = true)
+        val t = feed(FeedKind.ANNOUNCEMENTS, moderator.copy(writing = false), listOf(a))
+        t.clickOn(t.card("annonce").pin)
+        session.onResult(ResultPayload(r.last<PinPayload>().requestId, Outcome.NOT_ALLOWED))
+        t.tick(4)
+        assertTrue(t.showsStart("snackbar.action"))
+        assertFalse(t.card("annonce").pin.active)
+        repeat(100) { t.tick() }
+        t.delete("annonce")
+        session.onResult(ResultPayload(r.last<DeletePayload>().requestId, Outcome.UNAVAILABLE))
+        t.tick(4)
+        assertTrue(t.showsStart("snackbar.action"))
+        assertTrue(t.shows("annonce"))
+        repeat(100) { t.tick() }
+        t.click(128f, 44f + 68f + 14f)
+        t.tick()
+        assertTrue(t.shows("snackbar.writing_off"))
     }
 }
 

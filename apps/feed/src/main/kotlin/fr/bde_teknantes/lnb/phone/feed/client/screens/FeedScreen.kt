@@ -322,12 +322,11 @@ class FeedScreen(
         private fun heightOf(post: PostView): Float =
             PostCardLayout(post, lookOf(post), timeOf(post), TextMetrics, strings).height
 
-        private fun lookOf(post: PostView): CardLook {
-            val writes = session.writeBlock() == null
-            // The pin button on an announcement's main post only, whatever the view says (art direction 9.3).
-            val pinnable = FeedWriting.showsPin(post)
-            return CardLook(more = post.canDelete && writes, pin = pinnable && writes)
-        }
+        /**
+         * The more and pin buttons follow the view, writing switched off included: the site still deletes and pins then
+         * (art direction 9.11). The pin button on an announcement's main post only, whatever the view says (9.3).
+         */
+        private fun lookOf(post: PostView): CardLook = CardLook(more = post.canDelete, pin = FeedWriting.showsPin(post))
 
         private fun timeOf(post: PostView) = FeedFormat.relativeTime(post.createdAt, session.clock(), zone, strings)
 

@@ -204,15 +204,21 @@ class FeedSessionPinsTest {
     }
 
     @Test
-    fun `whoever may not write now pins nothing`() {
-        for (state in listOf(FeedFixtures.GUEST, ANNOUNCER.copy(banned = true), ANNOUNCER.copy(writing = false))) {
-            val rec = FeedFixtures.Recorder()
-            rec.state(state)
-            val a = announcement(10)
-            rec.firstPage(FeedKind.ANNOUNCEMENTS, listOf(a))
-            assertEquals(PinAttempt.BLOCKED, rec.session.togglePin(a.id, replace = false))
-            assertTrue(rec.all<PinPayload>().isEmpty())
-        }
+    fun `pinning follows the view, writing switched off included, and a view that doesn't allow it sends nothing`() {
+        // Writing off: the site still pins (art direction 9.11), so the announcer's pin goes.
+        val off = FeedFixtures.Recorder()
+        off.state(ANNOUNCER.copy(writing = false))
+        val a = announcement(10)
+        off.firstPage(FeedKind.ANNOUNCEMENTS, listOf(a))
+        assertEquals(PinAttempt.SENT, off.session.togglePin(a.id, replace = false))
+        assertEquals(1, off.all<PinPayload>().size)
+        // A guest's view never allows pinning.
+        val guest = FeedFixtures.Recorder()
+        guest.state(FeedFixtures.GUEST)
+        val b = announcement(10).copy(canPin = false)
+        guest.firstPage(FeedKind.ANNOUNCEMENTS, listOf(b))
+        assertEquals(PinAttempt.IGNORED, guest.session.togglePin(b.id, replace = false))
+        assertTrue(guest.all<PinPayload>().isEmpty())
     }
 
     @Test

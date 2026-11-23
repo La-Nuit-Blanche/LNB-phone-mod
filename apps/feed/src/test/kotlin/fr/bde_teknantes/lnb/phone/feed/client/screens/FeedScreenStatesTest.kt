@@ -16,6 +16,7 @@ import fr.bde_teknantes.lnb.phone.feed.model.CountUpdate
 import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.model.Outcome
 import fr.bde_teknantes.lnb.phone.feed.model.Pin
+import fr.bde_teknantes.lnb.phone.feed.model.PlayerState
 import fr.bde_teknantes.lnb.phone.feed.model.PostView
 import fr.bde_teknantes.lnb.phone.feed.model.RemovedItem
 import fr.bde_teknantes.lnb.phone.feed.model.Unread
@@ -133,25 +134,29 @@ class FeedScreenStatesTest {
     }
 
     @Test
-    fun `guests, banned players and writing off - no compose button, no more or pin button, a heart that only says why`() {
+    fun `guests, banned players and writing off - no compose button, a heart that only says why, more and pin as the view says`() {
+        // The views as the server gives them: a guest's allow nothing, a banned author's own post may still be deleted,
+        // and with writing off an announcer still deletes and pins (art direction 9.11).
+        data class Case(val state: PlayerState, val words: String, val canDelete: Boolean, val canPin: Boolean)
         val cases = listOf(
-            FeedFixtures.GUEST to "guest.snackbar",
-            ANNOUNCER.copy(banned = true) to "snackbar.banned",
-            ANNOUNCER.copy(writing = false) to "snackbar.writing_off",
+            Case(FeedFixtures.GUEST, "guest.snackbar", canDelete = false, canPin = false),
+            Case(ANNOUNCER.copy(banned = true), "snackbar.banned", canDelete = true, canPin = false),
+            Case(ANNOUNCER.copy(writing = false), "snackbar.writing_off", canDelete = true, canPin = true),
         )
-        for ((state, words) in cases) {
+        for ((state, words, canDelete, canPin) in cases) {
             tester?.close()
             val rec = FeedFixtures.Recorder()
             val t = PhoneTester { FeedScreen(rec.session, strings, FeedKind.ANNOUNCEMENTS, fromHome = true, zone = ZoneOffset.UTC) }
             tester = t
             rec.state(state)
-            val p = post(FeedKind.ANNOUNCEMENTS, minutesAgo = 5, author = LUNE, text = "gg", likes = 8, canDelete = true, canPin = true)
+            val p = post(FeedKind.ANNOUNCEMENTS, minutesAgo = 5, author = LUNE, text = "gg", likes = 8, canDelete = canDelete, canPin = canPin)
             rec.session.onPage(PagePayload(rec.last<LoadFeedPayload>().requestId, Outcome.OK, FeedKind.ANNOUNCEMENTS, emptyList(), listOf(p), null))
             t.frame()
             assertEquals(0, t.fabs(), words)
-            assertEquals(244f, t.timeRight(), words)
+            // The more button takes the time's place at the right (9.3), the pin button sits right of the heart.
+            assertEquals(if (canDelete) 214f else 244f, t.timeRight(), words)
             t.moveTo(228f, 44f + 68f + 14f)
-            assertFalse(t.discAt(214f), words)
+            assertEquals(canPin, t.discAt(214f), words)
             // The heart is drawn and hovers like anyone's.
             t.moveTo(128f, 44f + 68f + 14f)
             assertTrue(t.discAt(114f), words)

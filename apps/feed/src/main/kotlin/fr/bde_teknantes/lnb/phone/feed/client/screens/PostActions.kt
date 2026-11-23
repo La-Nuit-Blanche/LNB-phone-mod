@@ -60,7 +60,6 @@ internal class PostActions(private val screen: KitScreen, private val session: F
     fun pin(post: PostView) {
         when (session.togglePin(post.id, replace = false)) {
             PinAttempt.NEEDS_REPLACE -> askReplace(post.id)
-            PinAttempt.BLOCKED -> session.writeBlock()?.let(::blocked)
             PinAttempt.SENT, PinAttempt.IGNORED -> {}
         }
     }

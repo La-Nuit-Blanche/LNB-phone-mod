@@ -8,8 +8,8 @@ import fr.bde_teknantes.lnb.phone.feed.model.PostView
 /**
  * What a card shows besides the post itself, decided by where it is and who looks (art direction 9.3, 9.7, 9.11).
  *
- * @property more The more button: the viewer can delete the post, and may write now.
- * @property pin The pin button: an announcement the viewer can pin, and may write now.
+ * @property more The more button: the viewer can delete the post, as its view says (writing off included, 9.11).
+ * @property pin The pin button: an announcement the viewer can pin, as its view says (writing off included, 9.11).
  * @property time The relative time on the name line; false on a thread's main post, which has its full timestamp.
  * @property replyTo The reply-to line (`En réponse à {name}`), in threads; null for none.
  * @property fullTime The full timestamp under the body (`14:32 · 12 nov.`), on a thread's main post (9.7); null for

@@ -82,7 +82,7 @@ enum class LikeAttempt {
 }
 
 /** What a click on a pin button did. */
-enum class PinAttempt { SENT, NEEDS_REPLACE, BLOCKED, IGNORED }
+enum class PinAttempt { SENT, NEEDS_REPLACE, IGNORED }
 
 /**
  * Feed's state on the client (`docs/feed-app.md` 8): availability, the player's state and rights, one copy of every
@@ -662,10 +662,10 @@ class FeedSession(
 
     /**
      * A click on the pin button of [postId] (art direction 9.4): shown at once and sent. With 3 pinned and not
-     * [replace], nothing is sent: the screen asks first, then calls again with [replace].
+     * [replace], nothing is sent: the screen asks first, then calls again with [replace]. Whoever's view allows it pins,
+     * writing switched off included (art direction 9.11): the site still pins then, and refuses the others itself.
      */
     fun togglePin(postId: UUID, replace: Boolean): PinAttempt {
-        if (writeBlock() != null) return PinAttempt.BLOCKED
         val post = posts[postId] ?: return PinAttempt.IGNORED
         // Only an announcement's main post, whatever the view says (a broken server).
         if (!post.canPin || post.isReply || post.feed != FeedKind.ANNOUNCEMENTS || postId in pendingPins) return PinAttempt.IGNORED
