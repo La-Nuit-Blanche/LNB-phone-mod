@@ -28,6 +28,9 @@ import java.time.Instant
  * ([FeedClientPayloads]) feed and the screens read. Loaded only on the physical client.
  */
 object FeedClient {
+    private const val CAPTURE_PROPERTY = "lnbphone_feed.capture"
+    private const val CAPTURE_CLASS = "fr.bde_teknantes.lnb.phone.feed.capture.FeedCapture"
+
     /** The home icon: the phone's Feed glyph (art direction 7.4) on an azure tile. */
     private val ICON = ResourceLocation.fromNamespaceAndPath("lnbphone", "textures/gui/sprites/icon/feed.png")
 
@@ -40,6 +43,17 @@ object FeedClient {
     fun init(modBus: IEventBus) {
         modBus.addListener(::registerApps)
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        startCapture()
+    }
+
+    /**
+     * The screenshot harness (`./gradlew :apps:feed:runCapture`), in development runs only. Its classes are in a source
+     * set of their own that the jar never holds, so it is found by name.
+     */
+    private fun startCapture() {
+        if (FMLEnvironment.production || System.getProperty(CAPTURE_PROPERTY).isNullOrBlank()) return
+        runCatching { Class.forName(CAPTURE_CLASS, true, FeedClient::class.java.classLoader).getMethod("start").invoke(null) }
+            .onFailure { FeedMod.LOGGER.error("Feed's capture harness couldn't start", it) }
     }
 
     private fun registerApps(event: RegisterPhoneAppsEvent) {
