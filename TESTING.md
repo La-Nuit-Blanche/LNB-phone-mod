@@ -197,16 +197,18 @@ against the real website with a person at the keyboard. This part is the plan fo
 Feed's jar (`apps/feed/build/libs/lnbphone_feed-<version>.jar`) and LNB Warden's (`apps/feed/libs/lnbwarden-<version>.jar`,
 0.5.0 or later) in the `mods` folder of the server and of both clients.
 
-Items 30 to 37 use Feed's in-memory backend, so they need no website. Before the server's first start, put
-`apps/feed/example-config/lnbphone_feed-server.toml` and `lnbwarden-server.toml` in its `config` folder
-(`./gradlew :apps:feed:prepareMemoryRun` does it for `apps/feed/run/config`, which `:apps:feed:runServer` and
-`:apps:feed:runClient` use). They select `backend.kind = "memory"` with the sample posts, and Warden's `auth.mode = "OFF"`
-so that both accounts may join. A is an operator: in memory mode that makes A a moderator (the website's roles are not
-there). B is a plain player. The sample posts are dated from the server's start, and nothing is kept when it stops.
+Items 30 to 38 use Feed's in-memory backend, so they need no website (item 38 ends by redoing it against the website).
+Before the server's first start, put `apps/feed/example-config/lnbphone_feed-server.toml` and `lnbwarden-server.toml` in
+its `config` folder (`./gradlew :apps:feed:prepareMemoryRun` does it for `apps/feed/run/config`, which
+`:apps:feed:runServer` and `:apps:feed:runClient` use). They select `backend.kind = "memory"` with the sample posts, and
+Warden's `auth.mode = "OFF"` so that both accounts may join. A is an operator: in memory mode that makes A a moderator
+(the website's roles are not there). B is a plain player. The sample posts are dated from the server's start, and
+nothing is kept when it stops.
 
-Items 38 to 44 need the website: a site with the `feed` flag on, Warden's `api.url` and `api.token` set in
+Items 39 to 43 need the website: a site with the `feed` flag on, Warden's `api.url` and `api.token` set in
 `lnbwarden-server.toml` (with `auth.mode` at `required` or `optional`), `backend.kind = "site"`, and the Minecraft
-accounts of A and B linked to LNB accounts. The LNB website's repository says how to run it locally.
+accounts of A and B linked to LNB accounts. The LNB website's repository says how to run it locally. Item 44 needs no
+website: it checks Feed with `backend.kind = "site"` where the site can't be called.
 
 30. **Start.** The server and both clients start without an error. The server log has the warning `Feed uses its memory
     backend (sample seed): nothing is kept, for development only`, which is expected here. The mod list shows "LNB
@@ -249,18 +251,20 @@ accounts of A and B linked to LNB accounts. The LNB website's repository says ho
     a dozen times: the count never goes negative or counts one player twice, and a like the server refuses (too fast)
     goes back with "Slow down! Wait 2s" (the seconds left). Likes never notify anyone.
 36. **Announcer and moderator.** A types `/feed` and the chat offers `announcer` and `dev` (the memory backend's
-    switches, item 37); B has no `/feed` command. A runs `/feed announcer list`: "No announcers besides the moderators."
-    `/feed announcer add B`: "B can now post announcements."; B's phone shows the round button on "Announcements" within
-    a second, with no new login, and the destination control in Compose. `/feed announcer remove B` takes it away again.
-    Adding an operator reads "A is a moderator, so already posts announcements." A pins an announcement with the pin
-    button of its action row, on the feed or on its thread's main post (the more menu holds only "Delete"): "Post
-    pinned", the post moves into the pinned group on B's open "Announcements" within a second. Pin until three are
-    pinned, then a fourth: the dialog "Replace a pin?" appears, and confirming unpins the oldest. Unpin: "Post
-    unpinned". A deletes a post of B's (more menu, "Delete", the dialog "Delete this post?"): it leaves B's open feed
-    within a second, with its replies, and B, inside that thread, is taken back to the feed with "This post was
-    deleted". B has no more menu on A's posts, and has one on B's own. A deletes an announcement while B is offline: B
-    joins and finds no badge for it. On an anonymous post, A (moderator) sees a line "Author: B" with a tooltip "Only
-    moderators can see this", B (the author) sees "Posted anonymously by you", and a third player sees neither.
+    switches, item 37); B has no `/feed` command. A is a moderator here only because A is an operator, the memory
+    backend's stand-in for the website's roles; item 43 checks the real roles. A runs `/feed announcer list`: "No
+    announcers besides the moderators." `/feed announcer add B`: "B can now post announcements."; B's phone shows the
+    round button on "Announcements" within a second, with no new login, and the destination control in Compose. `/feed
+    announcer remove B` takes it away again. Adding an operator reads "A is a moderator, so already posts
+    announcements." A pins an announcement with the pin button of its action row, on the feed or on its thread's main
+    post (the more menu holds only "Delete"): "Post pinned", the post moves into the pinned group on B's open
+    "Announcements" within a second. Pin until three are pinned, then a fourth: the dialog "Replace a pin?" appears, and
+    confirming unpins the oldest. Unpin: "Post unpinned". A deletes a post of B's (more menu, "Delete", the dialog
+    "Delete this post?"): it leaves B's open feed within a second, with its replies, and B, inside that thread, is taken
+    back to the feed with "This post was deleted". B has no more menu on A's posts, and has one on B's own. A deletes an
+    announcement while B is offline: B joins and finds no badge for it. On an anonymous post, A (moderator) sees a line
+    "Author: B" with a tooltip "Only moderators can see this", B (the author) sees "Posted anonymously by you", and a
+    third player sees neither.
 37. **A guest, writing paused, and the site away.** Put B's username under `memory.guests` and restart: B has no round
     button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a thread
     shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still gets the
@@ -398,9 +402,10 @@ this project can ship:
 It needs `apps/feed/run/eula.txt` with `eula=true` (accepting Minecraft's EULA is a person's decision: no tool creates
 it), and a configuration in `apps/feed/run/config`: `./gradlew :apps:feed:prepareMemoryRun` writes the memory backend's.
 The log must show the line `Feed uses its memory backend` and `Done`, and never `Attempted to load class
-net/minecraft/client` or `invalid dist`. Stop it with `stop` in its console, or by its process id (the Java process whose
-command line holds `fml.modFolders=lnbphone_feed`; never stop Java processes by name or by port, they may belong to
-other runs).
+net/minecraft/client` or `invalid dist`. Stop it with `stop` in its console, or by its process id: the Java process whose
+command line names `serverRunProgramArgs.txt` in this checkout's `apps/feed/build/moddev/` (Feed's client names
+`clientRunProgramArgs.txt` there instead, and both hold `fml.modFolders=lnbphone_feed`). Never stop Java processes by
+name or by port: they may belong to other runs.
 
 **Screenshots of Feed** come from its own harness, a smaller cousin of the demo's (Feed cannot depend on the demo):
 
