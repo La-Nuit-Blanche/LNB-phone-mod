@@ -142,6 +142,37 @@ class ThreadScreenTest {
     }
 
     @Test
+    fun `a reply answered not found keeps the draft with Action impossible, and the thread stays while it reloads`() {
+        val t = open(expand = true)
+        answer(emptyList())
+        t.frame()
+        t.type("tard")
+        t.key(GLFW.GLFW_KEY_ENTER, GLFW.GLFW_MOD_CONTROL)
+        val loads = r.all<LoadThreadPayload>().size
+        session.onResult(ResultPayload(r.last<CreateReplyPayload>().requestId, Outcome.NOT_FOUND))
+        t.tick()
+        assertInstanceOf(ThreadScreen::class.java, t.screen)
+        assertTrue(t.showsStart("snackbar.action"))
+        assertFalse(t.showsStart("error.retry"))
+        assertEquals("tard", session.replyDraft(main.id).text.text)
+        // The thread asks again whether it is still there.
+        assertEquals(loads + 1, r.all<LoadThreadPayload>().size)
+    }
+
+    @Test
+    fun `every notice waiting is told, the last one showing`() {
+        val t = open()
+        answer(emptyList())
+        t.frame()
+        r.state(available = fr.bde_teknantes.lnb.phone.feed.model.Availability.UNAVAILABLE)
+        r.state()
+        t.tick()
+        // Lost, then back in the same tick: the `Connexion perdue` shown for the first went with the second.
+        assertFalse(t.showsStart("feed.conn"))
+        assertTrue(session.takeNotice() == null)
+    }
+
+    @Test
     fun `a failed reply keeps the draft and its key, and Retry sends it again`() {
         val t = open(expand = true)
         answer(emptyList())

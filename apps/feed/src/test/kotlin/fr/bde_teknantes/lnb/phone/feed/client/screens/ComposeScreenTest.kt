@@ -118,6 +118,19 @@ class ComposeScreenTest {
     }
 
     @Test
+    fun `a post refused as not allowed says Action impossible without Retry, and keeps the draft`() {
+        val t = compose()
+        t.type("non")
+        t.click(200f, 22f)
+        session.onResult(ResultPayload(r.last<CreatePostPayload>().requestId, Outcome.NOT_ALLOWED))
+        t.tick()
+        assertInstanceOf(ComposeScreen::class.java, t.screen)
+        assertTrue(t.showsStart("snackbar.action"))
+        assertFalse(t.showsStart("error.retry"))
+        assertEquals("non", session.compose.text.text)
+    }
+
+    @Test
     fun `too fast says how long, without Retry`() {
         val t = compose()
         t.type("vite")
