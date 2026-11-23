@@ -166,20 +166,17 @@ class FeedSession(
     var carriedSnackbar: SnackbarHandle? = null
 
     private var landing: UUID? = null
-    // What the screen shown should say, in order, with the tick each came: two in one tick are both told, and one too
-    // old to mean anything (it came while no screen could tell it) is dropped.
-    private val notices = ArrayDeque<Pair<FeedNotice, Int>>()
+    // What the screens should say, in order, with what each is about: two in one tick are both told, each by a screen
+    // it concerns ([takeNoticeForThread]), and one left too long untold where it could have been is dropped
+    // ([ageNotices]).
+    private val notices = ArrayDeque<QueuedNotice>()
+    private var composeShown = false
 
-    /** Queues a notice (null clears them all). */
+    /** Queues a notice about no post, a connection's (null clears them all). */
     private var notice: FeedNotice?
-        get() = notices.lastOrNull()?.first
+        get() = notices.lastOrNull()?.notice
         set(value) {
-            if (value == null) {
-                notices.clear()
-                return
-            }
-            notices.addLast(value to ticks)
-            while (notices.size > MAX_NOTICES) notices.removeFirst()
+            if (value == null) notices.clear() else tell(value, null)
         }
 
     /** The feed on screen, set by the feed screen while it shows one; null otherwise. */
@@ -276,33 +273,59 @@ class FeedSession(
         return draft
     }
 
-    /** What the screen shown should say next, once each, oldest first; null when nothing (recent) is left. */
-    fun takeNotice(): FeedNotice? {
-        while (notices.isNotEmpty()) {
-            val (notice, at) = notices.removeFirst()
-            if (ticks - at <= NOTICE_MAX_AGE_TICKS) return notice
+    /** What the feed should say next, once each, oldest first: it tells them all. Null when nothing is left. */
+    fun takeNotice(): FeedNotice? = take { true }
+
+    /**
+     * The oldest notice [accept]ed, taken once; the others stay queued, in order, for the screen they belong to (the
+     * feed under a Compose or a thread that leaves). Null when none is accepted.
+     */
+    fun takeNotice(accept: (FeedNotice) -> Boolean): FeedNotice? = take { accept(it.notice) }
+
+    /**
+     * The oldest notice the thread of [threadId] tells: the connection's, and those about its main post or its
+     * replies (a like, a pin, a delete started there or on the feed). The others stay queued for the feed.
+     */
+    fun takeNoticeForThread(threadId: UUID): FeedNotice? = take { it.post == null || it.thread == threadId }
+
+    private fun take(accept: (QueuedNotice) -> Boolean): FeedNotice? {
+        val iterator = notices.iterator()
+        while (iterator.hasNext()) {
+            val queued = iterator.next()
+            if (accept(queued)) {
+                iterator.remove()
+                return queued.notice
+            }
         }
         return null
     }
 
+    /** Compose is the screen shown (true) or not: it tells the connection's notices, which age while it shows. */
+    fun showCompose(shown: Boolean) {
+        composeShown = shown
+    }
+
     /**
-     * The oldest notice [accept]ed, taken once; the others stay queued, in order, for the screen they belong to (the
-     * feed under a Compose or a thread that leaves). Null when none (recent) is accepted.
+     * Ages the notices a shown screen would tell and hasn't yet: one not told within [NOTICE_MAX_AGE_TICKS] of being
+     * tellable means nothing any more. A notice waiting with no screen to tell it (the phone put away, a Compose over
+     * the feed, a snackbar carried to the feed holding it back) doesn't age.
      */
-    fun takeNotice(accept: (FeedNotice) -> Boolean): FeedNotice? {
+    private fun ageNotices() {
+        val feedTells = viewing != null && carriedSnackbar?.isShowing != true
         val iterator = notices.iterator()
         while (iterator.hasNext()) {
-            val (notice, at) = iterator.next()
-            if (ticks - at > NOTICE_MAX_AGE_TICKS) {
-                iterator.remove()
-                continue
-            }
-            if (accept(notice)) {
-                iterator.remove()
-                return notice
-            }
+            val queued = iterator.next()
+            val tellable = feedTells ||
+                (viewingThread != null && (queued.post == null || queued.thread == viewingThread)) ||
+                (composeShown && queued.post == null)
+            if (tellable && ++queued.age > NOTICE_MAX_AGE_TICKS) iterator.remove()
         }
-        return null
+    }
+
+    /** Queues [notice] about [post] (of the thread [thread]); a connection's notice is about no post. */
+    private fun tell(notice: FeedNotice, post: UUID?, thread: UUID? = post?.let { posts[it]?.threadId ?: it }) {
+        notices.addLast(QueuedNotice(notice, post, thread))
+        while (notices.size > MAX_NOTICES) notices.removeFirst()
     }
 
     /** Whether [id] should get the post highlight now (once). */
@@ -360,6 +383,7 @@ class FeedSession(
     private fun appGone() {
         // They would show stale at the next opening.
         notices.clear()
+        composeShown = false
         viewing = null
         viewingThread = null
         openSent = false
@@ -660,7 +684,7 @@ class FeedSession(
     fun delete(postId: UUID): Boolean {
         if (postId in deleting || posts[postId]?.canDelete != true) return false
         deleting += postId
-        request(PendingRequest.Delete(postId, reply = posts[postId]?.isReply == true)) { DeletePayload(it, postId) }
+        request(PendingRequest.Delete(postId, reply = posts[postId]?.isReply == true, threadId = posts[postId]?.threadId)) { DeletePayload(it, postId) }
         changed()
         return true
     }
@@ -691,6 +715,7 @@ class FeedSession(
      */
     fun tick() {
         ticks++
+        ageNotices()
         flushSeen()
         settleAwaitingDrafts(timedOut = true)
         expireRequests()
@@ -937,6 +962,7 @@ class FeedSession(
         raisedFor.clear()
         landing = null
         notice = null
+        composeShown = false
         connectionSnackbar = null
         carriedSnackbar = null
         // Whatever Feed screens were open belong to the server just left; one that threw can no longer stay "open".
@@ -1302,7 +1328,7 @@ class FeedSession(
             collect()
             return
         } else if (pending.outstanding.none { it > payload.requestId }) {
-            notice = actionNotice(payload)
+            tell(actionNotice(payload), id)
         }
         if (pending.outstanding.isNotEmpty()) return
         pendingLikes.remove(id)
@@ -1379,7 +1405,7 @@ class FeedSession(
         val moved = pinsMovedSince.remove(request.postId)
         if (payload.outcome == Outcome.OK) {
             payload.pinned?.let(::applyPinGroup)
-            notice = FeedNotice.PinDone(request.pinned)
+            tell(FeedNotice.PinDone(request.pinned), request.postId)
             return
         }
         if (payload.outcome == Outcome.NOT_FOUND) {
@@ -1390,7 +1416,7 @@ class FeedSession(
         }
         // Put back as it was at the click, unless the server sent its group since: that one stands.
         if (!moved) before?.let(::applyPinGroup)
-        notice = if (payload.outcome == Outcome.PIN_LIMIT) FeedNotice.PinLimit(request.postId) else actionNotice(payload)
+        tell(if (payload.outcome == Outcome.PIN_LIMIT) FeedNotice.PinLimit(request.postId) else actionNotice(payload), request.postId)
     }
 
     private fun deleteAnswered(request: PendingRequest.Delete, payload: ResultPayload) {
@@ -1401,9 +1427,9 @@ class FeedSession(
             val reply = request.reply
             removePost(request.postId)
             collect()
-            if (payload.outcome == Outcome.OK && !told) notice = FeedNotice.Deleted(request.postId, reply)
+            if (payload.outcome == Outcome.OK && !told) tell(FeedNotice.Deleted(request.postId, reply), request.postId, request.threadId ?: request.postId)
         } else {
-            notice = actionNotice(payload)
+            tell(actionNotice(payload), request.postId, request.threadId ?: request.postId)
         }
     }
 
@@ -1527,6 +1553,11 @@ class FeedSession(
 
     /** A like shown before the server answered: what to put back if the last click fails. */
     /** A root screen of Feed, open while [alive]; [seen] once it was, so that a screen not yet on the phone counts as not. */
+    /** A notice waiting, about [post] of the thread [thread] (null for a connection's), and how long it was tellable. */
+    private class QueuedNotice(val notice: FeedNotice, val post: UUID?, val thread: UUID?) {
+        var age = 0
+    }
+
     private class AppOwner(val alive: () -> Boolean) {
         var seen = false
     }

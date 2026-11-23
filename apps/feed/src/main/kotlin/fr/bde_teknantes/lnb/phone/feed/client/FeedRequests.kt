@@ -27,8 +27,11 @@ internal sealed interface PendingRequest {
 
     data class Pin(val postId: UUID, val pinned: Boolean) : PendingRequest
 
-    /** `delete` of [postId]; [reply] read when it was sent, as the post may be gone by its answer. */
-    data class Delete(val postId: UUID, val reply: Boolean = false) : PendingRequest
+    /**
+     * `delete` of [postId]; [reply] and the [threadId] it is in (null for a main post) read when it was sent, as the
+     * post may be gone by its answer.
+     */
+    data class Delete(val postId: UUID, val reply: Boolean = false, val threadId: UUID? = null) : PendingRequest
 }
 
 /** Hands out request IDs: increasing, never reused within a session. */

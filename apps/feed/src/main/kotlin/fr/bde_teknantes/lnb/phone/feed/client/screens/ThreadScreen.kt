@@ -145,8 +145,9 @@ class ThreadScreen(
         }
         actions.tick()
         draft.takeOutcome()?.let(::outcome)
-        // Every notice waiting, in order.
-        while (true) actions.report(session.takeNotice() ?: break)
+        // Every notice waiting that concerns this thread, in order (the connection's, its own posts'); the others stay
+        // queued for the feed: a pin limit for a pin started there asks over the feed, not here.
+        while (true) actions.report(session.takeNoticeForThread(threadId) ?: break)
     }
 
     /** Back while the composer is open closes it and keeps the draft (9.7). */

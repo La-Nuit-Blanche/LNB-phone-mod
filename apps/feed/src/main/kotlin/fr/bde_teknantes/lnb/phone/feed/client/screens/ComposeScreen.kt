@@ -93,7 +93,12 @@ class ComposeScreen(
     }
 
     override fun onScreenShown() {
+        session.showCompose(true)
         focus(area)
+    }
+
+    override fun onScreenHidden() {
+        session.showCompose(false)
     }
 
     // The session's timers run from the app, whatever screen shows: never session.tick() here.

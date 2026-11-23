@@ -145,6 +145,84 @@ class NoticeRoutingTest {
     }
 
     @Test
+    fun `a pin refused for the limit while a thread of another post shows asks over the feed, not over the thread`() {
+        val t = PhoneTester(feedApp(session, FeedKind.ANNOUNCEMENTS)).also { tester = it }
+        r.state(ANNOUNCER)
+        val pinned = post(FeedKind.ANNOUNCEMENTS, minutesAgo = 5, text = "epingler", author = LUNE, canPin = true)
+        val other = post(FeedKind.ANNOUNCEMENTS, minutesAgo = 10, text = "autre", author = LUNE)
+        r.answerFeed(FeedKind.ANNOUNCEMENTS, listOf(pinned, other))
+        t.frame()
+        (t.screen as FeedScreen).pinClicked(session.post(pinned.id)!!)
+        (t.screen as FeedScreen).openThread(session.post(other.id)!!, compose = false)
+        t.tick(4)
+        assertInstanceOf(ThreadScreen::class.java, t.screen)
+        r.answerThread(other, emptyList())
+        session.onResult(ResultPayload(r.last<PinPayload>().requestId, Outcome.PIN_LIMIT))
+        t.play(session, 3)
+        assertFalse((t.screen as ThreadScreen).isDialogOpen)
+        // Back on the feed, after more than 5 seconds on the thread: the question is still asked there.
+        t.play(session, 200)
+        t.click(22f, 22f)
+        t.play(session, 4)
+        assertInstanceOf(FeedScreen::class.java, t.screen)
+        assertTrue((t.screen as FeedScreen).isDialogOpen)
+    }
+
+    @Test
+    fun `a pin refused for the limit on a thread's main post asks over that thread`() {
+        val t = PhoneTester(feedApp(session, FeedKind.ANNOUNCEMENTS)).also { tester = it }
+        r.state(ANNOUNCER)
+        val a = post(FeedKind.ANNOUNCEMENTS, text = "annonce", author = LUNE, canPin = true)
+        r.answerFeed(FeedKind.ANNOUNCEMENTS, listOf(a))
+        t.frame()
+        (t.screen as FeedScreen).openThread(session.post(a.id)!!, compose = false)
+        t.tick(4)
+        r.answerThread(a, emptyList())
+        (t.screen as ThreadScreen).pin(session.post(a.id)!!)
+        session.onResult(ResultPayload(r.last<PinPayload>().requestId, Outcome.PIN_LIMIT))
+        t.play(session, 2)
+        assertTrue((t.screen as ThreadScreen).isDialogOpen)
+    }
+
+    @Test
+    fun `a like refused while Compose stays open long is still told on the feed, the session's clock running`() {
+        val t = PhoneTester(feedApp(session, FeedKind.GLOBAL)).also { tester = it }
+        r.state()
+        r.answerFeed(FeedKind.GLOBAL, listOf(post(text = "gg", likes = 3)))
+        t.frame()
+        t.click(128f, 44f + 68f + 14f)
+        t.click(220f, 334f)
+        t.tick(4)
+        session.onResult(ResultPayload(r.last<LikePayload>().requestId, Outcome.UNAVAILABLE))
+        // Ten seconds in Compose: the notice isn't Compose's, and doesn't age meanwhile.
+        t.play(session, 200)
+        t.click(22f, 22f)
+        t.play(session, 4)
+        assertInstanceOf(FeedScreen::class.java, t.screen)
+        assertTrue(t.showsStart("snackbar.action"))
+    }
+
+    @Test
+    fun `a notice held back by Published doesn't age behind it`() {
+        val t = PhoneTester(feedApp(session, FeedKind.GLOBAL)).also { tester = it }
+        r.state()
+        r.answerFeed(FeedKind.GLOBAL, listOf(post(text = "gg", likes = 3)))
+        t.frame()
+        t.click(128f, 44f + 68f + 14f)
+        t.click(220f, 334f)
+        t.tick(4)
+        t.type("salut")
+        t.click(200f, 22f)
+        session.onResult(ResultPayload(r.last<LikePayload>().requestId, Outcome.UNAVAILABLE))
+        session.onResult(
+            ResultPayload(r.last<CreatePostPayload>().requestId, Outcome.OK, post = post(minutesAgo = 0, author = CAMILLE, text = "salut", mine = true)),
+        )
+        // Six seconds, the session's clock running: `Publié` holds 3, then the refused like is told.
+        t.play(session, 120)
+        assertTrue(t.showsStart("snackbar.action"))
+    }
+
+    @Test
     fun `takeNotice with a filter takes the oldest accepted and leaves the others in order`() {
         r.state()
         r.page(FeedKind.GLOBAL, listOf(post(text = "x")))

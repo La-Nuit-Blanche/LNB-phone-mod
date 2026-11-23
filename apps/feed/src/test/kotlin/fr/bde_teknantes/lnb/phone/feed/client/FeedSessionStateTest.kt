@@ -546,10 +546,18 @@ class FeedSessionStateTest {
     }
 
     @Test
-    fun `a notice nobody told within 5 seconds is dropped, and all go when Feed closes`() {
+    fun `a notice untold 5 seconds while a screen could tell it is dropped, and all go when Feed closes`() {
         r.state()
         r.firstPage(FeedKind.GLOBAL, listOf(post()))
         r.state(available = Availability.UNAVAILABLE)
+        // No screen shown (the phone put away): it waits, however long.
+        repeat(FeedSession.NOTICE_MAX_AGE_TICKS + 1) { session.tick() }
+        assertEquals(FeedNotice.ConnectionLost, session.takeNotice())
+        r.state()
+        assertEquals(FeedNotice.ConnectionBack, session.takeNotice())
+        // The feed shown and not telling it: 5 seconds, then it means nothing any more.
+        r.state(available = Availability.UNAVAILABLE)
+        session.show(FeedKind.GLOBAL)
         repeat(FeedSession.NOTICE_MAX_AGE_TICKS + 1) { session.tick() }
         assertNull(session.takeNotice())
         val owner = Any()
