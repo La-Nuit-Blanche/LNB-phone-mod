@@ -125,19 +125,28 @@ class ThreadScreen(
     override fun onTick() {
         if (leaving) return
         session.loadThreadIfNeeded(threadId)
-        // Every notice waiting, in order. The player's own delete of the main post says `Post supprimé`, someone
-        // else's `Ce post a été supprimé`: both set the thread's flag, so the notices are looked at first.
-        val notices = generateSequence { session.takeNotice() }.toList()
-        val ownDelete = notices.any { it is FeedNotice.Deleted && it.postId == threadId }
+        // The player's own delete of the main post says `Post supprimé`, someone else's `Ce post a été supprimé`: both
+        // set the thread's flag, so the notice is looked at first.
+        val ownDelete = session.takeNotice { it is FeedNotice.Deleted && it.postId == threadId } != null
         if (ownDelete || thread.deleted) {
-            // The others are told before leaving; the snackbar saying why the thread went is the one carried over.
-            for (notice in notices) if (!(notice is FeedNotice.Deleted && notice.postId == threadId)) actions.report(notice)
-            leave(ownDelete = ownDelete || actions.deletedHere(threadId))
+            leave(
+                when {
+                    ownDelete -> strings.get("delete.post_done")
+                    // Deleted here, the `removed` before the answer: `Post supprimé` now, and not again from the
+                    // answer's notice on the feed.
+                    actions.deletedHere(threadId) -> {
+                        session.deletedTold(threadId)
+                        strings.get("delete.post_done")
+                    }
+                    else -> strings.get("thread.deleted")
+                },
+            )
             return
         }
         actions.tick()
         draft.takeOutcome()?.let(::outcome)
-        notices.forEach(actions::report)
+        // Every notice waiting, in order.
+        while (true) actions.report(session.takeNotice() ?: break)
     }
 
     /** Back while the composer is open closes it and keeps the draft (9.7). */
@@ -151,14 +160,15 @@ class ThreadScreen(
     override fun showsTarget(target: String): Boolean = (FeedTarget.parse(target) as? FeedTarget.Reply)?.threadId == threadId
 
     /**
-     * The main post went (deleted here, by a moderator, or found gone): back to the feed (9.7, 9.9), with `Post
-     * supprimé` when the player deleted it from here ([ownDelete]), `Ce post a été supprimé` otherwise. The snackbar is
-     * carried over to the feed, so it shows there after the back slide.
+     * The main post went (deleted here, by a moderator, or found gone): back to the feed (9.7, 9.9), saying [words]
+     * (`Post supprimé` when the player deleted it from here, `Ce post a été supprimé` otherwise; null when the feed
+     * says it). The snackbar is carried over to the feed, so it shows there after the back slide.
      */
-    private fun leave(ownDelete: Boolean) {
+    private fun leave(words: String?) {
         if (leaving) return
         leaving = true
-        showSnackbar(strings.get(if (ownDelete) "delete.post_done" else "thread.deleted"))
+        // The other notices waiting stay queued: they belong to the feed this goes back to, which tells them.
+        session.carriedSnackbar = words?.let(::showSnackbar)
         phone.pop()
     }
 

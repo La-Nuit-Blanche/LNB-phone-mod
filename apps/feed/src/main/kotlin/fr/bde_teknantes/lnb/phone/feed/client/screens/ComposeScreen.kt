@@ -18,6 +18,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.api.client.ui.at
 import fr.bde_teknantes.lnb.phone.feed.Feed
 import fr.bde_teknantes.lnb.phone.feed.client.DraftOutcome
+import fr.bde_teknantes.lnb.phone.feed.client.FeedNotice
 import fr.bde_teknantes.lnb.phone.feed.client.FeedSession
 import fr.bde_teknantes.lnb.phone.feed.client.FeedStrings
 import fr.bde_teknantes.lnb.phone.feed.client.FeedWriting
@@ -101,8 +102,9 @@ class ComposeScreen(
         outcome?.let(::outcome)
         // Going back to the feed: what the session has to say is told there, after `Publié`.
         if (outcome is DraftOutcome.Sent) return
-        // Every notice waiting, in order, as the other screens tell them.
-        while (true) actions.report(session.takeNotice() ?: break)
+        // Only the connection's notices concern Compose; the others (a like, a pin, a delete, all started on the feed
+        // or a thread) stay queued for the feed, which tells them when the player is back there.
+        while (true) actions.report(session.takeNotice(::concernsCompose) ?: break)
     }
 
     /** The controls as the draft is: Publier's rule, and the sending state (9.8). */
@@ -138,7 +140,7 @@ class ComposeScreen(
             is DraftOutcome.Sent -> {
                 PhoneSounds.sent()
                 // Carried over to the feed, under the published post.
-                showSnackbar(strings.get("compose.posted"))
+                session.carriedSnackbar = showSnackbar(strings.get("compose.posted"))
                 onPosted(outcome.post.feed)
                 phone.pop()
             }
@@ -174,6 +176,9 @@ class ComposeScreen(
     }
 
     companion object {
+        /** The notices Compose tells: the connection lost, and back (9.12). The others are the feed's. */
+        fun concernsCompose(notice: FeedNotice): Boolean = notice == FeedNotice.ConnectionLost || notice == FeedNotice.ConnectionBack
+
         /** `Publier` / `Post`, sized for the longer (13.3). */
         const val PUBLISH_WIDTH = 88f
 

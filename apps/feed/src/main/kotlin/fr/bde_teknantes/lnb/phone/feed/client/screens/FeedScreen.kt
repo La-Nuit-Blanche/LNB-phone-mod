@@ -105,6 +105,9 @@ class FeedScreen(
         if (session.feed(tab).loaded) session.markViewed(tab)
         actions.tick()
         // Every notice waiting, in order: a later one may undo an earlier (Feed back after Connexion perdue).
+        // Not over a snackbar just carried here (`Publié`, a thread gone): those wait for it to go.
+        if (session.carriedSnackbar?.isShowing == true) return
+        session.carriedSnackbar = null
         while (true) report(session.takeNotice() ?: break)
     }
 

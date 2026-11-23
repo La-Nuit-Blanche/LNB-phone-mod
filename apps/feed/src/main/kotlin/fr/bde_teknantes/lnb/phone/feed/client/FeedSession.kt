@@ -139,6 +139,9 @@ class FeedSession(
     // Pins waiting for their answer since which the server sent its group: on failure, that group stands.
     private val pinsMovedSince = HashSet<UUID>()
     private val deleting = HashSet<UUID>()
+
+    // Deletes whose `Post supprimé` a screen already told (the thread leaving on `removed`): their answer says nothing.
+    private val deletesTold = HashSet<UUID>()
     private val highlights = HashSet<UUID>()
     private val reveals = EnumMap<FeedKind, UUID>(FeedKind::class.java)
     private val threadReveals = HashMap<UUID, UUID>()
@@ -154,6 +157,13 @@ class FeedSession(
      * Feed screen hears that Feed is back ([FeedNotice.ConnectionBack]) takes that one away, and no other.
      */
     var connectionSnackbar: SnackbarHandle? = null
+
+    /**
+     * A snackbar carried to the feed by a screen that just left it (`Publié` from Compose, `Ce post a été supprimé` from
+     * a thread): the feed tells the notices waiting once it is gone, rather than replacing it at once. Notices still
+     * expire as usual.
+     */
+    var carriedSnackbar: SnackbarHandle? = null
 
     private var landing: UUID? = null
     // What the screen shown should say, in order, with the tick each came: two in one tick are both told, and one too
@@ -248,6 +258,14 @@ class FeedSession(
     /** Whether the pin or unpin of [id] waits for the server (the "Replace a pin?" dialog's confirm button loads). */
     fun isPinning(id: UUID) = id in pendingPins
 
+    /**
+     * A screen told the player their delete of [id] is done before its answer came (the thread whose main post went
+     * on `removed`): the answer tells nothing more, so `Post supprimé` shows once. Only while the delete waits.
+     */
+    fun deletedTold(id: UUID) {
+        if (id in deleting) deletesTold += id
+    }
+
     /** The reply draft of [threadId], made if new, kept as the most recently used of the [MAX_REPLY_DRAFTS]. */
     fun replyDraft(threadId: UUID): ReplyDraft {
         replyDrafts[threadId]?.let { return it }
@@ -262,6 +280,26 @@ class FeedSession(
         while (notices.isNotEmpty()) {
             val (notice, at) = notices.removeFirst()
             if (ticks - at <= NOTICE_MAX_AGE_TICKS) return notice
+        }
+        return null
+    }
+
+    /**
+     * The oldest notice [accept]ed, taken once; the others stay queued, in order, for the screen they belong to (the
+     * feed under a Compose or a thread that leaves). Null when none (recent) is accepted.
+     */
+    fun takeNotice(accept: (FeedNotice) -> Boolean): FeedNotice? {
+        val iterator = notices.iterator()
+        while (iterator.hasNext()) {
+            val (notice, at) = iterator.next()
+            if (ticks - at > NOTICE_MAX_AGE_TICKS) {
+                iterator.remove()
+                continue
+            }
+            if (accept(notice)) {
+                iterator.remove()
+                return notice
+            }
         }
         return null
     }
@@ -840,6 +878,7 @@ class FeedSession(
         draftsAwaitingState.clear()
         threadsToCheck.clear()
         deleting.clear()
+        deletesTold.clear()
         highlights.clear()
         reveals.clear()
         threadReveals.clear()
@@ -848,6 +887,7 @@ class FeedSession(
         landing = null
         notice = null
         connectionSnackbar = null
+        carriedSnackbar = null
         viewing = null
         viewingThread = null
         threadSeenSent = null
@@ -1271,12 +1311,13 @@ class FeedSession(
 
     private fun deleteAnswered(request: PendingRequest.Delete, payload: ResultPayload) {
         deleting -= request.postId
+        val told = deletesTold.remove(request.postId)
         if (payload.outcome == Outcome.OK || payload.outcome == Outcome.NOT_FOUND) {
             // Read when it was sent: a `removed` may have taken the post before this answer.
             val reply = request.reply
             removePost(request.postId)
             collect()
-            if (payload.outcome == Outcome.OK) notice = FeedNotice.Deleted(request.postId, reply)
+            if (payload.outcome == Outcome.OK && !told) notice = FeedNotice.Deleted(request.postId, reply)
         } else {
             notice = actionNotice(payload)
         }
