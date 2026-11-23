@@ -54,9 +54,18 @@ internal class RecordingCanvas : FakeCanvas() {
     val texts = ArrayList<Text>()
     val fills = ArrayList<Int>()
 
+    /** The room each text cut to fit was given, by text: what a slot holds (this canvas never cuts). */
+    val room = HashMap<String, Float>()
+
     fun clear() {
         texts.clear()
         fills.clear()
+        room.clear()
+    }
+
+    override fun truncate(text: String, style: TextStyle, maxWidth: Float): String {
+        room[text] = maxWidth
+        return super.truncate(text, style, maxWidth)
     }
 
     fun drew(text: String) = texts.any { it.text == text }

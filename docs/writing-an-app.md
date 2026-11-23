@@ -457,7 +457,9 @@ revision has moved, and reports the server's answer to the last ping (step 7):
 
 The kit plays the tap sound on every click, the error sound on a click on something disabled and with an error
 snackbar. `PhoneSounds` has the others (`sent`, `like`); all of them follow the player's Sounds setting. A snackbar
-shown just before a `pop` is carried over to the screen underneath.
+shown just before a `pop` is carried over to the screen underneath. `showSnackbar` and `showErrorSnackbar` return a `SnackbarHandle`:
+its `dismiss` takes that snackbar away, wherever it was carried, and leaves alone any other that replaced it (a
+"Connection lost" to take back once the connection is back).
 
 ### 7. Talking to your server
 

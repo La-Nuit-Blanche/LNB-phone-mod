@@ -36,6 +36,7 @@ import fr.bde_teknantes.lnb.phone.feed.model.FeedKind
 import fr.bde_teknantes.lnb.phone.feed.model.Outcome
 import fr.bde_teknantes.lnb.phone.feed.model.PostView
 import java.time.ZoneId
+import kotlin.math.abs
 import java.util.UUID
 
 /**
@@ -68,12 +69,13 @@ class FeedScreen(
     private val fab = addFloating(Fab { compose(tab) })
 
     private var opened = false
-    private var connectionLostAt = Float.NaN
 
     /** The more menu, the delete and pin dialogs and their snackbars, shared with the thread. */
     private val actions = PostActions(this, session, strings)
 
     init {
+        // The app is open from now until this root screen closes: the session's timers run all that time.
+        session.appOpened(this)
         if (fromHome) session.feed(initialTab).scroll.offset = 0f
         for ((kind, view) in views) view.visible = kind == tab
     }
@@ -93,12 +95,16 @@ class FeedScreen(
         session.show(null)
     }
 
+    override fun onClosed() {
+        session.appClosed(this)
+    }
+
     override fun onTick() {
-        session.tick()
         session.loadIfNeeded(tab)
         if (session.feed(tab).loaded) session.markViewed(tab)
         actions.tick()
-        session.takeNotice()?.let(::report)
+        // Every notice waiting, in order: a later one may undo an earlier (Feed back after Connexion perdue).
+        while (true) report(session.takeNotice() ?: break)
     }
 
     /**
@@ -182,14 +188,12 @@ class FeedScreen(
 
     private fun report(notice: FeedNotice) {
         when (notice) {
-            FeedNotice.ConnectionLost -> {
+            FeedNotice.ConnectionLost -> session.connectionSnackbar =
                 showErrorSnackbar(strings.get("feed.connection_lost"), SnackbarAction(strings.get("error.retry")) { session.retryConnection() })
-                connectionLostAt = now
-            }
-            // Back with no message: a `Connexion perdue` still showing goes.
-            FeedNotice.ConnectionBack -> if (now - connectionLostAt < CONNECTION_SNACKBAR_MS) {
-                dismissSnackbar()
-                connectionLostAt = Float.NaN
+            // Back with no message: that `Connexion perdue` goes if it still shows, wherever it was shown; any other stays.
+            FeedNotice.ConnectionBack -> {
+                session.connectionSnackbar?.dismiss()
+                session.connectionSnackbar = null
             }
             FeedNotice.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             is FeedNotice.TooFast -> showErrorSnackbar(strings.get("snackbar.too_fast", notice.seconds))
@@ -257,6 +261,8 @@ class FeedScreen(
                 session.takeHighlight(id)
                 card.highlight()
             }
+            // Where the player reads, so that trimming the list never takes it away.
+            feed.shownTop = list.children.firstOrNull { it is PostCard && it.y + it.height > list.offset }?.let { (it as PostCard).current()?.id }
             // The spinner row in view: the next page.
             if (loadingRow.parent === list && loadingRow.y < list.offset + list.height) session.loadMore(kind)
         }
@@ -319,7 +325,9 @@ class FeedScreen(
 
         private fun lookOf(post: PostView): CardLook {
             val writes = session.writeBlock() == null
-            return CardLook(more = post.canDelete && writes, pin = post.canPin && writes)
+            // The pin button on an announcement's main post only, whatever the view says (art direction 9.3).
+            val pinnable = post.canPin && post.feed == FeedKind.ANNOUNCEMENTS && !post.isReply
+            return CardLook(more = post.canDelete && writes, pin = pinnable && writes)
         }
 
         private fun timeOf(post: PostView) = FeedFormat.relativeTime(post.createdAt, session.clock(), zone, strings)
@@ -384,8 +392,9 @@ class FeedScreen(
             if (mode != Mode.LIST) return
             val ids = feed.pinned + feed.posts
             val shown = ids.toHashSet()
+            // Cards the player deleted here fold away where they stood; the others leave with the rows below.
             val folding = foldAway(shown)
-            for (id in cards.keys.toList()) if (id !in shown && cards[id] !in folding) cards.remove(id)?.let(list::remove)
+            for (id in cards.keys.toList()) if (id !in shown && cards[id] !in folding) cards.remove(id)
             val desired = ArrayList<Widget>(ids.size + 2)
             for (id in ids) {
                 val card = cards.getOrPut(id) { newCard(id) }
@@ -398,8 +407,9 @@ class FeedScreen(
                 else -> loadingRow
             }
             desired += spacer
-            // The first row in view keeps its place on screen while rows change above it.
-            val kept = if (anchor) list.children.firstOrNull { it.y + it.height > list.offset } else null
+            // The first row in view that stays keeps its place on screen while rows change above it: measured before
+            // anything leaves, as the list closes up at once.
+            val kept = if (anchor) list.children.firstOrNull { it.y + it.height > list.offset && it in desired } else null
             val keptAt = kept?.let { it.y - list.offset }
             val rows = Rows.keepInPlace(desired, list.children, folding)
             for (row in list.children.toList()) if (row !in rows) list.remove(row)
@@ -410,7 +420,8 @@ class FeedScreen(
                 }
             }
             list.layoutRows()
-            if (kept != null && keptAt != null && kept.parent === list) list.scrollTo(kept.y - keptAt)
+            // Only when the rows above really moved: scrolling would stop the pill's scroll under way and flash the bar.
+            if (kept != null && keptAt != null && kept.parent === list && abs(kept.y - keptAt - list.offset) > 0.01f) list.scrollTo(kept.y - keptAt)
         }
 
         /**
@@ -442,8 +453,5 @@ class FeedScreen(
         const val FAB_ROOM = 72f
         const val RETRY_WIDTH = 104f
         const val WRITE_WIDTH = 136f
-
-        /** A `Connexion perdue` snackbar, with its action, is gone after this. */
-        private const val CONNECTION_SNACKBAR_MS = 6300f
     }
 }

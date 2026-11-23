@@ -44,6 +44,9 @@ class ComposeScreen(
 ) : KitScreen() {
     private val draft = session.compose
 
+    /** How the session's notices are told here, as on the feed and the thread. */
+    private val actions = PostActions(this, session, strings)
+
     /** Announcers choose where it goes; everyone else posts on Global. */
     val announcer: Boolean = session.canCompose(FeedKind.ANNOUNCEMENTS)
 
@@ -86,7 +89,12 @@ class ComposeScreen(
 
     // The session's timers run from the app, whatever screen shows: never session.tick() here.
     override fun onTick() {
-        draft.takeOutcome()?.let(::outcome)
+        val outcome = draft.takeOutcome()
+        outcome?.let(::outcome)
+        // Going back to the feed: what the session has to say is told there, after `Publié`.
+        if (outcome is DraftOutcome.Sent) return
+        // Every notice waiting, in order, as the other screens tell them.
+        while (true) actions.report(session.takeNotice() ?: break)
     }
 
     /** The controls as the draft is: Publier's rule, and the sending state (9.8). */
@@ -119,6 +127,8 @@ class ComposeScreen(
             DraftOutcome.SendFailed -> showErrorSnackbar(strings.get("snackbar.send_failed"), SnackbarAction(strings.get("error.retry")) { send() })
             is DraftOutcome.TooFast -> showErrorSnackbar(strings.get("snackbar.too_fast", outcome.seconds))
             is DraftOutcome.Refused -> showErrorSnackbar(strings.get(FeedWriting.snackbarKey(outcome.block)))
+            // Refused for good (not allowed): no Retry, the draft stays.
+            DraftOutcome.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             DraftOutcome.ThreadGone -> {}
         }
     }

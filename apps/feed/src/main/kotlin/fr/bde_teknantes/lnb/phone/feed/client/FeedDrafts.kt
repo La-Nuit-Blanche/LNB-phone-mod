@@ -25,6 +25,9 @@ sealed interface DraftOutcome {
     /** `Échec de l'envoi` with Retry, which sends again with the same key. */
     data object SendFailed : DraftOutcome
 
+    /** `Action impossible`, without an action: the site refused it (`NOT_ALLOWED`), and sending again can't help. */
+    data object ActionFailed : DraftOutcome
+
     /** `Doucement ! Attends {n} s`, without an action. */
     data class TooFast(val seconds: Int) : DraftOutcome
 

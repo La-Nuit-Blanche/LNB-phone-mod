@@ -1249,7 +1249,7 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | `time.days` | {n} j | {n}d | under 7 days |
 | `time.date` | {d} {mois} (`12 nov.`) | {d} {Mon} (`12 Nov`) | 7 days and older; year added when not the current year |
 | `time.full` | {HH:mm} · {date} (`14:32 · 12 nov.`) | {HH:mm} · {date} (`14:32 · 12 Nov`) | thread main post, 24-hour in both |
-| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts |
+| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts; the decimal is cut, never rounded, and a zero decimal is dropped (`1 k` / `1k` for 1,000, `1,9 k` / `1.9k` for 1,999) |
 | `feed.new_posts` | 1 nouveau post / {n} nouveaux posts | 1 new post / {n} new posts | new posts pill, Global |
 | `feed.new_announcements` | 1 nouvelle annonce / {n} nouvelles annonces | 1 new announcement / {n} new announcements | new posts pill, Annonces |
 | `feed.end` | Tu as tout vu | You're all caught up | end of list |
@@ -1336,7 +1336,7 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Empty-state texts (200 dp) | `Server announcements will show up here.` | wraps to 2 lines | up to 2 lines |
 | Dialog texts (200 dp) | `Its replies will be deleted too. This can't be undone.` | wraps to 2 lines | up to 3 lines |
 | Collapsed composer placeholder (208 dp) | `Répondre à` + a long name | truncates with `…` | |
-| Error snackbar text beside `Réessayer` (about 112 dp from `x 38`) | `Connexion perdue` / `Échec de l'envoi`, about 109 dp | fits, tight | no longer `Feed indisponible` (about 116 dp) in a snackbar |
+| Error snackbar text beside `Réessayer` (about 116 dp from `x 38`) | `Connexion perdue` / `Échec de l'envoi`, about 113 dp | fits, tight | no longer `Feed indisponible` (about 116 dp) in a snackbar |
 | Plain snackbar text (212 dp from `x 14`) | `Compte LNB requis`, about 120 dp; `Écriture bloquée (sanction)`, about 185 dp | fits | |
 | Error snackbar text without an action (188 dp from `x 38`) | `Écriture bloquée (sanction)` about 185 dp; `Doucement ! Attends 10 s` about 165 dp | fits, tight | |
 | Guest strip text (208 dp from `x 36`) | `Compte LNB requis pour répondre`, about 197 dp; `Écriture bloquée (sanction)`, about 185 dp | fits, tight | truncates with an ellipsis |

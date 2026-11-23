@@ -5,6 +5,7 @@ import fr.bde_teknantes.lnb.phone.api.client.ui.Icon
 import fr.bde_teknantes.lnb.phone.api.client.ui.KitScreen
 import fr.bde_teknantes.lnb.phone.api.client.ui.MenuItem
 import fr.bde_teknantes.lnb.phone.api.client.ui.PhoneSounds
+import fr.bde_teknantes.lnb.phone.api.client.ui.SnackbarAction
 import fr.bde_teknantes.lnb.phone.api.client.ui.Widget
 import fr.bde_teknantes.lnb.phone.feed.client.FeedNotice
 import fr.bde_teknantes.lnb.phone.feed.client.FeedSession
@@ -109,11 +110,20 @@ internal class PostActions(private val screen: KitScreen, private val session: F
     }
 
     /**
-     * Shows what the session reports about writes, as an error or plain snackbar (`docs/feed-app.md` 5.3, art
-     * direction 9.4, 9.9, 9.11). Returns false for the connection's notices, which the screen shows itself.
+     * Shows a notice of the session on the screen (`docs/feed-app.md` 5.3, art direction 9.4, 9.9, 9.11, 9.12): writes
+     * refused or done, and `Connexion perdue` with its Retry, which goes when Feed is back
+     * ([FeedSession.connectionSnackbar], wherever it was shown), as on the root screen.
      */
-    fun report(notice: FeedNotice): Boolean {
+    fun report(notice: FeedNotice) {
         when (notice) {
+            FeedNotice.ConnectionLost -> session.connectionSnackbar = screen.showErrorSnackbar(
+                strings.get("feed.connection_lost"),
+                SnackbarAction(strings.get("error.retry")) { session.retryConnection() },
+            )
+            FeedNotice.ConnectionBack -> {
+                session.connectionSnackbar?.dismiss()
+                session.connectionSnackbar = null
+            }
             FeedNotice.ActionFailed -> screen.showErrorSnackbar(strings.get("snackbar.action_failed"))
             is FeedNotice.TooFast -> screen.showErrorSnackbar(strings.get("snackbar.too_fast", notice.seconds))
             is FeedNotice.Refused -> screen.showErrorSnackbar(strings.get(FeedWriting.snackbarKey(notice.block)))
@@ -121,9 +131,7 @@ internal class PostActions(private val screen: KitScreen, private val session: F
             // Two announcers pinned at once and the server found 3: the dialog, as for a fourth pin.
             is FeedNotice.PinLimit -> askReplace(notice.postId)
             is FeedNotice.Deleted -> screen.showSnackbar(strings.get(if (notice.reply) "delete.reply_done" else "delete.post_done"))
-            FeedNotice.ConnectionLost, FeedNotice.ConnectionBack -> return false
         }
-        return true
     }
 
     /** A guest, a banned player or writing off (9.11): a plain snackbar saying why, with the error sound. */

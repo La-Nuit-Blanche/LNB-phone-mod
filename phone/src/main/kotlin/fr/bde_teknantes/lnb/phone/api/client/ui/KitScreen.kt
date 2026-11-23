@@ -241,27 +241,33 @@ abstract class KitScreen : AppScreen() {
     /**
      * Shows a snackbar: a short message at the bottom of the viewport for 3 seconds, replacing the one showing. It
      * outlives the screen: popped right after, the screen hands it to the one the player comes back to (Compose
-     * closes, "Posted" shows on the feed).
+     * closes, "Posted" shows on the feed). Returns a handle that takes this snackbar away, and no other
+     * ([SnackbarHandle.dismiss]).
      */
-    fun showSnackbar(text: String) = snackbar(text, null, error = false)
+    fun showSnackbar(text: String): SnackbarHandle = snackbar(text, null, error = false)
 
     /** [showSnackbar] with a button such as "Retry", held 6 seconds. */
-    fun showSnackbar(text: String, action: SnackbarAction) = snackbar(text, action, error = false)
+    fun showSnackbar(text: String, action: SnackbarAction): SnackbarHandle = snackbar(text, action, error = false)
 
     /** An error snackbar: a red alert icon before the text, and the error sound. */
-    fun showErrorSnackbar(text: String) = snackbar(text, null, error = true)
+    fun showErrorSnackbar(text: String): SnackbarHandle = snackbar(text, null, error = true)
 
     /** An error snackbar with a button such as "Retry". */
-    fun showErrorSnackbar(text: String, action: SnackbarAction) = snackbar(text, action, error = true)
+    fun showErrorSnackbar(text: String, action: SnackbarAction): SnackbarHandle = snackbar(text, action, error = true)
 
-    private fun snackbar(text: String, action: SnackbarAction?, error: Boolean) {
+    private fun snackbar(text: String, action: SnackbarAction?, error: Boolean): SnackbarHandle {
         val wasShowing = snackbar?.isShowing(now) == true
         dismissSnackbar()
-        snackbar = overlays.add(0, Snackbar(text, action, error, now, slideIn = !wasShowing))
+        val handle = SnackbarHandle()
+        snackbar = overlays.add(0, Snackbar(text, action, error, now, slideIn = !wasShowing, handle)).also { handle.showOn(this, it) }
         if (error) PhoneSounds.error()
+        return handle
     }
 
-    /** Hides the snackbar at once. */
+    /** The snackbar shown, for its handle. */
+    internal val shownSnackbar: Snackbar? get() = snackbar
+
+    /** Hides the snackbar at once, whichever it is (to hide one in particular, use its [SnackbarHandle]). */
     fun dismissSnackbar() {
         snackbar?.let(overlays::remove)
         snackbar = null
@@ -488,8 +494,10 @@ abstract class KitScreen : AppScreen() {
         val handover = handedOver.remove(session) ?: return
         // Handed to the next screen at once (a pop, a push); not brought back long after, when the phone reopens.
         if (System.nanoTime() - handover.at > HANDOVER_NANOS) return
+        // Dismissed by its handle while it was being handed over.
+        if (handover.snackbar.handle.dismissed) return
         dismissSnackbar()
-        snackbar = overlays.add(0, Snackbar.restore(handover.snackbar, now))
+        snackbar = overlays.add(0, Snackbar.restore(handover.snackbar, now)).also { handover.snackbar.handle.showOn(this, it) }
     }
 
     private class Handover(val snackbar: Snackbar.Saved, val at: Long)

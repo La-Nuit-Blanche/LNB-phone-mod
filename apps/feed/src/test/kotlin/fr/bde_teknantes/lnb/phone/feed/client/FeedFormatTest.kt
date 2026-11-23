@@ -19,6 +19,7 @@ class FeedFormatTest {
             "time.month.11" -> "nov."
             "time.month.10" -> "oct."
             "count.thousands" -> "%s,%s k"
+            "count.thousands_whole" -> "%s k"
             else -> error("unexpected $id")
         }
         format.format(*args)
@@ -54,7 +55,8 @@ class FeedFormatTest {
     fun `counts hide 0 and shorten thousands without rounding up`() {
         assertEquals("", FeedFormat.count(0, french))
         assertEquals("999", FeedFormat.count(999, french))
-        assertEquals("1,0 k", FeedFormat.count(1000, french))
+        assertEquals("1 k", FeedFormat.count(1000, french))
+        assertEquals("1,9 k", FeedFormat.count(1999, french))
         assertEquals("1,2 k", FeedFormat.count(1299, french))
         assertEquals("12,3 k", FeedFormat.count(12345, french))
     }

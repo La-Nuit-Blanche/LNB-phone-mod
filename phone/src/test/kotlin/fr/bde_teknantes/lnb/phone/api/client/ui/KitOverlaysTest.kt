@@ -334,6 +334,15 @@ class KitOverlaysTest {
         }
 
         @Test
+        fun `beside an action, the text runs up to the button, whose padding is the gap`() {
+            // 6.5 dp a character: "Réessayer" makes a 74.5 dp text button ending 4 dp from the right edge (x 248), at
+            // x 161.5; the error text starts at x 38, so it has 123.5 dp, with no gap besides the button's own padding.
+            screen.showErrorSnackbar("Connexion perdue", SnackbarAction("Réessayer") {})
+            screen.frame()
+            assertEquals(123.5f, screen.canvas.room.getValue("Connexion perdue"), 0.01f)
+        }
+
+        @Test
         fun `a click on the snackbar's text doesn't reach what is under it`() {
             val behind = screen.add(Counter().at(0f, 0f, 256f, 370f))
             screen.showSnackbar("Publié")

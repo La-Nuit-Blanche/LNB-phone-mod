@@ -84,7 +84,6 @@ class ThreadScreen(
     private var shownOnce = false
     private var focusComposer = false
     private var leaving = false
-    private var connectionLostAt = Float.NaN
 
     // Replies seen at the last sync, and whether the thread then took live replies at its end: one that appears
     // afterwards just arrived, and gets the post highlight.
@@ -123,17 +122,19 @@ class ThreadScreen(
     override fun onTick() {
         if (leaving) return
         session.loadThreadIfNeeded(threadId)
-        val notice = session.takeNotice()
-        // The player's own delete of the main post says `Post supprimé`, someone else's `Ce post a été supprimé`: both
-        // set the thread's flag, so the notice is looked at first.
-        if (notice is FeedNotice.Deleted && notice.postId == threadId) return leave(ownDelete = true)
-        if (thread.deleted) {
-            leave(ownDelete = actions.deletedHere(threadId))
+        // Every notice waiting, in order. The player's own delete of the main post says `Post supprimé`, someone
+        // else's `Ce post a été supprimé`: both set the thread's flag, so the notices are looked at first.
+        val notices = generateSequence { session.takeNotice() }.toList()
+        val ownDelete = notices.any { it is FeedNotice.Deleted && it.postId == threadId }
+        if (ownDelete || thread.deleted) {
+            // The others are told before leaving; the snackbar saying why the thread went is the one carried over.
+            for (notice in notices) if (!(notice is FeedNotice.Deleted && notice.postId == threadId)) actions.report(notice)
+            leave(ownDelete = ownDelete || actions.deletedHere(threadId))
             return
         }
         actions.tick()
         draft.takeOutcome()?.let(::outcome)
-        notice?.let(::report)
+        notices.forEach(actions::report)
     }
 
     /** Back while the composer is open closes it and keeps the draft (9.7). */
@@ -202,23 +203,10 @@ class ThreadScreen(
             DraftOutcome.SendFailed -> showErrorSnackbar(strings.get("snackbar.send_failed"), SnackbarAction(strings.get("error.retry")) { send() })
             is DraftOutcome.TooFast -> showErrorSnackbar(strings.get("snackbar.too_fast", outcome.seconds))
             is DraftOutcome.Refused -> showErrorSnackbar(strings.get(FeedWriting.snackbarKey(outcome.block)))
+            // Refused for good (not allowed, or what it answered went): no Retry, the draft stays.
+            DraftOutcome.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             // The thread went: leave() says so.
             DraftOutcome.ThreadGone -> {}
-        }
-    }
-
-    private fun report(notice: FeedNotice) {
-        if (actions.report(notice)) return
-        when (notice) {
-            FeedNotice.ConnectionLost -> {
-                showErrorSnackbar(strings.get("feed.connection_lost"), SnackbarAction(strings.get("error.retry")) { session.retryConnection() })
-                connectionLostAt = now
-            }
-            FeedNotice.ConnectionBack -> if (now - connectionLostAt < CONNECTION_SNACKBAR_MS) {
-                dismissSnackbar()
-                connectionLostAt = Float.NaN
-            }
-            else -> {}
         }
     }
 
@@ -380,10 +368,5 @@ class ThreadScreen(
 
     private fun newCard(id: UUID) = PostCard({ session.post(id) }, strings, this).apply {
         time = { FeedFormat.relativeTime(it.createdAt, session.clock(), zone, strings) }
-    }
-
-    private companion object {
-        /** A `Connexion perdue` snackbar, with its action, is gone after this. */
-        const val CONNECTION_SNACKBAR_MS = 6300f
     }
 }

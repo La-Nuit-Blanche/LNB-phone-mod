@@ -19,6 +19,7 @@ import net.minecraft.resources.ResourceLocation
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
+import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.PacketDistributor
 import java.time.Instant
@@ -43,6 +44,7 @@ object FeedClient {
     fun init(modBus: IEventBus) {
         modBus.addListener(::registerApps)
         NeoForge.EVENT_BUS.addListener(::onLoggingOut)
+        NeoForge.EVENT_BUS.addListener(::onClientTick)
         startCapture()
     }
 
@@ -73,6 +75,11 @@ object FeedClient {
      * Anything else opens Feed on Announcements.
      */
     fun targetScreens(target: String): List<AppScreen> = FeedTargetScreens.screens(session, strings, target)
+
+    // The one place the session's clock moves: while Feed is open on the phone, whatever screen shows.
+    private fun onClientTick(event: ClientTickEvent.Post) {
+        if (session.isAppOpen) session.tick()
+    }
 
     private fun onLoggingOut(event: ClientPlayerNetworkEvent.LoggingOut) {
         // What the client holds belongs to the server just left. Hop to the client thread, where it is used.

@@ -58,11 +58,12 @@ object FeedFormat {
 
     /**
      * A count of the action row: empty at 0 (the icon alone), as is under 1,000, then thousands with one decimal cut,
-     * not rounded (`1,2 k` / `1.2k` for 1,299: never more than there is).
+     * not rounded (`1,2 k` / `1.2k` for 1,299: never more than there is), a zero decimal dropped (`1 k` / `1k`).
      */
-    fun count(n: Int, strings: FeedStrings): String = when {
-        n <= 0 -> ""
-        n < 1000 -> n.toString()
-        else -> strings.get("count.thousands", n / 1000, n % 1000 / 100)
+    fun count(n: Int, strings: FeedStrings): String {
+        if (n <= 0) return ""
+        if (n < 1000) return n.toString()
+        val tenths = n % 1000 / 100
+        return if (tenths == 0) strings.get("count.thousands_whole", n / 1000) else strings.get("count.thousands", n / 1000, tenths)
     }
 }
