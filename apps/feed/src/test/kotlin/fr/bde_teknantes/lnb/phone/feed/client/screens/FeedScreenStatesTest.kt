@@ -560,11 +560,6 @@ class FeedScreenStatesTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: FeedSession.show(null), called when the screen is hidden (a thread pushed over it, or the phone put " +
-            "away), trims the list to 200 posts. A player reading post 221 who puts the phone away comes back to a list " +
-            "that no longer holds it, the view jumped to the end of what is left.",
-    )
     fun `putting the phone away deep in a long list keeps the player's place`() {
         r.state()
         val all = posts(230)

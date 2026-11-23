@@ -59,6 +59,12 @@ class FeedList internal constructor(val kind: FeedKind) {
     /** Where the list is scrolled, kept across screens. */
     val scroll = ScrollState()
 
+    /**
+     * The post at the top of the view, kept up to date by the screen that shows the list: trimming the list never drops
+     * it, nor a page under it, so the player finds their place again.
+     */
+    internal var shownTop: UUID? = null
+
     /** For each post held, the cursor its page was loaded with, to load it again once trimmed (null: first page, live). */
     internal val loadedWith = HashMap<UUID, String?>()
 
@@ -94,6 +100,7 @@ class FeedList internal constructor(val kind: FeedKind) {
         retrying = false
         reloadNotBefore = 0
         moreNotBefore = 0
+        shownTop = null
         scroll.offset = 0f
     }
 }

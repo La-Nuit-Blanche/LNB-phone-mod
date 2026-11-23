@@ -256,6 +256,8 @@ class FeedScreen(
                 session.takeHighlight(id)
                 card.highlight()
             }
+            // Where the player reads, so that trimming the list never takes it away.
+            feed.shownTop = list.children.firstOrNull { it is PostCard && it.y + it.height > list.offset }?.let { (it as PostCard).current()?.id }
             // The spinner row in view: the next page.
             if (loadingRow.parent === list && loadingRow.y < list.offset + list.height) session.loadMore(kind)
         }

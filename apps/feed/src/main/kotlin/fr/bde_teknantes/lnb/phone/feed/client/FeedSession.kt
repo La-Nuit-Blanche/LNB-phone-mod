@@ -1272,11 +1272,17 @@ class FeedSession(
         }
     }
 
-    /** A list the player isn't looking at keeps its newest [MAX_FEED] posts; the older ones load again on scroll. */
+    /**
+     * A list the player isn't looking at keeps its newest [MAX_FEED] posts, or more when they were reading further down;
+     * the older ones load again on scroll.
+     */
     private fun trimFeed(list: FeedList) {
-        if (list.postIds.size <= MAX_FEED) return
-        val kept = list.postIds.subList(0, MAX_FEED).toList()
-        val dropped = list.postIds.subList(MAX_FEED, list.postIds.size).toList()
+        // Never what the player was reading, nor a page under it: they come back to their place.
+        val reading = list.shownTop?.let { list.postIds.indexOf(it) } ?: -1
+        val keep = maxOf(MAX_FEED, reading + 1 + Feed.FEED_PAGE)
+        if (list.postIds.size <= keep) return
+        val kept = list.postIds.subList(0, keep).toList()
+        val dropped = list.postIds.subList(keep, list.postIds.size).toList()
         list.postIds.clear()
         list.postIds += kept
         dropped.forEach { list.loadedWith.remove(it) }
