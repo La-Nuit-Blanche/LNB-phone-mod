@@ -1,0 +1,22 @@
+{
+  "fml.menu.mods.info.description.lnbphone_feed": "Feed, the LNB Phone's social app: announcements and the players' posts, shared with LNB's website.",
+  "app.lnbphone_feed.feed": "Feed",
+  "lnbphone_feed.building": "Feed is being built.",
+  "lnbphone_feed.post.anonymous": "Anonymous",
+  "notif.lnbphone_feed.announcement": "New announcement",
+  "notif.lnbphone_feed.reply": "New reply",
+  "notif.lnbphone_feed.text": "%s: %s",
+  "command.lnbphone_feed.announcer.added": "%s can now post announcements.",
+  "command.lnbphone_feed.announcer.removed": "%s can no longer post announcements.",
+  "command.lnbphone_feed.announcer.already": "%s can already post announcements.",
+  "command.lnbphone_feed.announcer.already_not": "%s already couldn't post announcements.",
+  "command.lnbphone_feed.announcer.via_role": "%s is a moderator, so already posts announcements.",
+  "command.lnbphone_feed.announcer.not_linked": "%s has no LNB account.",
+  "command.lnbphone_feed.announcer.implied_by_role": "%s is a moderator: moderators always post announcements.",
+  "command.lnbphone_feed.announcer.not_allowed": "Only moderators can choose announcers.",
+  "command.lnbphone_feed.announcer.unavailable": "Feed can't be reached. Try again in a moment.",
+  "command.lnbphone_feed.announcer.invalid_name": "%s isn't a Minecraft username.",
+  "command.lnbphone_feed.announcer.list": "Announcers: %s",
+  "command.lnbphone_feed.announcer.list.empty": "No announcers besides the moderators.",
+  "command.lnbphone_feed.dev.set": "Feed memory backend: %s %s"
+}

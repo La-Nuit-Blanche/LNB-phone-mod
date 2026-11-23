@@ -1,0 +1,22 @@
+{
+  "fml.menu.mods.info.description.lnbphone_feed": "Feed, l'appli sociale du LNB Phone : les annonces et les posts des joueurs, partagés avec le site de LNB.",
+  "app.lnbphone_feed.feed": "Feed",
+  "lnbphone_feed.building": "Feed est en construction.",
+  "lnbphone_feed.post.anonymous": "Anonyme",
+  "notif.lnbphone_feed.announcement": "Nouvelle annonce",
+  "notif.lnbphone_feed.reply": "Nouvelle réponse",
+  "notif.lnbphone_feed.text": "%s : %s",
+  "command.lnbphone_feed.announcer.added": "%s peut désormais publier des annonces.",
+  "command.lnbphone_feed.announcer.removed": "%s ne peut plus publier d'annonces.",
+  "command.lnbphone_feed.announcer.already": "%s peut déjà publier des annonces.",
+  "command.lnbphone_feed.announcer.already_not": "%s ne pouvait déjà pas publier d'annonces.",
+  "command.lnbphone_feed.announcer.via_role": "%s est modérateur, et publie donc déjà des annonces.",
+  "command.lnbphone_feed.announcer.not_linked": "%s n'a pas de compte LNB.",
+  "command.lnbphone_feed.announcer.implied_by_role": "%s est modérateur : les modérateurs publient toujours des annonces.",
+  "command.lnbphone_feed.announcer.not_allowed": "Seuls les modérateurs peuvent choisir les annonceurs.",
+  "command.lnbphone_feed.announcer.unavailable": "Feed est injoignable. Réessaie dans un instant.",
+  "command.lnbphone_feed.announcer.invalid_name": "%s n'est pas un pseudo Minecraft.",
+  "command.lnbphone_feed.announcer.list": "Annonceurs : %s",
+  "command.lnbphone_feed.announcer.list.empty": "Aucun annonceur en dehors des modérateurs.",
+  "command.lnbphone_feed.dev.set": "Backend mémoire de Feed : %s %s"
+}
