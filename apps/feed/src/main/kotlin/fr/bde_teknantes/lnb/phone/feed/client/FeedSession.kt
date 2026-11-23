@@ -1433,9 +1433,10 @@ class FeedSession(
         /**
          * A feed's or a thread's seen mark at most once every 2 seconds, and only when what is shown changed: the
          * server drops seen marks past a burst of 3, then one every 2 seconds (`docs/feed-app.md` 4.3), which all the
-         * marks share here too ([SEEN_BURST]).
+         * marks share here too ([SEEN_BURST]). Paced at 2.2 seconds, a margin over the server's 2: marks that reach it
+         * a little late (the network, client ticks catching up after a lag) still find the allowance refilled.
          */
-        const val SEEN_EVERY_TICKS = 40
+        const val SEEN_EVERY_TICKS = 44
 
         /** How long a draft refused as `DISABLED` waits for the state that says whether writing is off. */
         const val WRITING_STATE_TICKS = 240

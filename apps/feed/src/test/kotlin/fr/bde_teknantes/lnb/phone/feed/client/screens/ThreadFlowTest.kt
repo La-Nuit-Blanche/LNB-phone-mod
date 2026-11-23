@@ -358,7 +358,7 @@ class ThreadFlowTest {
     }
 
     @Test
-    fun `replies to me while I read the thread raise no marker, and the thread is marked seen again once, two seconds on`() {
+    fun `replies to me while I read the thread raise no marker, and the thread is marked seen again once, one pace on`() {
         val own = main.copy(author = CAMILLE, mine = true)
         val t = open(of = own)
         r.answerThread(own, emptyList())
@@ -369,7 +369,7 @@ class ThreadFlowTest {
         t.frame()
         assertEquals(0, session.post(own.id)!!.unseenReplies)
         assertTrue(t.shapes.none { it.kind == DrawnShape.Kind.CIRCLE && it.x == 47f && it.width == 6f })
-        t.play(session, 39)
+        t.play(session, fr.bde_teknantes.lnb.phone.feed.client.FeedSession.SEEN_EVERY_TICKS - 1)
         assertEquals(1, r.all<SeenThreadPayload>().size)
         t.play(session, 2)
         assertEquals(2, r.all<SeenThreadPayload>().size)

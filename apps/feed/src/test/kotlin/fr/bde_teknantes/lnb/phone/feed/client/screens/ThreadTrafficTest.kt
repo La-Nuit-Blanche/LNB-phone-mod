@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.time.ZoneOffset
 import java.util.UUID
@@ -177,12 +176,6 @@ class ThreadTrafficTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (low): seen marks are paced at exactly the server's rate (burst 3, then one per 40 client ticks, " +
-            "anchored on the client's tick count), with no margin; when the earlier marks reach the server a tick " +
-            "later than the one sent as the allowance refills (network jitter, or client ticks run to catch up after " +
-            "a lag), the server drops it and the site keeps the marker the client already cleared",
-    )
     fun `a seen mark sent as the allowance refills is still allowed when the earlier ones reached the server a tick late`() {
         r.state()
         val threads = (1..4).map { post(text = "t$it") }
