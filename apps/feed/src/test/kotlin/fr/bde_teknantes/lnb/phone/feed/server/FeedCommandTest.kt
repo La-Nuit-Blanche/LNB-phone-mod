@@ -3,6 +3,9 @@ package fr.bde_teknantes.lnb.phone.feed.server
 import com.google.gson.JsonParser
 import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.exceptions.CommandSyntaxException
+import fr.bde_teknantes.lnb.phone.feed.model.Availability
+import fr.bde_teknantes.lnb.phone.feed.network.ResetPayload
+import fr.bde_teknantes.lnb.phone.feed.network.StatePayload
 import fr.bde_teknantes.lnb.phone.feed.server.Players.CAMILLE
 import fr.bde_teknantes.lnb.phone.feed.server.Players.KAEL
 import fr.bde_teknantes.lnb.phone.feed.server.backend.BackendResult
@@ -70,8 +73,10 @@ class FeedCommandTest {
 
     private fun announces(player: UUID) = (memory.player(player).join() as BackendResult.Ok).body.rights.announce
 
+    private val service = FeedService(memory, host, RecordingSink()).apply { start() }
+
     init {
-        setCurrent(FeedService(memory, host, RecordingSink()).apply { start() })
+        setCurrent(service)
     }
 
     @AfterEach
@@ -188,6 +193,38 @@ class FeedCommandTest {
         setCurrent(FeedService(ScriptedBackend(), host, RecordingSink()))
         assertThrows(CommandSyntaxException::class.java) { run("feed dev writing true", level = 4, dev = true) }
         assertFalse(memory.isWriting)
+    }
+
+    @Test
+    fun `each dev switch reaches the players with Feed open at once, writing by a new read of their state`() {
+        host.online += CAMILLE
+        host.online += KAEL
+        service.handleOpen(CAMILLE)
+        host.sent.clear()
+        run("feed dev writing false", level = 2, dev = true)
+        val states = host.sent.filter { it.second is StatePayload }
+        // Camille, watching, has the new state; Kael, Feed closed, gets it when opening Feed.
+        assertEquals(listOf(CAMILLE), states.map { it.first })
+        val state = states.single().second as StatePayload
+        assertEquals(Availability.OK, state.available)
+        assertFalse(state.state!!.writing)
+        host.sent.clear()
+        run("feed dev writing true", level = 2, dev = true)
+        assertTrue((host.sent.single { it.second is StatePayload }.second as StatePayload).state!!.writing)
+        // `offline` and `disabled` go through the connection's events: the watchers hear of each at once.
+        host.sent.clear()
+        run("feed dev offline true", level = 2, dev = true)
+        assertEquals(Availability.UNAVAILABLE, (host.sent.single().second as StatePayload).available)
+        host.sent.clear()
+        run("feed dev offline false", level = 2, dev = true)
+        assertEquals(Availability.OK, (host.sent.single { it.second is StatePayload }.second as StatePayload).available)
+        assertTrue(host.sent.any { it.second == ResetPayload })
+        host.sent.clear()
+        run("feed dev disabled true", level = 2, dev = true)
+        assertEquals(Availability.DISABLED, (host.sent.single().second as StatePayload).available)
+        run("feed dev disabled false", level = 2, dev = true)
+        // Brigadier's booleans: `on` and `off` are not words it reads.
+        assertThrows(CommandSyntaxException::class.java) { run("feed dev writing off", level = 2, dev = true) }
     }
 
     @Test

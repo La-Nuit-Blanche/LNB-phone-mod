@@ -260,12 +260,16 @@ accounts of A and B linked to LNB accounts. The LNB website's repository says ho
 37. **A guest, writing paused, and the site away.** Put B's username under `memory.guests` and restart: B has no round
     button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a thread
     shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still gets the
-    announcements' banners. Remove B from the list and restart. `/feed dev writing off` (A, memory mode only): within
-    seconds nobody has a round button, the thread strip reads "Writing is paused", and a heart click shows it too; `/feed
-    dev writing on` brings everything back. `/feed dev offline on`: a Feed that is open keeps its list readable and
-    shows "Connection lost" with "Retry"; a Feed opened afresh shows "Feed unavailable" with "Retry". `/feed dev offline
-    off`: the open Feed recovers by itself within about 15 seconds, and "Retry" does it at once. `/feed dev disabled on`:
-    a Feed opened afresh shows "Feed is switched off".
+    announcements' banners. Remove B from the list and restart. The `/feed dev` switches (A, memory mode only) reach a
+    Feed that is open at once, within the tick the command runs in. `/feed dev writing false`: the server reads the state
+    of every online player again, so B's open Feed loses its round button and its more and pin buttons, a thread shows
+    the strip "Writing is paused" in place of the composer, and a heart click shows "Writing is paused" with the error
+    sound; A, a moderator, gets the same look. A Feed opened afterwards opens that way. `/feed dev writing true` brings
+    everything back, as fast. `/feed dev offline true`: a Feed that is open keeps its list readable and shows
+    "Connection lost" with "Retry"; a Feed opened afresh shows "Feed unavailable" with "Retry". `/feed dev offline
+    false`: "Connection lost" goes and the lists reload where they are, and a Feed showing "Feed unavailable" loads its
+    list, both with no click. `/feed dev disabled true`: an open Feed shows "Connection lost" as above, a Feed opened
+    afresh shows "Feed is switched off" with "Retry"; `/feed dev disabled false` brings it back as `offline false` does.
 38. **A dedicated server restart.** Stop the server (`stop`) while B has Feed open on a thread: B returns to the menu with
     no error in either log. Start it again and join: Feed opens afresh on Announcements and shows the new server's
     content (in memory mode the sample again: what was posted is gone, and the announcers added by command with it),

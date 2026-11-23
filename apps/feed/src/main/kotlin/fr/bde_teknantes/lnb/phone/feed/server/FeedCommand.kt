@@ -180,6 +180,11 @@ object FeedCommand {
             "disabled" -> backend.setDisabled(on)
             "writing" -> backend.setWriting(on)
         }
+        // The site sends no event when its `feed.writing` flag changes (`docs/feed-mod.md` 11.2), so the memory backend
+        // doesn't either: the online players' state is read again here, as a reconnection does, and goes at once to
+        // those with Feed open. `offline` and `disabled` need nothing more: the backend reports its connection going
+        // down or coming back, and the relay tells the watchers then.
+        if (switch == "writing") FeedServer.current?.let { it.rights.refreshAll(it.host.onlinePlayers()) }
         val state = Component.translatable(if (on) "options.on" else "options.off")
         context.source.sendSuccess({ Component.translatable("$KEY.dev.set", switch, state) }, true)
         return 1
