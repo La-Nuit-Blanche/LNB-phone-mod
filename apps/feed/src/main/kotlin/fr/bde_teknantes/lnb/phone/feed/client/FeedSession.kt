@@ -125,6 +125,7 @@ class FeedSession(
     val compose = ComposeDraft()
 
     private val requests = HashMap<Int, PendingRequest>()
+    private val draftsAwaitingState = HashMap<Any, Int>()
     private val ids = RequestIds()
     private val pendingLikes = HashMap<UUID, PendingLike>()
     private val pendingPins = HashMap<UUID, List<Pin>>()
@@ -549,6 +550,7 @@ class FeedSession(
     fun tick() {
         ticks++
         flushSeen()
+        settleAwaitingDrafts(timedOut = true)
         val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED
         if (lost && hasLoadedContent && (viewing != null || viewingThread != null) && ticks >= nextAutoRetry) {
             nextAutoRetry = ticks + AUTO_RETRY_TICKS
@@ -576,6 +578,7 @@ class FeedSession(
         }
         payload.state?.let { s ->
             state = s
+            settleAwaitingDrafts(timedOut = false)
             for (kind in FeedKind.entries) unread[kind] = s.unread[kind] && viewing != kind
         }
         val wasLost = before == FeedAvailability.UNAVAILABLE || before == FeedAvailability.DISABLED
@@ -761,6 +764,7 @@ class FeedSession(
         pendingLikes.clear()
         pendingPins.clear()
         pinsMovedSince.clear()
+        draftsAwaitingState.clear()
         deleting.clear()
         highlights.clear()
         reveals.clear()
@@ -1138,7 +1142,7 @@ class FeedSession(
             return
         }
         if (payload.outcome != Outcome.OK || reply == null) {
-            draft?.outcome = draftFailure(payload)
+            if (draft != null) draftFailure(payload, draft)?.let { settleDraft(draft, it) } ?: run { draft.sending = true }
             return
         }
         draft?.clear()
@@ -1193,11 +1197,59 @@ class FeedSession(
     }
 
     /** What a refused draft says: the draft stays, with its key. */
-    private fun draftFailure(payload: ResultPayload): DraftOutcome = when (payload.outcome) {
+    /**
+     * What a refused draft says, each refusal as what it is (`docs/feed-app.md` 5.3, art direction 9.11); the draft
+     * stays, with its key. Only a real failure to send offers Retry. Null: not known yet (see [awaitWritingState]).
+     */
+    private fun draftFailure(payload: ResultPayload, draft: Any): DraftOutcome? = when (payload.outcome) {
         Outcome.RATE_LIMITED -> DraftOutcome.TooFast(payload.retryAfter?.coerceIn(1, 3600) ?: 1)
         Outcome.NOT_LINKED -> DraftOutcome.Refused(WriteBlock.GUEST)
         Outcome.BANNED -> DraftOutcome.Refused(WriteBlock.BANNED)
+        Outcome.NOT_ALLOWED -> DraftOutcome.ActionFailed
+        Outcome.DISABLED -> awaitWritingState(draft)
         else -> DraftOutcome.SendFailed
+    }
+
+    /**
+     * `DISABLED` says either that Feed is switched off (a failure to send, with Retry) or that writing is (its own words,
+     * no Retry); the server reads the player's state again in the second case only. So the draft keeps sending until
+     * that state comes, or until it is clear none will.
+     */
+    private fun awaitWritingState(draft: Any): DraftOutcome? = when {
+        availability == FeedAvailability.DISABLED -> DraftOutcome.SendFailed
+        state?.writing == false -> DraftOutcome.Refused(WriteBlock.WRITING_OFF)
+        else -> {
+            draftsAwaitingState[draft] = ticks + WRITING_STATE_TICKS
+            null
+        }
+    }
+
+    private fun settleDraft(draft: Any, outcome: DraftOutcome) {
+        when (draft) {
+            is ComposeDraft -> {
+                draft.sending = false
+                draft.outcome = outcome
+            }
+            is ReplyDraft -> {
+                draft.sending = false
+                draft.outcome = outcome
+            }
+        }
+        changed()
+    }
+
+    /** The drafts refused as `DISABLED` that wait for the state to say why (writing off) or for their deadline. */
+    private fun settleAwaitingDrafts(timedOut: Boolean) {
+        if (draftsAwaitingState.isEmpty()) return
+        for ((draft, deadline) in draftsAwaitingState.entries.toList()) {
+            val outcome = when {
+                state?.writing == false -> DraftOutcome.Refused(WriteBlock.WRITING_OFF)
+                !timedOut || ticks >= deadline -> DraftOutcome.SendFailed
+                else -> continue
+            }
+            draftsAwaitingState.remove(draft)
+            settleDraft(draft, outcome)
+        }
     }
 
     /** A list the player isn't looking at keeps its newest [MAX_FEED] posts; the older ones load again on scroll. */
@@ -1295,6 +1347,9 @@ class FeedSession(
          * marks share here too ([SEEN_BURST]).
          */
         const val SEEN_EVERY_TICKS = 40
+
+        /** How long a draft refused as `DISABLED` waits for the state that says whether writing is off. */
+        const val WRITING_STATE_TICKS = 240
 
         /** Seen marks that may go at once before the 2-second pace. */
         const val SEEN_BURST = 3

@@ -41,7 +41,7 @@ class FeedSessionDraftsTest {
         r.state()
         val cases = listOf(
             ResultPayload(0, Outcome.UNAVAILABLE) to DraftOutcome.SendFailed,
-            ResultPayload(0, Outcome.DISABLED) to DraftOutcome.SendFailed,
+            ResultPayload(0, Outcome.NOT_ALLOWED) to DraftOutcome.ActionFailed,
             ResultPayload(0, Outcome.INVALID) to DraftOutcome.SendFailed,
             ResultPayload(0, Outcome.RATE_LIMITED, retryAfter = 12) to DraftOutcome.TooFast(12),
             ResultPayload(0, Outcome.RATE_LIMITED) to DraftOutcome.TooFast(1),
@@ -61,6 +61,36 @@ class FeedSessionDraftsTest {
             assertEquals("Bonjour", session.compose.text.text)
             assertTrue(session.sendPost())
         }
+    }
+
+    @Test
+    fun `a draft refused as DISABLED says writing is off once the new state says so, without Retry`() {
+        r.state()
+        val sent = compose()
+        session.onResult(ResultPayload(sent.requestId, Outcome.DISABLED))
+        // Not known yet which flag is off: still sending.
+        assertTrue(session.compose.sending)
+        assertNull(session.compose.takeOutcome())
+        r.state(FeedFixtures.PLAYER.copy(writing = false))
+        assertFalse(session.compose.sending)
+        assertEquals(DraftOutcome.Refused(WriteBlock.WRITING_OFF), session.compose.takeOutcome())
+        assertEquals("Bonjour", session.compose.text.text)
+    }
+
+    @Test
+    fun `a draft refused as DISABLED with writing still on is a failure to send, with Retry`() {
+        r.state()
+        session.onResult(ResultPayload(compose().requestId, Outcome.DISABLED))
+        r.state()
+        assertEquals(DraftOutcome.SendFailed, session.compose.takeOutcome())
+        // Feed switched off altogether: no state comes, the draft gives up after a while.
+        session.sendPost()
+        session.onResult(ResultPayload(r.last<CreatePostPayload>().requestId, Outcome.DISABLED))
+        repeat(FeedSession.WRITING_STATE_TICKS - 1) { session.tick() }
+        assertNull(session.compose.takeOutcome())
+        session.tick()
+        assertEquals(DraftOutcome.SendFailed, session.compose.takeOutcome())
+        assertFalse(session.compose.sending)
     }
 
     @Test
