@@ -1112,8 +1112,14 @@ class FeedSession(
         val draft = compose
         draft.sending = false
         val post = payload.post
+        if (payload.outcome == Outcome.NOT_FOUND) {
+            // The key's post was published, then deleted (feed-mod.md 11): retrying can't help, the draft goes.
+            draft.clear()
+            draft.outcome = DraftOutcome.ActionFailed
+            return
+        }
         if (payload.outcome != Outcome.OK || post == null) {
-            draft.outcome = draftFailure(payload)
+            draftFailure(payload, draft)?.let { settleDraft(draft, it) } ?: run { draft.sending = true }
             return
         }
         draft.clear()

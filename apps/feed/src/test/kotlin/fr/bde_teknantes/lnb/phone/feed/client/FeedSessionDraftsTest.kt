@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -161,11 +160,6 @@ class FeedSessionDraftsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (feed-mod.md 11: 'A key whose post was deleted since answers 404 notFound: stop retrying and clear the " +
-            "draft'): postAnswered treats NOT_FOUND as any failure, so the draft and its key stay and every Retry gets " +
-            "NOT_FOUND again.",
-    )
     fun `a draft whose replayed key finds its post deleted is cleared`() {
         r.state()
         val sent = compose()
