@@ -13,7 +13,7 @@ Required on the server and on every client, with:
 
 | Mod              | Version                                        |
 | ---------------- | ---------------------------------------------- |
-| LNB Phone        | 0.1.1 up to, not including, 0.2 (written by the build) |
+| LNB Phone        | 0.2.0 up to, not including, 0.3 (written by the build) |
 | LNB Warden       | 0.5.0 or newer                                 |
 | Kotlin for Forge | 5.12 or newer                                  |
 

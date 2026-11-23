@@ -242,7 +242,8 @@ abstract class KitScreen : AppScreen() {
      * Shows a snackbar: a short message at the bottom of the viewport for 3 seconds, replacing the one showing. It
      * outlives the screen: popped right after, the screen hands it to the one the player comes back to (Compose
      * closes, "Posted" shows on the feed). Returns a handle that takes this snackbar away, and no other
-     * ([SnackbarHandle.dismiss]).
+     * ([SnackbarHandle.dismiss]). The handle is new in phone 0.2.0: these functions returned nothing before, so an app
+     * built against 0.1 must be rebuilt.
      */
     fun showSnackbar(text: String): SnackbarHandle = snackbar(text, null, error = false)
 

@@ -459,7 +459,8 @@ The kit plays the tap sound on every click, the error sound on a click on someth
 snackbar. `PhoneSounds` has the others (`sent`, `like`); all of them follow the player's Sounds setting. A snackbar
 shown just before a `pop` is carried over to the screen underneath. `showSnackbar` and `showErrorSnackbar` return a `SnackbarHandle`:
 its `dismiss` takes that snackbar away, wherever it was carried, and leaves alone any other that replaced it (a
-"Connection lost" to take back once the connection is back).
+"Connection lost" to take back once the connection is back). The handle is new in phone 0.2.0, whose snackbar functions
+returned nothing before: an app built against 0.1 must be rebuilt for 0.2, as its range already says.
 
 ### 7. Talking to your server
 
