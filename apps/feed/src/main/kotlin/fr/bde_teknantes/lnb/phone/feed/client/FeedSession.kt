@@ -639,7 +639,7 @@ class FeedSession(
             thread.loadingFirst = false
             when {
                 payload.outcome == Outcome.OK && main != null && main.id == thread.id && !main.isReply -> {
-                    posts[main.id] = main
+                    posts[main.id] = incoming(main)
                     mergeThreadPage(thread, payload.replies, payload.next)
                     thread.firstError = null
                     thread.stale = request.generation != resets
@@ -656,7 +656,7 @@ class FeedSession(
             if (payload.outcome == Outcome.OK && thread.loaded) {
                 for (reply in payload.replies) {
                     if (reply.threadId != thread.id || reply.id in gone || reply.id in thread.replyIds) continue
-                    posts[reply.id] = reply
+                    posts[reply.id] = incoming(reply)
                     thread.replyIds += reply.id
                 }
                 thread.next = payload.next
@@ -822,12 +822,12 @@ class FeedSession(
         list.loadedWith.clear()
         if (list.kind == FeedKind.ANNOUNCEMENTS) {
             for (view in page.pinned) if (usable(view, list.kind) && view.id !in list.pinnedIds) {
-                posts[view.id] = view
+                posts[view.id] = incoming(view)
                 list.pinnedIds += view.id
             }
         }
         for (view in page.posts) if (usable(view, list.kind) && !list.holds(view.id)) {
-            posts[view.id] = view.copy(pinnedAt = null)
+            posts[view.id] = incoming(view.copy(pinnedAt = null))
             list.postIds += view.id
             list.loadedWith[view.id] = null
         }
@@ -840,7 +840,7 @@ class FeedSession(
     private fun appendPage(list: FeedList, page: PagePayload, before: String?) {
         for (view in page.posts) {
             if (!usable(view, list.kind) || list.holds(view.id)) continue
-            posts[view.id] = view.copy(pinnedAt = null)
+            posts[view.id] = incoming(view.copy(pinnedAt = null))
             list.postIds += view.id
             list.loadedWith[view.id] = before
         }
@@ -863,7 +863,7 @@ class FeedSession(
         }
         if (list.kind == FeedKind.ANNOUNCEMENTS) {
             val pinned = page.pinned.filter { usable(it, list.kind) && it.pinnedAt != null }
-            for (view in pinned) posts[view.id] = view
+            for (view in pinned) posts[view.id] = incoming(view)
             applyPinGroup(pinned.map { Pin(it.id, it.pinnedAt!!) })
         }
         val fresh = page.posts.filter { usable(it, list.kind) }
@@ -879,7 +879,7 @@ class FeedSession(
         }
         for (view in fresh) {
             val held = list.holds(view.id)
-            posts[view.id] = if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null)
+            posts[view.id] = incoming(if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null))
             if (held) continue
             if (newestHeld == null || view.createdAt.isAfter(newestHeld)) {
                 insertWaiting(list, view.id)
@@ -906,7 +906,7 @@ class FeedSession(
         if (!thread.loaded) {
             thread.replyIds.clear()
             for (reply in fresh) if (reply.id !in thread.replyIds) {
-                posts[reply.id] = reply
+                posts[reply.id] = incoming(reply)
                 thread.replyIds += reply.id
             }
             thread.next = next
@@ -920,7 +920,7 @@ class FeedSession(
         val covers = { id: UUID -> next == null || (newest != null && posts[id]?.createdAt?.isBefore(newest) == true) }
         thread.replyIds.removeAll { id -> (id !in inPage && covers(id)).also { if (it) gone += id } }
         for (reply in fresh) {
-            posts[reply.id] = reply
+            posts[reply.id] = incoming(reply)
             if (reply.id in thread.replyIds) continue
             var i = thread.replyIds.size
             while (i > 0 && posts[thread.replyIds[i - 1]]?.createdAt?.isAfter(reply.createdAt) == true) i--
@@ -936,11 +936,11 @@ class FeedSession(
         val list = feed(view.feed)
         val held = list.holds(view.id)
         if (held) {
-            posts[view.id] = if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null)
+            posts[view.id] = incoming(if (view.id in list.pinnedIds) view else view.copy(pinnedAt = null))
             return
         }
         if (list.loaded) {
-            posts[view.id] = view.copy(pinnedAt = null)
+            posts[view.id] = incoming(view.copy(pinnedAt = null))
             insertWaiting(list, view.id)
         }
         if (!view.mine && viewing != view.feed) unread[view.feed] = true
@@ -951,9 +951,9 @@ class FeedSession(
         val thread = threads[threadId]
         val held = thread?.replyIds?.contains(view.id) == true
         if (held) {
-            posts[view.id] = view
+            posts[view.id] = incoming(view)
         } else if (thread != null && thread.loaded && !thread.hasMore) {
-            posts[view.id] = view
+            posts[view.id] = incoming(view)
             thread.replyIds += view.id
         }
         if (!view.answersMe || view.mine || !raisedFor.add(view.id)) return
@@ -1106,7 +1106,7 @@ class FeedSession(
         draft.outcome = DraftOutcome.Sent(post)
         if (post.id in gone || post.isReply) return
         val list = feed(post.feed)
-        posts[post.id] = post.copy(pinnedAt = null)
+        posts[post.id] = incoming(post.copy(pinnedAt = null))
         if (!list.loaded) return
         // Always at its place, scrolled into view (art direction 9.5): the posts waiting before it come along.
         list.waitingIds.remove(post.id)
@@ -1134,7 +1134,7 @@ class FeedSession(
         draft?.outcome = DraftOutcome.Sent(reply)
         if (reply.id in gone || reply.threadId != request.threadId) return
         val thread = threads[request.threadId] ?: return
-        posts[reply.id] = reply
+        posts[reply.id] = incoming(reply)
         if (thread.loaded && !thread.hasMore && reply.id !in thread.replyIds) thread.replyIds += reply.id
         if (reply.id in thread.replyIds) {
             highlights += reply.id
@@ -1203,6 +1203,16 @@ class FeedSession(
             threads.remove(eldest)
         }
         collect()
+    }
+
+    /**
+     * A view from the server about to be held: the heart of a post whose like waits for its answer stays as the player
+     * clicked it (the answer settles it), whatever page, live copy or thread brings the view meanwhile.
+     */
+    private fun incoming(view: PostView): PostView {
+        if (view.id !in pendingLikes) return view
+        val shown = posts[view.id] ?: return view
+        return view.copy(liked = shown.liked, likes = shown.likes)
     }
 
     /** Drops the views no list or thread refers to any more. */

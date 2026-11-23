@@ -215,4 +215,21 @@ class FeedSessionLikesTest {
         rec.session.toggleLike(broken.id)
         assertEquals(0, rec.session.post(broken.id)!!.likes)
     }
+
+    @Test
+    fun `a page, a live copy or a thread bringing the post while its like waits keep the heart as clicked`() {
+        val like = click()
+        // A reload after a reset, from before the like.
+        session.onReset()
+        r.firstPage(FeedKind.GLOBAL, listOf(p))
+        assertTrue(liked())
+        assertEquals(9, likes())
+        session.onLive(listOf(p))
+        assertTrue(liked())
+        r.loadThread(p, emptyList())
+        assertTrue(liked())
+        assertEquals(9, likes())
+        ok(like, likes = 9, liked = true)
+        assertTrue(liked())
+    }
 }
