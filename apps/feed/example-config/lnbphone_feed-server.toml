@@ -1,0 +1,11 @@
+# Feed's settings for development without LNB's website: the memory backend, loaded with the art direction's sample
+# posts. Copied into a run folder by `./gradlew :apps:feed:prepareMemoryRun`, and into the screenshot run's folder by
+# `./gradlew :apps:feed:runCapture`. Never for a real server: nothing is kept, and operators are moderators.
+[backend]
+	kind = "memory"
+
+[memory]
+	seed = "sample"
+	# Read as guests (no LNB account, read only): the guest capture scenario plays as this one.
+	guests = ["Visiteur_42"]
+	rateLimits = true

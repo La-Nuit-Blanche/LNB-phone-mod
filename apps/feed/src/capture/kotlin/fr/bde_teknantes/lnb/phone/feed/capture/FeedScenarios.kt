@@ -29,11 +29,15 @@ object FeedScenarios {
 
     /** As Camille R. (`Cam_Roux`), the mockups' viewer: the root screen's main states. */
     private fun FeedCapture.Script.root() {
-        language("fr_fr")
-        guiScale(3)
+        language(FeedCapture.Options.language)
+        guiScale(FeedCapture.Options.scale)
         enterWorld("lnbphone_feed-capture")
         waitTicks(40)
         openPhone()
+        // The home screen: Feed's own icon on its azure tile, beside Settings.
+        mouseTo(AWAY_X, 200)
+        waitTicks(2)
+        shot("00_home")
         openFeed()
         waitTicks(40)
         mouseTo(AWAY_X, 200)
@@ -134,7 +138,9 @@ object FeedScenarios {
         backend { it.setWriting(true) }
         waitTicks(10)
 
-        // Sheet 5: English at GUI scale 2.
+        // Sheet 5: English at GUI scale 2, to compare with the first shots. Left out when the run asks for a language or
+        // a scale of its own (-PcaptureLang, -PcaptureScale): then every shot above already is that one.
+        if (FeedCapture.Options.customised) return
         key(GLFW.GLFW_KEY_ESCAPE)
         waitTicks(10)
         language("en_us")
@@ -155,8 +161,8 @@ object FeedScenarios {
 
     /** As `Visiteur_42`, listed as a guest in the memory backend's config: F-25. */
     private fun FeedCapture.Script.guest() {
-        language("fr_fr")
-        guiScale(3)
+        language(FeedCapture.Options.language)
+        guiScale(FeedCapture.Options.scale)
         enterWorld("lnbphone_feed-capture-guest")
         waitTicks(40)
         openPhone()

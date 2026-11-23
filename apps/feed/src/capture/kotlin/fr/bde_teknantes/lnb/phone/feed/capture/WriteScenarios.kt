@@ -351,6 +351,7 @@ object WriteScenarios {
         away()
         shot("pin_05_group")
 
+        if (FeedCapture.Options.customised) return
         // English at GUI scale 2: the announcer's destination, `Announcements` whole in its segment (8.7, 13.3).
         key(GLFW.GLFW_KEY_ESCAPE)
         waitTicks(10)
@@ -402,8 +403,8 @@ object WriteScenarios {
     private fun post1() = postOf(FeedKind.GLOBAL, "Des diamants")
 
     private fun FeedCapture.Script.start(world: String) {
-        language("fr_fr")
-        guiScale(3)
+        language(FeedCapture.Options.language)
+        guiScale(FeedCapture.Options.scale)
         enterWorld(world)
         waitTicks(40)
         openPhone()

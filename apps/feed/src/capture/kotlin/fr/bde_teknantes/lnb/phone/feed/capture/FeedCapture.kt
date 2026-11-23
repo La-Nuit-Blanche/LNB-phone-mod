@@ -38,11 +38,41 @@ import kotlin.io.path.exists
  * Feed's screenshot harness: an unattended client plays a scenario ([FeedScenarios]) from the title screen, one step
  * per client tick, shoots, and quits; a watchdog kills it after 6 minutes. Development runs only (started by
  * [FeedClient] when `-Dlnbphone_feed.capture` is set). Shots go to `-Dlnbphone_feed.capture.dir`, or
- * `<game dir>/captures/feed/`.
+ * `<game dir>/captures/feed/`. The language and the GUI scale a scenario starts with are `-Dlnbphone_feed.capture.lang`
+ * (default `fr_fr`) and `-Dlnbphone_feed.capture.scale` (default 3): [Options].
+ *
+ * Two things made early runs fragile, and the harness now guards against both:
+ * - a window too small for the GUI scale (Minecraft allows scale n only from 320n x 240n pixels, and lowers it
+ *   silently) once gave a blank shot: a scale that isn't the one asked for, a minimised window, or a render target
+ *   that isn't the window now stop the run with a message instead of shooting;
+ * - a click was once lost when the real mouse moved over the window: the game's own input callbacks are detached when
+ *   the run starts, so that only the harness's events reach the game (the keyboard likewise), and a click's move and
+ *   press happen in one step.
  *
  * A smaller cousin of the demo's harness (`apps/demo/.../client/capture`), which Feed can't depend on.
  */
 object FeedCapture {
+    /** What a run starts with, from the capture run's properties (`-PcaptureLang`, `-PcaptureScale`). */
+    object Options {
+        val language: String = System.getProperty("lnbphone_feed.capture.lang")?.takeIf { it.isNotBlank() } ?: "fr_fr"
+        val scale: Int = System.getProperty("lnbphone_feed.capture.scale")?.toIntOrNull() ?: 3
+
+        /**
+         * Whether the run asks for something other than the defaults. A scenario's closing shots in another language
+         * and scale (to compare with the first ones) are then left out: the run is about the one asked for.
+         */
+        val customised: Boolean get() = language != "fr_fr" || scale != 3
+    }
+
+    /** Stops the run with [message] in the log and a failure exit code: a half-played scenario shows nothing true. */
+    private fun fail(message: String): Nothing {
+        FeedMod.LOGGER.error("Feed capture stopped: {}", message)
+        Runtime.getRuntime().halt(2)
+        error(message)
+    }
+
+    private var requestedScale = 0
+
     private val steps = ArrayList<() -> Boolean>()
     private var step = 0
     private var started = false
@@ -80,7 +110,9 @@ object FeedCapture {
             mc.options.pauseOnLostFocus = false
             mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(0.0)
             mc.options.tutorialStep = TutorialSteps.NONE
+            detachRealInput(mc)
             started = true
+            FeedMod.LOGGER.info("Feed capture started: window {}x{}, shots in {}", mc.window.width, mc.window.height, outDir)
         }
         if (step >= steps.size) return
         if (steps[step]()) step++
@@ -88,6 +120,16 @@ object FeedCapture {
             FeedMod.LOGGER.info("Feed capture finished: shots in {}", outDir)
             mc.stop()
         }
+    }
+
+    /** Removes the game's GLFW callbacks for the mouse and the keyboard: the script calls the handlers itself. */
+    private fun detachRealInput(mc: Minecraft) {
+        val window = mc.window.window
+        GLFW.glfwSetCursorPosCallback(window, null)
+        GLFW.glfwSetMouseButtonCallback(window, null)
+        GLFW.glfwSetScrollCallback(window, null)
+        GLFW.glfwSetKeyCallback(window, null)
+        GLFW.glfwSetCharCallback(window, null)
     }
 
     /** What a scenario is written with: each call adds steps. */
@@ -112,6 +154,8 @@ object FeedCapture {
             val mc = Minecraft.getInstance()
             mc.options.guiScale().set(scale)
             mc.resizeDisplay()
+            requestedScale = scale
+            checkWindow(mc)
         }
 
         fun language(code: String) {
@@ -172,6 +216,29 @@ object FeedCapture {
         /** Moves the pointer to the app-local point [at] gives when the step runs (a card found where it is then). */
         fun mouseToAt(at: () -> Pair<Float, Float>) = run {
             val (x, y) = at()
+            movePointer(x, y)
+        }
+
+        fun click(x: Int, y: Int) = clickAt { x.toFloat() to y.toFloat() }
+
+        /**
+         * Clicks the app-local point [at] gives when the step runs. The pointer is moved in the same step as the press
+         * (and again for the release, to the same point), so that nothing can come between a move and its click.
+         */
+        fun clickAt(at: () -> Pair<Float, Float>) {
+            var point = 0f to 0f
+            run {
+                point = at()
+                movePointer(point.first, point.second)
+                button(GLFW.GLFW_PRESS)
+            }
+            run {
+                movePointer(point.first, point.second)
+                button(GLFW.GLFW_RELEASE)
+            }
+        }
+
+        private fun movePointer(x: Float, y: Float) {
             val mc = Minecraft.getInstance()
             val device = CaptureHooks.devicePosition() ?: error("The phone is away")
             val viewport = CaptureHooks.viewportOffset
@@ -179,19 +246,6 @@ object FeedCapture {
             val gy = device[1] + viewport[1] + y / 2.0
             val scale = mc.window.screenWidth.toDouble() / mc.window.guiScaledWidth
             ON_MOVE.invoke(mc.mouseHandler, mc.window.window, gx * scale, gy * scale)
-        }
-
-        fun click(x: Int, y: Int) {
-            mouseTo(x, y)
-            run { button(GLFW.GLFW_PRESS) }
-            run { button(GLFW.GLFW_RELEASE) }
-        }
-
-        /** Clicks the app-local point [at] gives when the step runs. */
-        fun clickAt(at: () -> Pair<Float, Float>) {
-            mouseToAt(at)
-            run { button(GLFW.GLFW_PRESS) }
-            run { button(GLFW.GLFW_RELEASE) }
         }
 
         private fun button(action: Int) {
@@ -216,6 +270,7 @@ object FeedCapture {
 
         fun shot(name: String) = run {
             val mc = Minecraft.getInstance()
+            checkWindow(mc)
             Files.createDirectories(outDir)
             val file = outDir.resolve("$name.png")
             Screenshot.takeScreenshot(mc.mainRenderTarget).use { it.writeToFile(file) }
@@ -234,6 +289,25 @@ object FeedCapture {
                 s.feed(FeedKind.GLOBAL).posts.size,
                 s.feed(FeedKind.GLOBAL).waiting.size,
             )
+        }
+    }
+
+    /**
+     * Stops the run unless the window can show what the scenario set: it is not minimised, and the GUI scale in force is
+     * the one a scenario set (Minecraft lowers a scale the window is too small for), drawn into a target the window's size.
+     */
+    private fun checkWindow(mc: Minecraft) {
+        val window = mc.window
+        if (GLFW.glfwGetWindowAttrib(window.window, GLFW.GLFW_ICONIFIED) == GLFW.GLFW_TRUE) fail("the game window is minimised")
+        if (requestedScale > 0 && window.guiScale.toInt() != requestedScale) {
+            fail(
+                "GUI scale ${window.guiScale.toInt()} is in force, not $requestedScale: the window is ${window.width}x${window.height} " +
+                    "and scale $requestedScale needs ${320 * requestedScale}x${240 * requestedScale} (-PcaptureSize=<w>x<h>)",
+            )
+        }
+        val target = mc.mainRenderTarget
+        if (target.width != window.width || target.height != window.height) {
+            fail("the render target (${target.width}x${target.height}) isn't the window (${window.width}x${window.height})")
         }
     }
 

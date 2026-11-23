@@ -1,0 +1,4 @@
+# LNB Warden's settings for development without LNB's website: every player may join, and Warden calls no API.
+# Copied next to lnbphone_feed-server.toml (see that file). Warden fills in the options left out here.
+[auth]
+	mode = "OFF"
