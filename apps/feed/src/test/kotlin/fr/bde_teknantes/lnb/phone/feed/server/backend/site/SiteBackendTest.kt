@@ -114,7 +114,9 @@ class SiteBackendTest {
         assertEquals(BackendResult.Refused(400, null), SiteAnswers.classify(400, "{}", null) { }.result)
         val broken = SiteAnswers.classify(200, "{}", null) { SiteJson.post(SiteJson.parse(it)) }
         assertInstanceOf(BackendResult.Unavailable::class.java, broken.result)
-        assertInstanceOf(ApiResult.Network::class.java, broken.health)
+        // An answer the site gave, so not an outage for Warden's shared health.
+        assertEquals(ApiResult.Http(200, SiteAnswers.MALFORMED), broken.health)
+        assertFalse(broken.health.isUnreachable)
     }
 
     @Test

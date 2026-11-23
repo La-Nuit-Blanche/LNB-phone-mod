@@ -14,7 +14,7 @@ internal object SiteAnswers {
     data class Classified<T>(val result: BackendResult<T>, val health: ApiResult<*>)
 
     /**
-     * - 2xx: `Ok` with [decode] of the body (an unparsable body is `Unavailable`);
+     * - 2xx: `Ok` with [decode] of the body (an unparsable body is `Unavailable`, an answer with a problem for ApiHealth);
      * - 503 `disabled`: `Disabled` with `data.flag`;
      * - 401 and other 5xx: `Unavailable`;
      * - anything else: `Refused`, with `data.problem`, `data.oldest.id` (`pinLimit`) and `Retry-After` (`rateLimited`).
@@ -28,7 +28,9 @@ internal object SiteAnswers {
                 Classified(BackendResult.Ok(decode(body.orEmpty())), ApiResult.Ok(Unit))
             } catch (e: RuntimeException) {
                 val reason = (e as? SiteFormatException)?.message ?: e.javaClass.simpleName
-                Classified(BackendResult.Unavailable("unexpected answer ($reason)"), ApiResult.Network(SiteFormatException(reason)))
+                // The site answered: told to ApiHealth as an answer with a problem, not as an outage, which would flip
+                // the "API unreachable" state Warden shares with LNB's other mods.
+                Classified(BackendResult.Unavailable("unexpected answer ($reason)"), ApiResult.Http(status, MALFORMED))
             }
         }
         val data = errorData(body)
@@ -43,6 +45,9 @@ internal object SiteAnswers {
             }
         }
     }
+
+    /** The problem ApiHealth is told for a body Feed couldn't read. */
+    const val MALFORMED = "feedMalformedBody"
 
     /** No answer at all: a timeout, a refused connection, a malformed URL. */
     fun <T> network(cause: Throwable): Classified<T> =
