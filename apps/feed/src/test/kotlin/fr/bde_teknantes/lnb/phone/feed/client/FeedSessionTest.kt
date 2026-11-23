@@ -342,6 +342,8 @@ class FeedSessionTest {
         val seen = r.all<SeenThreadPayload>().size
         session.onLive(listOf(reply(mine, answersMe = true)))
         assertEquals(0, session.post(mine.id)!!.unseenReplies)
+        // Marked seen again, 2 seconds after the last mark.
+        repeat(FeedSession.SEEN_EVERY_TICKS) { session.tick() }
         assertEquals(seen + 1, r.all<SeenThreadPayload>().size)
     }
 

@@ -299,10 +299,6 @@ class FeedSessionStateTest {
     }
 
     @Test
-    @Disabled(
-        "Defect (low): the 2-second gap between seen_feed is shared by both tabs. Viewing Annonces, then Global for under " +
-            "2 seconds, never tells the site Global was seen, so its dot comes back at the next open.",
-    )
     fun `a tab viewed briefly right after the other is still marked seen`() {
         r.state()
         r.firstPage(FeedKind.ANNOUNCEMENTS, listOf(post(FeedKind.ANNOUNCEMENTS)))
@@ -391,10 +387,44 @@ class FeedSessionStateTest {
         assertEquals(0, session.post(mine.id)!!.unseenReplies)
         session.showThread(main.id)
         assertEquals(1, r.all<SeenThreadPayload>().size)
-        // Left and opened again: seen again.
+        // Left and opened again: seen again, 2 seconds after the last mark at the soonest.
         session.showThread(null)
         session.showThread(main.id)
+        assertEquals(1, r.all<SeenThreadPayload>().size)
+        repeat(FeedSession.SEEN_EVERY_TICKS) { session.tick() }
         assertEquals(2, r.all<SeenThreadPayload>().size)
+    }
+
+    @Test
+    fun `replies arriving while the thread is read are marked seen together, one mark every 2 seconds at most`() {
+        r.state()
+        val main = post(mine = true)
+        r.firstPage(FeedKind.GLOBAL, listOf(main))
+        r.loadThread(main, emptyList())
+        session.showThread(main.id)
+        assertEquals(1, r.all<SeenThreadPayload>().size)
+        repeat(5) { session.onLive(listOf(replyIn(main, answersMe = true))) }
+        assertEquals(1, r.all<SeenThreadPayload>().size)
+        repeat(FeedSession.SEEN_EVERY_TICKS) { session.tick() }
+        assertEquals(2, r.all<SeenThreadPayload>().size)
+        repeat(3 * FeedSession.SEEN_EVERY_TICKS) { session.tick() }
+        assertEquals(2, r.all<SeenThreadPayload>().size)
+        assertEquals(0, session.post(main.id)!!.unseenReplies)
+    }
+
+    @Test
+    fun `a seen mark that waits for its turn goes once the player left the tab`() {
+        r.state()
+        r.firstPage(FeedKind.GLOBAL, listOf(post(minutesAgo = 5)))
+        session.show(FeedKind.GLOBAL)
+        session.markViewed(FeedKind.GLOBAL)
+        val fresh = post(minutesAgo = 1)
+        session.onLive(listOf(fresh))
+        session.releaseWaiting(FeedKind.GLOBAL)
+        session.markViewed(FeedKind.GLOBAL)
+        session.show(FeedKind.ANNOUNCEMENTS)
+        repeat(FeedSession.SEEN_EVERY_TICKS) { session.tick() }
+        assertEquals(fresh.createdAt, r.last<SeenFeedPayload>().upTo)
     }
 
     @Test

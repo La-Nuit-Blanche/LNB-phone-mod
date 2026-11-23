@@ -165,8 +165,15 @@ class FeedSession(
     private var nextAutoRetry = 0
     private var manualRetry = false
     private var retryDeadline = 0
+    // Seen marks: the newest time queued per feed, what waits to go, and when each feed or thread last went. They
+    // share one allowance, as the server counts them: a burst of SEEN_BURST, then one per SEEN_EVERY_TICKS.
     private val lastSeenSent = EnumMap<FeedKind, Instant>(FeedKind::class.java)
-    private var lastSeenTick = Int.MIN_VALUE / 2
+    private val pendingSeen = EnumMap<FeedKind, Instant>(FeedKind::class.java)
+    private val seenFeedAt = EnumMap<FeedKind, Int>(FeedKind::class.java)
+    private val pendingThreadSeen = LinkedHashSet<UUID>()
+    private val seenThreadAt = HashMap<UUID, Int>()
+    private var seenAllowance = SEEN_BURST
+    private var seenRefilled = 0
 
     // ---- Reading ----
 
@@ -282,13 +289,54 @@ class FeedSession(
             changed()
         }
         val list = feed(kind)
-        if (!list.loaded || state?.linked != true || ticks - lastSeenTick < SEEN_EVERY_TICKS) return
+        if (!list.loaded || state?.linked != true) return
         val newest = (list.pinnedIds.asSequence() + list.postIds.asSequence()).mapNotNull { posts[it]?.createdAt }.maxOrNull() ?: return
         val last = lastSeenSent[kind]
         if (last != null && !newest.isAfter(last)) return
+        // Queued, and sent as soon as the allowance lets it, even once the player left the tab.
         lastSeenSent[kind] = newest
-        lastSeenTick = ticks
-        send(SeenFeedPayload(kind, newest))
+        pendingSeen[kind] = newest
+        flushSeen()
+    }
+
+    /** Sends the seen marks waiting, each feed and thread at most once every 2 seconds, within the shared allowance. */
+    private fun flushSeen() {
+        if (pendingSeen.isEmpty() && pendingThreadSeen.isEmpty()) return
+        if (state?.linked != true) {
+            pendingSeen.clear()
+            pendingThreadSeen.clear()
+            return
+        }
+        if (seenAllowance >= SEEN_BURST) {
+            seenRefilled = ticks
+        } else {
+            val gained = (ticks - seenRefilled) / SEEN_EVERY_TICKS
+            if (gained > 0) {
+                seenAllowance = minOf(SEEN_BURST, seenAllowance + gained)
+                seenRefilled += gained * SEEN_EVERY_TICKS
+            }
+        }
+        for (kind in pendingSeen.keys.toList()) {
+            if (seenAllowance == 0) return
+            if (ticks - (seenFeedAt[kind] ?: Int.MIN_VALUE / 2) < SEEN_EVERY_TICKS) continue
+            val upTo = pendingSeen.remove(kind) ?: continue
+            seenFeedAt[kind] = ticks
+            spendSeen()
+            send(SeenFeedPayload(kind, upTo))
+        }
+        for (threadId in pendingThreadSeen.toList()) {
+            if (seenAllowance == 0) return
+            if (ticks - (seenThreadAt[threadId] ?: Int.MIN_VALUE / 2) < SEEN_EVERY_TICKS) continue
+            pendingThreadSeen.remove(threadId)
+            seenThreadAt[threadId] = ticks
+            spendSeen()
+            send(SeenThreadPayload(threadId))
+        }
+    }
+
+    private fun spendSeen() {
+        if (seenAllowance == SEEN_BURST) seenRefilled = ticks
+        seenAllowance--
     }
 
     /**
@@ -493,6 +541,7 @@ class FeedSession(
      */
     fun tick() {
         ticks++
+        flushSeen()
         val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED
         if (lost && hasLoadedContent && (viewing != null || viewingThread != null) && ticks >= nextAutoRetry) {
             nextAutoRetry = ticks + AUTO_RETRY_TICKS
@@ -717,6 +766,10 @@ class FeedSession(
         threadSeenSent = null
         manualRetry = false
         lastSeenSent.clear()
+        pendingSeen.clear()
+        seenFeedAt.clear()
+        pendingThreadSeen.clear()
+        seenThreadAt.clear()
         changed()
     }
 
@@ -928,7 +981,11 @@ class FeedSession(
         for ((id, post) in posts.entries.toList()) {
             if ((id == threadId || post.threadId == threadId) && post.unseenReplies != 0) posts[id] = post.copy(unseenReplies = 0)
         }
-        if (state?.linked == true) send(SeenThreadPayload(threadId))
+        // Coalesced: however many replies come while the thread is read, one mark goes every 2 seconds at most.
+        if (state?.linked == true) {
+            pendingThreadSeen += threadId
+            flushSeen()
+        }
         changed()
     }
 
@@ -1195,10 +1252,14 @@ class FeedSession(
         const val RETRY_TIMEOUT_TICKS = 300
 
         /**
-         * `seen_feed` at most once every 2 seconds, and only when what is shown changed: the server drops seen marks
-         * past a burst of 3, then one every 2 seconds (`docs/feed-app.md` 4.3).
+         * A feed's or a thread's seen mark at most once every 2 seconds, and only when what is shown changed: the
+         * server drops seen marks past a burst of 3, then one every 2 seconds (`docs/feed-app.md` 4.3), which all the
+         * marks share here too ([SEEN_BURST]).
          */
         const val SEEN_EVERY_TICKS = 40
+
+        /** Seen marks that may go at once before the 2-second pace. */
+        const val SEEN_BURST = 3
 
         /**
          * A read the server refused as too frequent (`RATE_LIMITED`) is asked again after this: pages carry no
