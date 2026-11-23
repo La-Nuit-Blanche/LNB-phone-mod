@@ -266,15 +266,18 @@ website: it checks Feed with `backend.kind = "site"` where the site can't be cal
     "Author: B" with a tooltip "Only moderators can see this", B (the author) sees "Posted anonymously by you", and a
     third player sees neither.
 37. **A guest, writing paused, and the site away.** Put B's username under `memory.guests` and restart: B has no round
-    button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a thread
-    shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still gets the
-    announcements' banners. Remove B from the list and restart. The `/feed dev` switches (A, memory mode only) reach a
-    Feed that is open at once, within the tick the command runs in. `/feed dev writing false`: the server reads the state
-    of every online player again, so B's open Feed loses its round button and its more and pin buttons, a thread shows
-    the strip "Writing is paused" in place of the composer, and a heart click shows "Writing is paused" with the error
-    sound; A, a moderator, gets the same look. A Feed opened afterwards opens that way. `/feed dev writing true` brings
-    everything back, as fast. `/feed dev offline true`: a Feed that is open keeps its list readable and shows
-    "Connection lost" with "Retry"; a Feed opened afresh shows "Feed unavailable" with "Retry". `/feed dev offline
+    button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a
+    thread shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still
+    gets the announcements' banners. Remove B from the list and restart. The `/feed dev` switches (A, memory mode only)
+    reach a Feed that is open at once, within the tick the command runs in. `/feed dev writing false`: the server reads
+    the state of every online player again, so B's open Feed loses its round button, a thread shows the strip "Writing
+    is paused" in place of the composer, and a heart click shows "Writing is paused" with the error sound; B keeps the
+    more button on B's own posts. A, a moderator, gets the same look but keeps a more button on every post and the pin
+    button on announcements, since the site still deletes and pins while writing is off: A deletes a post of B's (more
+    menu, "Delete", the dialog "Delete this post?", then "Post deleted", and the post leaves B's feed) and pins and
+    unpins an announcement ("Post pinned", "Post unpinned"). A Feed opened afterwards opens that way. `/feed dev writing
+    true` brings everything back, as fast. `/feed dev offline true`: a Feed that is open keeps its list readable and
+    shows "Connection lost" with "Retry"; a Feed opened afresh shows "Feed unavailable" with "Retry". `/feed dev offline
     false`: "Connection lost" goes and the lists reload where they are, and a Feed showing "Feed unavailable" loads its
     list, both with no click. `/feed dev disabled true`: an open Feed shows "Connection lost" as above, a Feed opened
     afresh shows "Feed is switched off" with "Retry"; `/feed dev disabled false` brings it back as `offline false` does.
@@ -304,8 +307,8 @@ website: it checks Feed with `backend.kind = "site"` where the site can't be cal
     switched off" with "Retry", an open one shows "Connection lost"; switch it on: Feed recovers within a minute (the
     stream retries every 60 seconds while the site answers that it is off). Switch `feed.writing` off: the site sends no
     event for it, so a Feed opened afterwards has no round buttons and the strip reads "Writing is paused", and a Feed
-    already open learns of it from its next post, reply or like, refused with "Writing is paused". Switch it on: a Feed
-    opened afterwards has them back.
+    already open learns of it from its next post, reply or like, refused with "Writing is paused". A moderator keeps the
+    more buttons and an announcer the pin buttons, as in item 37. Switch it on: a Feed opened afterwards has them back.
 43. **The website: roles.** Give B the announcer role on the website's People page: the round button on "Announcements"
     appears on B's phone within a second, with no new login; take it away: it goes. `/feed announcer add` and `remove`
     work from the server's console and for an `admin` or `warden-admin` account in game; for an operator who is not a

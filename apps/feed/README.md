@@ -93,8 +93,9 @@ backend works in any world.
 - **Feed is switched off on the site.** Feed opened with nothing loaded shows "Feed is switched off"; an open one reads
   as a lost connection. The server asks the site again every minute.
 - **Writing is switched off on the site (`feed.writing`).** Players read, with no compose button, and a strip where the
-  reply field was says "Writing is paused". The site sends no event when the flag changes: a player's Feed learns of it
-  at its next state read, when Feed is opened, or when a post, reply or like is refused for it.
+  reply field was says "Writing is paused". Deleting and pinning go on: authors delete their own posts, moderators any
+  post, announcers pin. The site sends no event when the flag changes: a player's Feed learns of it at its next state
+  read, when Feed is opened, or when a post, reply or like is refused for it.
 - **A player has no LNB account (a guest),** or is banned: they read, and a quiet line says why they cannot write.
 - **Notifications** (a new announcement; a reply to a player's post or reply) are the phone's own: they are kept with
   the world for players who are offline, shown as a badge at their next login, and dropped after 30 days. The site
