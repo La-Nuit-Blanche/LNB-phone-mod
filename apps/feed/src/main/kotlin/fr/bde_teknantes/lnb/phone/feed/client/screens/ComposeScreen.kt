@@ -131,6 +131,8 @@ class ComposeScreen(
             DraftOutcome.ActionFailed -> showErrorSnackbar(strings.get("snackbar.action_failed"))
             DraftOutcome.ThreadGone -> {}
         }
+        // Not sent: the text area has the keyboard again, to fix the text (and Backspace erases, it doesn't close).
+        if (outcome !is DraftOutcome.Sent) focus(area)
     }
 
     /**

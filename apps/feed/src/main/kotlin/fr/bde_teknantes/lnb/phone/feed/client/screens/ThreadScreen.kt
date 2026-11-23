@@ -208,6 +208,8 @@ class ThreadScreen(
             // The thread went: leave() says so.
             DraftOutcome.ThreadGone -> {}
         }
+        // Not sent: the text area has the keyboard again, to fix the text (and Backspace erases, it doesn't go back).
+        if (outcome !is DraftOutcome.Sent && outcome != DraftOutcome.ThreadGone && composer.expanded && composer.visible) focus(composer.area)
     }
 
     // ---- Catching up with the session ----
