@@ -70,6 +70,8 @@ class FeedScreen(
     private var connectionLostAt = Float.NaN
 
     init {
+        // The app is open from now until this root screen closes: the session's timers run all that time.
+        session.appOpened(this)
         if (fromHome) session.feed(initialTab).scroll.offset = 0f
         for ((kind, view) in views) view.visible = kind == tab
     }
@@ -89,8 +91,11 @@ class FeedScreen(
         session.show(null)
     }
 
+    override fun onClosed() {
+        session.appClosed(this)
+    }
+
     override fun onTick() {
-        session.tick()
         session.loadIfNeeded(tab)
         if (session.feed(tab).loaded) session.markViewed(tab)
         session.takeNotice()?.let(::report)

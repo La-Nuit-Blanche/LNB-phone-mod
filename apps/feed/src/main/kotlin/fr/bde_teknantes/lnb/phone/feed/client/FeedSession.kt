@@ -151,6 +151,7 @@ class FeedSession(
     private var threadSeenSent: UUID? = null
 
     private var ticks = 0
+    private val openApps = HashSet<Any>()
     private var nextAutoRetry = 0
     private var manualRetry = false
     private var retryDeadline = 0
@@ -228,6 +229,22 @@ class FeedSession(
     fun takeThreadReveal(threadId: UUID): UUID? = threadReveals.remove(threadId)
 
     // ---- What the screens tell ----
+
+    /**
+     * Feed's root screen [owner] is on the phone (from its creation until it closes): the app is open, and
+     * [FeedClient][fr.bde_teknantes.lnb.phone.feed.client.FeedClient] ticks the session ([tick]) whatever screen shows.
+     */
+    fun appOpened(owner: Any) {
+        openApps += owner
+    }
+
+    /** [owner] left the phone for good. */
+    fun appClosed(owner: Any) {
+        openApps -= owner
+    }
+
+    /** Whether Feed is open on the phone (shown or not): its timers run. */
+    val isAppOpen: Boolean get() = openApps.isNotEmpty()
 
     /** The feed screen shows [kind] (or nothing, null): live posts elsewhere light that tab's dot. */
     fun show(kind: FeedKind?) {
@@ -459,7 +476,11 @@ class FeedSession(
         return true
     }
 
-    /** Called 20 times a second by the screen shown: the automatic retry while the connection is lost. */
+    /**
+     * Called 20 times a second while Feed is open on the phone ([isAppOpen]), from one place (the client's tick), never
+     * from a screen, so that no timer stops while another screen is on top: the automatic retry while the connection is
+     * lost, the deadlines, the throttles.
+     */
     fun tick() {
         ticks++
         val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED

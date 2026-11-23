@@ -90,6 +90,12 @@ class FeedScreenStatesTest {
 
     private fun PhoneTester.yOf(text: String) = texts.first { it.text == text }.y
 
+    /** Client ticks as the game plays them: the screen's, then the session's while Feed is open (FeedClient). */
+    private fun PhoneTester.clientTicks(times: Int) = repeat(times) {
+        tick()
+        if (session.isAppOpen) session.tick()
+    }
+
     // ---- Tab dots (9.6) ----
 
     @Test
@@ -281,10 +287,11 @@ class FeedScreenStatesTest {
         t.frame()
         failLast(FeedKind.GLOBAL, Outcome.RATE_LIMITED)
         val loads = r.all<LoadFeedPayload>().size
-        t.tick(39)
+        t.clientTicks(39)
         assertEquals(loads, r.all<LoadFeedPayload>().size)
         assertFalse(t.shows("error.retry"))
-        t.tick()
+        t.clientTicks(1)
+        t.frame()
         assertEquals(loads + 1, r.all<LoadFeedPayload>().size)
     }
 
@@ -458,6 +465,17 @@ class FeedScreenStatesTest {
     // ---- Connection lost (9.12) ----
 
     @Test
+    fun `the session's clock runs while Feed is open, from its root screen's creation until it closes`() {
+        val t = open()
+        assertTrue(session.isAppOpen)
+        t.closePhone()
+        // Put away, Feed is still open on the phone: its timers go on.
+        assertTrue(session.isAppOpen)
+        t.close()
+        assertFalse(session.isAppOpen)
+    }
+
+    @Test
     fun `Connexion perdue's Retry sends open at once, and Feed tries alone every 15 seconds`() {
         val t = open(FeedKind.GLOBAL)
         r.state()
@@ -469,7 +487,7 @@ class FeedScreenStatesTest {
         val opens = r.sent.count { it == OpenPayload }
         t.click(action.x + 5f, action.y + 6f)
         assertEquals(opens + 1, r.sent.count { it == OpenPayload })
-        t.tick(300)
+        t.clientTicks(300)
         assertEquals(opens + 2, r.sent.count { it == OpenPayload })
         // Everything loaded stays readable.
         assertTrue(t.shows("p1"))
