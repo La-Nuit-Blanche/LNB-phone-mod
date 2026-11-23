@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -70,10 +69,6 @@ class FeedSessionResetTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: mergeFirstPage takes a held post as deleted when it has the same createdAt as the page's oldest post " +
-            "but the keyset cursor put it on the next page. It is marked gone, so its page can't bring it back either.",
-    )
     fun `a held post at the page's oldest time, cut onto the next page, is not taken for deleted`() {
         // Four posts of the same millisecond, as the memory backend's fixed clock makes them.
         val same = (1..4).map { post(minutesAgo = 5) }
@@ -296,14 +291,52 @@ class FeedSessionResetTest {
         session.onReset()
         r.loadThread(main, replies.take(2), next = "t1b")
         assertEquals(replies.map { it.id }, session.thread(main.id).replies)
+        // Replies made meanwhile come after those: the thread goes on from the page, skipping what it holds.
+        assertTrue(session.thread(main.id).hasMore)
+        val made = replyIn(main, minutesAgo = 1)
+        session.loadMoreReplies(main.id)
+        val more = r.last<LoadThreadPayload>()
+        assertEquals("t1b", more.after)
+        session.onThread(ThreadPayload(more.requestId, Outcome.OK, null, replies.drop(2) + made, null))
+        assertEquals(replies.map { it.id } + made.id, session.thread(main.id).replies)
         assertFalse(session.thread(main.id).hasMore)
     }
 
     @Test
-    @Disabled(
-        "Defect: mergeThreadPage, like mergeFirstPage, drops a held reply with the same createdAt as the page's newest " +
-            "reply when the cursor cut it onto the next page, and marks it gone.",
-    )
+    fun `a whole thread held, longer than a page, gets the replies made meanwhile`() {
+        val main = post()
+        val replies = (1..4).map { replyIn(main, minutesAgo = 50L - it) }
+        r.loadThread(main, replies)
+        assertFalse(session.thread(main.id).hasMore)
+        session.onReset()
+        // Two replies made while away; the reloaded page holds only the first two.
+        r.loadThread(main, replies.take(2), next = "t1")
+        val made = (1..2).map { replyIn(main, minutesAgo = 3L - it) }
+        session.loadMoreReplies(main.id)
+        session.onThread(ThreadPayload(r.last<LoadThreadPayload>().requestId, Outcome.OK, null, replies.drop(2) + made, null))
+        assertEquals((replies + made).map { it.id }, session.thread(main.id).replies)
+    }
+
+    @Test
+    fun `more than a page posted while away - the page starts the list again, nothing between is lost`() {
+        val held = (20..24).map { post(minutesAgo = it.toLong()) }
+        r.firstPage(FeedKind.GLOBAL, held, next = "c1")
+        session.onReset()
+        // A page of posts all newer than what is held, and more behind it.
+        val fresh = (1..3).map { post(minutesAgo = it.toLong()) }
+        r.firstPage(FeedKind.GLOBAL, fresh, next = "c9")
+        assertEquals(fresh.map { it.id }, global.posts)
+        assertTrue(global.waiting.isEmpty())
+        // The posts between come with the next page, and the old ones after them, in order.
+        val between = (10..11).map { post(minutesAgo = it.toLong()) }
+        session.loadMore(FeedKind.GLOBAL)
+        val more = r.last<LoadFeedPayload>()
+        assertEquals("c9", more.before)
+        session.onPage(PagePayload(more.requestId, Outcome.OK, FeedKind.GLOBAL, emptyList(), between + held, null))
+        assertEquals((fresh + between + held).map { it.id }, global.posts)
+    }
+
+    @Test
     fun `a held reply at the page's newest time, cut onto the next page, is not taken for deleted`() {
         val main = post()
         val same = (1..4).map { replyIn(main, minutesAgo = 3) }

@@ -782,6 +782,14 @@ class FeedSession(
      * arrive as live posts do, held posts the page lacks within its span went meanwhile, the rest is updated in place.
      */
     private fun mergeFirstPage(list: FeedList, page: PagePayload) {
+        val pageOldest = page.posts.filter { usable(it, list.kind) }.lastOrNull()?.createdAt
+        val heldNewest = list.postIds.firstOrNull()?.let(posts::get)?.createdAt
+        if (page.next != null && pageOldest != null && heldNewest != null && heldNewest.isBefore(pageOldest)) {
+            // More than a page was posted meanwhile: the page doesn't reach what is held, and what lies between would
+            // never load. The page starts the list again, as a first load does.
+            replaceFirstPage(list, page)
+            return
+        }
         if (list.kind == FeedKind.ANNOUNCEMENTS) {
             val pinned = page.pinned.filter { usable(it, list.kind) && it.pinnedAt != null }
             for (view in pinned) posts[view.id] = view
@@ -791,8 +799,9 @@ class FeedSession(
         val inPage = fresh.mapTo(HashSet()) { it.id } + list.pinnedIds
         val newestHeld = list.postIds.firstOrNull()?.let(posts::get)?.createdAt
         val oldest = fresh.lastOrNull()?.createdAt
-        // With no next page, the page is the whole feed; otherwise it covers its own time span only.
-        val covers = { id: UUID -> page.next == null || (oldest != null && posts[id]?.createdAt?.isBefore(oldest) == false) }
+        // With no next page, the page is the whole feed; otherwise it covers what is strictly newer than its oldest
+        // post only: a post of that same time may have been cut onto the next page by the keyset.
+        val covers = { id: UUID -> page.next == null || (oldest != null && posts[id]?.createdAt?.isAfter(oldest) == true) }
         for (id in (list.postIds + list.waitingIds)) if (id !in inPage && covers(id)) {
             list.removeId(id)
             gone += id
@@ -836,7 +845,8 @@ class FeedSession(
         }
         val inPage = fresh.mapTo(HashSet()) { it.id }
         val newest = fresh.lastOrNull()?.createdAt
-        val covers = { id: UUID -> next == null || (newest != null && posts[id]?.createdAt?.isAfter(newest) == false) }
+        // As for a feed: strictly older than the page's newest reply, or the whole thread without a next page.
+        val covers = { id: UUID -> next == null || (newest != null && posts[id]?.createdAt?.isBefore(newest) == true) }
         thread.replyIds.removeAll { id -> (id !in inPage && covers(id)).also { if (it) gone += id } }
         for (reply in fresh) {
             posts[reply.id] = reply
@@ -845,14 +855,10 @@ class FeedSession(
             while (i > 0 && posts[thread.replyIds[i - 1]]?.createdAt?.isAfter(reply.createdAt) == true) i--
             thread.replyIds.add(i, reply.id)
         }
-        val newestHeld = thread.replyIds.lastOrNull()?.let(posts::get)?.createdAt
-        if (next == null) {
-            thread.next = null
-            thread.hasMore = false
-        } else if (newest == null || newestHeld == null || !newestHeld.isAfter(newest)) {
-            thread.next = next
-            thread.hasMore = true
-        }
+        // With a next page, the thread goes on from it: replies made meanwhile come after what is held, and the next
+        // pages skip what is held already. Keeping an older end would leave them out.
+        thread.next = next
+        thread.hasMore = next != null
     }
 
     private fun livePost(view: PostView) {
