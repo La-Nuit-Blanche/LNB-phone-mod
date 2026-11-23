@@ -571,4 +571,24 @@ class FeedSessionStateTest {
         assertTrue(session.feed(FeedKind.ANNOUNCEMENTS).posts.contains(fresh.id))
         assertTrue(session.wantsHighlight(fresh.id))
     }
+
+    @Test
+    fun `an answer lost on the way counts as unavailable after 30 seconds`() {
+        r.state()
+        session.loadIfNeeded(FeedKind.GLOBAL)
+        repeat(FeedSession.ANSWER_TIMEOUT_TICKS - 1) { session.tick() }
+        assertTrue(global.loadingFirst)
+        session.tick()
+        assertFalse(global.loadingFirst)
+        assertEquals(Outcome.UNAVAILABLE, global.firstError)
+        // A write too: the heart goes back.
+        val p = post(likes = 3)
+        session.retryFirst(FeedKind.GLOBAL)
+        r.state()
+        session.onPage(PagePayload(r.last<LoadFeedPayload>().requestId, Outcome.OK, FeedKind.GLOBAL, emptyList(), listOf(p), null))
+        session.toggleLike(p.id)
+        repeat(FeedSession.ANSWER_TIMEOUT_TICKS) { session.tick() }
+        assertFalse(session.post(p.id)!!.liked)
+        assertEquals(3, session.post(p.id)!!.likes)
+    }
 }

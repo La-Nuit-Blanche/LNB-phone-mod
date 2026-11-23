@@ -125,6 +125,9 @@ class FeedSession(
     val compose = ComposeDraft()
 
     private val requests = HashMap<Int, PendingRequest>()
+
+    // When each request stops being waited for: a lost answer must not leave skeletons or a spinner for ever.
+    private val deadlines = HashMap<Int, Int>()
     private val draftsAwaitingState = HashMap<Any, Int>()
 
     // Threads reloaded because a reply was answered NOT_FOUND: if they are gone, their draft hears it.
@@ -570,6 +573,25 @@ class FeedSession(
         return true
     }
 
+    /** Requests past their deadline count as answered `UNAVAILABLE`, as if the server had said so. */
+    private fun expireRequests() {
+        if (deadlines.isEmpty()) return
+        for ((id, deadline) in deadlines.entries.toList()) {
+            val pending = requests[id]
+            if (pending == null) {
+                deadlines.remove(id)
+                continue
+            }
+            if (ticks < deadline) continue
+            deadlines.remove(id)
+            when (pending) {
+                is PendingRequest.LoadFeed -> onPage(PagePayload.failed(id, Outcome.UNAVAILABLE, pending.feed))
+                is PendingRequest.LoadThread -> onThread(ThreadPayload.failed(id, Outcome.UNAVAILABLE))
+                else -> onResult(ResultPayload(id, Outcome.UNAVAILABLE))
+            }
+        }
+    }
+
     /**
      * Called 20 times a second while Feed is open on the phone ([isAppOpen]), from one place (the client's tick), never
      * from a screen, so that no timer stops while another screen is on top: the automatic retry while the connection is
@@ -579,6 +601,7 @@ class FeedSession(
         ticks++
         flushSeen()
         settleAwaitingDrafts(timedOut = true)
+        expireRequests()
         val lost = availability == FeedAvailability.UNAVAILABLE || availability == FeedAvailability.DISABLED
         if (lost && hasLoadedContent && (viewing != null || viewingThread != null) && ticks >= nextAutoRetry) {
             nextAutoRetry = ticks + AUTO_RETRY_TICKS
@@ -797,6 +820,7 @@ class FeedSession(
         compose.destination = FeedKind.GLOBAL
         compose.outcome = null
         requests.clear()
+        deadlines.clear()
         pendingLikes.clear()
         pendingPins.clear()
         pinsMovedSince.clear()
@@ -843,6 +867,7 @@ class FeedSession(
     private fun request(pending: PendingRequest, payload: (Int) -> CustomPacketPayload): Int {
         val id = ids.next()
         requests[id] = pending
+        deadlines[id] = ticks + ANSWER_TIMEOUT_TICKS
         send(payload(id))
         return id
     }
@@ -1413,6 +1438,12 @@ class FeedSession(
         const val NOTICE_MAX_AGE_TICKS = 100
 
         private const val MAX_NOTICES = 8
+
+        /**
+         * How long an answer is waited for (30 seconds): well past the server's own 12-second deadline on the site, so
+         * only an answer lost on the way gets there.
+         */
+        const val ANSWER_TIMEOUT_TICKS = 600
 
         /** Seen marks that may go at once before the 2-second pace. */
         const val SEEN_BURST = 3
