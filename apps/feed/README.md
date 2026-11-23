@@ -103,7 +103,7 @@ in the player's language ("X can now post announcements.", "X is a moderator, so
 no LNB account.", and so on). A change takes effect on the player's phone within a second, with no new login. Pinning
 and deleting posts have no command: they are done in the app, by announcers and moderators.
 
-With `backend.kind = "memory"` the command also has `/feed dev offline|disabled|writing on|off`, for operators, to show
+With `backend.kind = "memory"` the command also has `/feed dev offline|disabled|writing true|false`, for operators, to show
 the unavailable, switched-off and writing-paused states.
 
 ## For a developer
@@ -170,7 +170,7 @@ that already exists there is kept (it may hold a site's token); `-Poverwrite=tru
 - `/feed announcer add <name>` makes an announcer; a name under `memory.guests` reads as a guest;
 - `memory.seed = "sample"` loads the art direction's sample content (its authors, posts 1 to 10, replies, likes and pins);
   the screenshot harness (below) shows it as the mockups' viewer, `Cam_Roux`, sees it;
-- `/feed dev offline on`, `/feed dev disabled on` and `/feed dev writing off` show the unavailable, switched-off and
+- `/feed dev offline true`, `/feed dev disabled true` and `/feed dev writing false` show the unavailable, switched-off and
   writing-paused states (operators, memory mode only);
 - the system property `lnbphone_feed.memory.clock` fixes the memory backend's clock: `sample` for the moment the mockups
   draw (12 November 2026, 14:34 in Paris), or an ISO instant. The screenshot harness uses it.

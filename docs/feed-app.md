@@ -146,11 +146,11 @@ The site's rules, in memory, for unit tests, the screenshot harness and developi
 | --- | --- |
 | Data | Posts, replies, likes, pins, read state and the notification queue in memory, lost when the server stops. A `Clock` is injected, so tests and screenshots have fixed times. |
 | Identity | Every player is linked, each Minecraft account its own LNB account, `realName` null, except players listed as guests in the config (read only) and the sample authors (who have the art direction's names). |
-| Rights | `moderate` is the op permission level 2 or more (a stand-in for the site's roles, in memory mode only). `announce` is moderate or a grant from `/feed announcer add`. `write` is linked. Nobody is banned. `writing` is true unless `/feed dev writing off`. |
+| Rights | `moderate` is the op permission level 2 or more (a stand-in for the site's roles, in memory mode only). `announce` is moderate or a grant from `/feed announcer add`. `write` is linked. Nobody is banned. `writing` is true unless `/feed dev writing false`. |
 | Rules | The same as the site's: `FeedText` for text (with `emptyText`, `tooLong`), anonymous posts in both feeds, idempotency by key with a fingerprint (`replayed`, `idempotencyMismatch`, `notFound` after a delete), 3 pins with `pinLimit` and `replace`, `notPinnable`, deletion of a thread with its main post, 30-day retention ignored (nothing is purged in a session), per-viewer views by the same rules, the rate limits of `feed-mod.md` section 7 (switchable off for tests), page and thread sizes, keyset cursors. |
 | Notifications | Queued as on the site (`players` and `except`), drained by the same `FeedNotifier` code. |
 | Events | `onPost`, `onDeleted`, `onCounts`, `onPins`, `onRights` and `onNotification` as the site sends them; `onConnected` once at start. |
-| Dev switches | `/feed dev offline on|off` makes every call `Unavailable` and reports the stream down (the "Feed unavailable" and "Connection lost" states), `/feed dev disabled on|off` answers `Disabled("feed")` (the switched-off state), `/feed dev writing on|off` the `feed.writing` flag. Operators only, memory mode only. |
+| Dev switches | `/feed dev offline true|false` makes every call `Unavailable` and reports the stream down (the "Feed unavailable" and "Connection lost" states), `/feed dev disabled true|false` answers `Disabled("feed")` (the switched-off state), `/feed dev writing true|false` the `feed.writing` flag. Operators only, memory mode only. |
 | Seed | `sample` loads the art direction's sample content (section 18.3: the authors, posts 1 to 10, replies, likes and pins) for screenshots; `none` starts empty. |
 
 ### 3.4 Choosing one
@@ -441,8 +441,8 @@ unless `-Poverwrite=true`): `backend.kind = "memory"` with `memory.seed = "sampl
 at `off` so that the development account may join. `runServer` (with `-Pserver_port=<port>`, and `eula=true` in
 `apps/feed/run/eula.txt`) starts a dedicated server the same way; joining it with `runClient` makes two players. Make
 yourself an operator (single player with cheats, or `/op`) to be a moderator; `/feed announcer add <name>` for an
-announcer; list a name under `memory.guests` to try reading as a guest; `/feed dev offline on`, `disabled on` and
-`writing off` for the unavailable, switched-off and writing-paused screens. The screenshot harness runs this way, with
+announcer; list a name under `memory.guests` to try reading as a guest; `/feed dev offline true`, `disabled true` and
+`writing false` for the unavailable, switched-off and writing-paused screens. The screenshot harness runs this way, with
 the sample seed and a fixed clock.
 
 ### 12.2 Against a local site
