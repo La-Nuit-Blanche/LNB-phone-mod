@@ -48,6 +48,7 @@
   "lnbphone_feed.time.month.12": "déc.",
   "lnbphone_feed.time.full": "%s · %s",
   "lnbphone_feed.count.thousands": "%s,%s k",
+  "lnbphone_feed.count.thousands_whole": "%s k",
   "lnbphone_feed.feed.new_posts.one": "1 nouveau post",
   "lnbphone_feed.feed.new_posts.other": "%s nouveaux posts",
   "lnbphone_feed.feed.new_announcements.one": "1 nouvelle annonce",

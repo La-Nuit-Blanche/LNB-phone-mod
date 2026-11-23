@@ -77,22 +77,22 @@ class FeedFormatLanguagesTest {
     }
 
     @Test
-    fun `counts - none at 0, as is under 1,000, then thousands with one decimal cut, a no-break space in French`() {
+    fun `counts - none at 0, as is under 1,000, then thousands with one decimal cut and a zero one dropped, a no-break space in French`() {
         val cases = listOf(
             0 to ("" to ""),
             -3 to ("" to ""),
             1 to ("1" to "1"),
             999 to ("999" to "999"),
-            // `{n},{d} k` always writes its decimal (art direction 13.2).
-            1000 to ("1,0 k" to "1.0k"),
-            1099 to ("1,0 k" to "1.0k"),
+            // A zero decimal is dropped (art direction 13.2).
+            1000 to ("1 k" to "1k"),
+            1099 to ("1 k" to "1k"),
             1250 to ("1,2 k" to "1.2k"),
             // Cut, not rounded: never more than there is.
             1999 to ("1,9 k" to "1.9k"),
             12_345 to ("12,3 k" to "12.3k"),
             999_999 to ("999,9 k" to "999.9k"),
             // No step past thousands in the art direction.
-            1_000_000 to ("1000,0 k" to "1000.0k"),
+            1_000_000 to ("1000 k" to "1000k"),
         )
         for ((n, words) in cases) {
             assertEquals(words.first, FeedFormat.count(n, FRENCH), "$n, French")

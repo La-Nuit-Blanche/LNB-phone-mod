@@ -1249,7 +1249,7 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | `time.days` | {n} j | {n}d | under 7 days |
 | `time.date` | {d} {mois} (`12 nov.`) | {d} {Mon} (`12 Nov`) | 7 days and older; year added when not the current year |
 | `time.full` | {HH:mm} · {date} (`14:32 · 12 nov.`) | {HH:mm} · {date} (`14:32 · 12 Nov`) | thread main post, 24-hour in both |
-| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts |
+| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts; the decimal is cut, never rounded, and a zero decimal is dropped (`1 k` / `1k` for 1,000, `1,9 k` / `1.9k` for 1,999) |
 | `feed.new_posts` | 1 nouveau post / {n} nouveaux posts | 1 new post / {n} new posts | new posts pill, Global |
 | `feed.new_announcements` | 1 nouvelle annonce / {n} nouvelles annonces | 1 new announcement / {n} new announcements | new posts pill, Annonces |
 | `feed.end` | Tu as tout vu | You're all caught up | end of list |
