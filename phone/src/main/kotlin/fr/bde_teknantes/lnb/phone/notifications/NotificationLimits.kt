@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.notifications
 
 import fr.bde_teknantes.lnb.phone.api.AppTarget
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.contents.KeybindContents
@@ -151,14 +152,18 @@ object NotificationLimits {
             return true
         }
 
-        /** The start of [text] that the budget still allows, never splitting a surrogate pair. */
+        /**
+         * The start of [text] that the budget still allows, cut between graphemes: an emoji sequence that straddles the
+         * limit goes whole (a family cut after two of its people, a flag cut to a stray letter, a text ending on a
+         * joiner would reach players otherwise). The budget is UTF-16 units, as before; what a cut leaves unused stays
+         * unused.
+         */
         fun take(text: String): String {
             if (text.length <= chars) {
                 chars -= text.length
                 return text
             }
-            var end = chars.coerceAtLeast(0)
-            if (end > 0 && Character.isHighSurrogate(text[end - 1])) end--
+            val end = Graphemes.floor(text, chars.coerceAtLeast(0))
             chars = 0
             return text.substring(0, end)
         }

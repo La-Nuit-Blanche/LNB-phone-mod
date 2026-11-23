@@ -333,7 +333,7 @@ class PhoneTester private constructor(
         } finally {
             if (active === this) {
                 active = null
-                TextMetrics.fonts = { SmoothResources.font(it) }
+                TextMetrics.fonts = { SmoothResources.face(it) }
                 PhoneSounds.output = PhoneSounds.gameOutput
                 PhoneSounds.setting = PhoneSounds.playerSetting
                 TextEnvironment.current = TextEnvironment.Game

@@ -47,10 +47,12 @@ import java.util.UUID
  * on the player's client, in the player's language, even for a notification sent while they were away. Player content
  * (a name, the start of a post) goes in as **arguments**, never as the translation key: a key resolves to whatever
  * language entry has that name, and shows raw when there is none, so a player could make their post read as any text
- * of the game. The title is drawn on one line and the text on two, in a font without emoji or non-Latin scripts.
+ * of the game. The title is drawn on one line and the text on two, with Inter and the emoji font: emoji show, while a
+ * run of characters in other scripts (CJK, Arabic) shows as one `?`.
  * Styles (colours, bold, fonts, click and hover events) are not kept. Titles keep at most [MAX_TITLE_LENGTH]
  * characters of plain text and texts [MAX_TEXT_LENGTH] (all parts and arguments together), with at most 16
- * arguments per translation: longer ones are cut, so you can pass a post's whole text.
+ * arguments per translation: longer ones are cut, between graphemes (an emoji sequence goes whole or not at all), so
+ * you can pass a post's whole text.
  *
  * **Overloads.** Each `send` comes with and without a `target`, rather than with a default value: a default compiles
  * into your mod as a call to a generated method, which a later version of the phone adding a parameter would remove.

@@ -1,42 +1,69 @@
 package fr.bde_teknantes.lnb.phone.client.notifications
 
+import fr.bde_teknantes.lnb.phone.client.smooth.EmojiShaping
+import fr.bde_teknantes.lnb.phone.client.smooth.FontMetrics
+import fr.bde_teknantes.lnb.phone.text.Graphemes
+
 /**
- * Makes a notification's title or text drawable by the banner's font (Inter: Latin, Greek and Cyrillic, no emoji, no
- * CJK, Arabic or other scripts), which would otherwise draw an empty box for each character it lacks. Plain logic over
- * a [hasGlyph] test, so it can be tested without the font.
+ * Makes a notification's title or text drawable by the banner's fonts (Inter: Latin, Greek and Cyrillic; the emoji
+ * face: emoji; no CJK, Arabic or other scripts), which would otherwise draw an empty box for each grapheme they lack.
+ * Plain logic over [FontMetrics], so it can be tested without the fonts. Decided grapheme by grapheme ([Graphemes]):
  *
  * - Line breaks, tabs and other control characters become spaces: a banner is one continuous snippet.
- * - Emoji and their companions (skin tones, variation selectors, joiners, keycaps, flags, tags) are dropped: they
- *   decorate a sentence rather than carry it ("🎉 Party tonight" reads "Party tonight").
- * - Any other character the font lacks becomes `?`, once per run, so a name in an unsupported script still shows
- *   that a name is there ("田中 : salut" reads "? : salut").
+ * - What the fonts draw stays, emoji sequences whole (skin tones, joiners, flags, keycaps), as the apps draw them
+ *   ([EmojiShaping]).
+ * - Emoji the emoji face lacks (or all emoji, without an emoji face) are dropped with their companions: they decorate
+ *   a sentence rather than carry it ("🎉 Party tonight" reads "Party tonight").
+ * - Any other character the fonts lack becomes `?`, once per run, so a name in an unsupported script still shows that
+ *   a name is there ("田中 : salut" reads "? : salut").
  * - A space the font lacks becomes a plain space; spaces are collapsed and trimmed (a no-break space stays, so the
  *   French space before ":" keeps its line).
  */
 object BannerText {
     const val MISSING = "?"
 
-    fun clean(text: String, hasGlyph: (Int) -> Boolean): String {
+    /** [clean] with Inter alone, as [hasGlyph] tells: without an emoji face. */
+    fun clean(text: String, hasGlyph: (Int) -> Boolean): String = clean(text, object : FontMetrics {
+        override fun advance(codePoint: Int) = 0f
+        override fun kerning(left: Int, right: Int) = 0f
+        override fun hasGlyph(codePoint: Int) = hasGlyph(codePoint)
+        override val ascender = 0f
+        override val descender = 0f
+    })
+
+    fun clean(text: String, font: FontMetrics): String {
         val out = StringBuilder(text.length)
         var pendingSpace = false
         var inMissingRun = false
-        var i = 0
-        while (i < text.length) {
-            val cp = text.codePointAt(i)
-            i += Character.charCount(cp)
+        var start = 0
+        while (start < text.length) {
+            val end = Graphemes.next(text, start)
+            val base = text.codePointAt(start)
             when {
-                isBreakingSpace(cp) || (Character.isSpaceChar(cp) && !hasGlyph(cp)) -> {
+                isBreakingSpace(base) || (Character.isSpaceChar(base) && !font.hasGlyph(base)) -> {
                     pendingSpace = true
                     inMissingRun = false
                 }
-                isEmojiPart(cp) && !hasGlyph(cp) || isInvisible(cp) -> Unit
-                hasGlyph(cp) -> {
+                EmojiShaping.drawsAsEmoji(text, start, end, font) -> {
                     flushSpace(out, pendingSpace)
                     pendingSpace = false
                     inMissingRun = false
-                    out.appendCodePoint(cp)
+                    out.append(text, start, end)
                 }
-                isMark(cp) -> Unit
+                isInvisible(base) -> Unit
+                font.hasGlyph(base) -> {
+                    flushSpace(out, pendingSpace)
+                    pendingSpace = false
+                    inMissingRun = false
+                    // The letter and what the font draws of its accents; selectors, joiners and the rest go.
+                    var i = start
+                    while (i < end) {
+                        val cp = text.codePointAt(i)
+                        if (i == start || (!isInvisible(cp) && font.hasGlyph(cp))) out.appendCodePoint(cp)
+                        i += Character.charCount(cp)
+                    }
+                }
+                isEmojiPart(base) || isMark(base) -> Unit
                 else -> {
                     flushSpace(out, pendingSpace)
                     pendingSpace = false
@@ -44,6 +71,7 @@ object BannerText {
                     inMissingRun = true
                 }
             }
+            start = end
         }
         return out.toString()
     }

@@ -130,8 +130,9 @@ class GposBudgetTest {
     }
 
     @Test
-    fun `twenty thousand lookups of twenty thousand subtables give no kerning`() {
-        // Every lookup is the same lookup, every subtable the same subtable: 400 million entries. Before: OOM.
+    fun `twenty thousand lookups of twenty thousand subtables are read once`() {
+        // Every lookup is the same lookup, every subtable the same subtable: 400 million entries. Before: OOM; then no
+        // kerning (the budget ran out); now the one lookup and its one subtable, kept once, kern as they say.
         val n = 20000
         val t = Table()
         val lookupList = t.head(n)
@@ -156,7 +157,8 @@ class GposBudgetTest {
         t.u16(p + 20, 5)
         t.u16(p + 22, -50)
         val k = assertTimeoutPreemptively(Duration.ofSeconds(10), ThrowingSupplier { parse(t.font()) })
-        assertTrue(k.isEmpty)
+        assertEquals(-50, k.kerning(3, 5))
+        assertTrue(k.workUsed < 200_000, "used ${k.workUsed}")
     }
 
     @Test

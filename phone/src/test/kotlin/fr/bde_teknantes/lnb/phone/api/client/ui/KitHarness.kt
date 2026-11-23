@@ -40,7 +40,7 @@ internal object KitFakes {
     }
 
     fun uninstall() {
-        TextMetrics.fonts = { SmoothResources.font(it) }
+        TextMetrics.fonts = { SmoothResources.face(it) }
         PhoneSounds.output = PhoneSounds.gameOutput
         PhoneSounds.setting = PhoneSounds.playerSetting
         TextEnvironment.current = TextEnvironment.Game

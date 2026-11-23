@@ -20,7 +20,8 @@ import kotlin.math.roundToInt
  * at the screen's real resolution, whatever the GUI scale.
  *
  * - Text is Inter, rasterised by FreeType at the exact pixel size of each style (13 dp is 19.5 px at GUI scale 3),
- *   laid out with the font's unhinted advances and GPOS kerning, each glyph placed on a whole pixel.
+ *   laid out with the font's unhinted advances and GPOS kerning, each glyph placed on a whole pixel. Emoji come from
+ *   the single-colour emoji face ([EmojiFace]), rasterised and placed the same way and drawn in the text's colour.
  * - Rounded rectangles, pills and circles are anti-aliased masks computed once at the real pixel size and nine-sliced
  *   on whole pixels, so their curves are as sharp at 1.5 px per dp as at 2.
  * - Every edge is snapped to the pixel grid with [PixelGrid]: what touches in dp touches on screen.
@@ -51,6 +52,9 @@ class SmoothCanvas {
 
     /** How glyphs are fitted to pixels; see [SmoothFont.Hinting]. */
     var hinting = SmoothFont.Hinting.LIGHT
+
+    /** How emoji glyphs are fitted to pixels: the auto-hinter is made for letters, so emoji keep their exact shapes. */
+    var emojiHinting = SmoothFont.Hinting.NONE
 
     /** Sub-pixel positions each glyph is rasterised at (1 = every glyph on a whole pixel). */
     var subpixelPhases = 1
@@ -235,26 +239,28 @@ class SmoothCanvas {
     // ---- Text ----
 
     /** Width of [text] in [style], in dp. The same at every GUI scale. */
-    fun measure(text: String, style: TextStyle): Float = TextLayout.width(text, SmoothResources.font(style.weight), style.size)
+    fun measure(text: String, style: TextStyle): Float = TextLayout.width(text, SmoothResources.face(style.weight), style.size)
 
     /** [text] cut with an ellipsis to fit in [maxWidth] dp. */
     fun truncate(text: String, style: TextStyle, maxWidth: Float): String =
-        TextLayout.truncate(text, SmoothResources.font(style.weight), style.size, maxWidth)
+        TextLayout.truncate(text, SmoothResources.face(style.weight), style.size, maxWidth)
 
     /** [text] broken into lines of at most [maxWidth] dp. */
     fun wrap(text: String, style: TextStyle, maxWidth: Float): List<String> =
-        TextLayout.wrap(text, SmoothResources.font(style.weight), style.size, maxWidth)
+        TextLayout.wrap(text, SmoothResources.face(style.weight), style.size, maxWidth)
 
     /** Draws one line of [text] in the line box whose top-left is ([x], [y]). Returns its width in dp. */
     fun drawText(text: String, x: Float, y: Float, style: TextStyle, color: Int): Float {
-        val font = SmoothResources.font(style.weight)
+        val font = SmoothResources.face(style.weight)
         val sizePx = grid.toPx(style.size)
         val baseline = originY + grid.snap(y + TextLayout.baseline(style, font))
         val start = originX + grid.toPx(x)
         val phases = subpixelPhases
         val glyphs = SmoothResources.glyphs(style.weight, sizePx, hinting, phases)
+        // Looked up on the first emoji only: most text has none.
+        var emojiGlyphs: SmoothResources.GlyphSet? = null
         val k = grid.pxPerDp
-        return TextLayout.forEachGlyph(text, font, style.size) { cp, pen ->
+        return TextLayout.forEachGlyph(text, font, style.size) { drawn, pen ->
             val px = start + pen * k
             var whole = floor(px).toInt()
             var phase = ((px - whole) * phases).roundToInt()
@@ -262,7 +268,13 @@ class SmoothCanvas {
                 whole++
                 phase = 0
             }
-            val glyph = glyphs.get(cp, phase)
+            val glyph = if (EmojiShaping.isEmojiGlyph(drawn)) {
+                val set = emojiGlyphs ?: SmoothResources.emojiGlyphs(style.weight, sizePx * EmojiFace.SCALE, emojiHinting, phases)
+                    .also { emojiGlyphs = it }
+                set.glyph(EmojiShaping.glyphOf(drawn), phase)
+            } else {
+                glyphs.get(drawn, phase)
+            }
             val region = glyph.region
             if (region != null) {
                 val gx = whole + glyph.left

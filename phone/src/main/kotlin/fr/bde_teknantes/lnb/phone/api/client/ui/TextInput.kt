@@ -1,6 +1,7 @@
 package fr.bde_teknantes.lnb.phone.api.client.ui
 
 import fr.bde_teknantes.lnb.phone.api.client.AppCanvas
+import fr.bde_teknantes.lnb.phone.text.Graphemes
 import fr.bde_teknantes.lnb.phone.client.smooth.TextLayout
 import fr.bde_teknantes.lnb.phone.client.ui.EditCommand
 import fr.bde_teknantes.lnb.phone.client.ui.EditKey
@@ -437,7 +438,8 @@ class TextArea(state: TextState) : TextInput(state) {
             canvas.drawTextWrapped(placeholder, placeholderX, PADDING, innerWidth - (placeholderX - PADDING), TextStyle.BODY, Colors.TEXT_3, maxOf(1, (innerHeight / lh).toInt()))
             drawCaret(canvas, PADDING - CARET_GAP, PADDING)
         } else {
-            val overflow = limit?.let { CharacterCounter.overflowStart(text, it) }
+            // A sequence that straddles the limit is marked whole: its glyph can't be split.
+            val overflow = limit?.let { CharacterCounter.overflowStart(text, it) }?.let { Graphemes.floor(text, it) }
             val color = when {
                 !isEnabled -> Colors.TEXT_3
                 sending -> Colors.TEXT_2

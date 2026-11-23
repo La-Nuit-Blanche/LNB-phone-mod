@@ -465,13 +465,48 @@ class TextStateEditingTest {
         }
 
         @Test
-        fun `a flag is two characters, and the caret can stop between its halves`() {
-            // Code points, not what the player sees: a flag is two regional indicators. Reported, not decided.
+        fun `a flag counts two characters, but the caret steps over it whole`() {
+            // The count is code points (TextLimits); the caret moves by what the player sees.
             val flag = "🇫🇷"
-            val s = TextState(flag)
-            assertEquals(2, s.length)
+            val s = TextState(flag + flag)
+            assertEquals(4, s.length)
             s.moveLeft()
-            assertEquals(2, s.caret)
+            assertEquals(4, s.caret)
+            s.moveLeft()
+            assertEquals(0, s.caret)
+            s.moveTo(2)
+            assertEquals(0, s.caret)
+        }
+
+        @Test
+        fun `sequences are one step and one Backspace`() {
+            for (sequence in listOf("👍🏽", "👨‍👩‍👧", "1️⃣", "❤️", "❤️‍🔥", "🏴󠁧󠁢󠁥󠁮󠁧󠁿")) {
+                val s = TextState("a${sequence}b")
+                s.moveTo(1)
+                s.moveRight()
+                assertEquals(1 + sequence.length, s.caret, sequence)
+                s.deleteBackward()
+                assertEquals("ab", s.text, sequence)
+            }
+        }
+
+        @Test
+        fun `a skin tone or a joined emoji typed after an emoji leaves the caret after the sequence`() {
+            // As the emoji panel sends them: one code point at a time.
+            val s = TextState()
+            s.insert("👍")
+            s.insert("🏽")
+            assertEquals(4, s.caret)
+            s.insert("‍")
+            s.insert("🔥")
+            assertEquals(7, s.caret)
+            // A ZWJ typed between two emoji joins them: the caret goes after the sequence, never inside it, and not
+            // back before it either.
+            val m = TextState("👨👧")
+            m.moveTo(2)
+            m.insert("‍")
+            assertEquals("👨‍👧", m.text)
+            assertEquals(5, m.caret)
         }
     }
 

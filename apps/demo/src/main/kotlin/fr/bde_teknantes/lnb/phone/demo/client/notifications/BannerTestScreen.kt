@@ -19,12 +19,14 @@ import net.minecraft.world.item.Items
  * Test sheet for the notification banner (task 6), sized for the window at GUI scale 4 (640 x 480 dp).
  *
  * - [Mode.STATES]: on the app background, the banner's states (normal, hover, pressed) with the storyboard's texts,
- *   then the edge cases: characters the font lacks, a long title, an item icon, a one-line text, no text.
+ *   then the edge cases: characters the fonts lack and emoji, a long title, an item icon, a one-line text, no text,
+ *   and emoji in a title and a text.
+ * - [Mode.CHAIN]: a hundred emoji joined by ZWJ, as a player could paste them, in a banner.
  * - [Mode.FRAMES]: P-10 steps 3 and 2 on the home wallpaper (no icons yet: the home screen is task 4): resting at
  *   app-local (8, 4), and half-way down its slide at `y -36`, clipped to the viewport.
  */
 class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banner test")) {
-    enum class Mode { STATES, FRAMES }
+    enum class Mode { STATES, FRAMES, CHAIN }
 
     private val banner = NotificationBanner()
     private val canvas = SmoothCanvas()
@@ -48,6 +50,10 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         "Marie-Charlotte de La Villemarqué a répondu",
         "Supercalifragilisticexpidelilicieusementinterminable mot sans espace pour la coupure",
     )
+    private val emoji = BannerContent(
+        feed, "Camille 🌸 Roux 🎉",
+        "Soirée au spawn ce soir 🎉 On part au Nether 🔥 vers 21:00, ramenez des potions 🧪 et à manger 🍗.",
+    )
     private val item = BannerContent(AppIcon.Item(TileColor.ORANGE, ItemStack(Items.DIAMOND)), "Vente conclue", "Ton annonce a trouvé preneur.")
     private val noText = BannerContent(
         AppIcon.Glyph(TileColor.GRAPHITE, ResourceLocation.fromNamespaceAndPath(LnbPhone.ID, "textures/gui/sprites/icon/settings.png")),
@@ -65,6 +71,7 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         when (mode) {
             Mode.STATES -> states(graphics)
             Mode.FRAMES -> frames(graphics)
+            Mode.CHAIN -> chain(graphics)
         }
     }
 
@@ -76,7 +83,7 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         canvas.end()
         val rows = listOf(
             listOf(reply to BannerLook.NORMAL, announcement to BannerLook.HOVER, pvp to BannerLook.PRESSED, glyphless to BannerLook.NORMAL),
-            listOf(longTitle to BannerLook.NORMAL, item to BannerLook.NORMAL, noText to BannerLook.NORMAL),
+            listOf(longTitle to BannerLook.NORMAL, item to BannerLook.NORMAL, noText to BannerLook.NORMAL, emoji to BannerLook.NORMAL),
         )
         rows.forEachIndexed { column, list ->
             list.forEachIndexed { i, (content, look) ->
@@ -85,6 +92,16 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
             }
         }
     }
+
+    /** A hundred emoji joined by ZWJ in a banner: two lines inside the slot, the second ended by the ellipsis. */
+    private fun chain(graphics: GuiGraphics) {
+        canvas.begin(graphics, 0, 0, width, height)
+        canvas.fillRect(0f, 0f, 256f, 200f, BG)
+        canvas.end()
+        banner.render(graphics, 0, 0, 128, height, BannerLayout.IN_PHONE_X, BannerLayout.IN_PHONE_Y, chainBanner, BannerLook.NORMAL)
+    }
+
+    private val chainBanner = BannerContent(feed, "Nouvelle réponse", fr.bde_teknantes.lnb.phone.demo.client.kit.EmojiPages.CHAIN)
 
     private fun frames(graphics: GuiGraphics) {
         // Resting, then half-way in position (P-10.2: y -36), whatever the easing.

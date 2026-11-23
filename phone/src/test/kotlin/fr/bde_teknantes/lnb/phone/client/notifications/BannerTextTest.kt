@@ -159,7 +159,9 @@ class BannerTextTest {
     }
 
     @Test
-    fun `cleaning twice changes nothing`() {
+    fun `cleaning these texts twice changes nothing`() {
+        // Not true of every text: a lone skin tone after a line break is kept by the first pass (it starts a grapheme
+        // of its own), then joins the space the break became on the second, and goes (BannerEmojiTest).
         for (text in listOf("🎉 Party\ntonight 👍🏽", "田中 : salut", "  a   b ", "Événement à l'arène", "é")) {
             val once = clean(text)
             assertEquals(once, clean(once), text)

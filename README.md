@@ -78,6 +78,7 @@ Starts a client that plays a capture scenario by itself and quits. The scenarios
 
 AGPL-3.0-or-later.
 
-The bundled Inter font files (`phone/src/main/resources/assets/lnbphone/font/inter_*.ttf`) are not covered by that
-licence: they are © The Inter Project Authors under the SIL Open Font License 1.1 (text in `inter_ofl.txt` next to
+The bundled font files in `phone/src/main/resources/assets/lnbphone/font/` are not covered by that licence: Inter
+(`inter_*.ttf`) is © The Inter Project Authors and Noto Emoji (`noto_emoji.ttf`, version 3.002, unmodified) is
+© Google LLC, both under the SIL Open Font License 1.1 (texts in `inter_ofl.txt` and `noto_emoji_ofl.txt` next to
 them), which allows bundling them but not relicensing them.

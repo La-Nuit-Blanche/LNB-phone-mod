@@ -401,6 +401,13 @@ object PingSession {
 cut as it is typed or pasted. A `TextArea` (several lines, with a character counter when you set its `limit`) takes a
 `TextState.multiline()` the same way.
 
+What text can show: everything the phone draws in apps uses Inter (Latin, Greek and Cyrillic) and a single-colour
+emoji font (Noto Emoji, emoji up to Unicode 15.1), so players can type emoji, skin tones, flags and keycaps included,
+and they take the colour of the text around them. Other scripts (Chinese, Japanese, Arabic, Hindi and the like) and
+emoji newer than the font show one missing-glyph box per character; the text itself is kept as it was typed. Carets,
+selections, wrapping and truncation all work on what a reader sees as one character, so an emoji sequence is never
+split; limits still count code points (`api.TextLimits`), so `👍🏽` is 2 and a flag 2.
+
 Everything that keeps coming is bounded. A conversation keeps its newest 50 messages, so a talkative player (or a
 modified client) can't make the screen grow without end:
 
@@ -575,7 +582,8 @@ Opening the app, by any route, clears its notifications. `clearApp` and `clearTa
 - **Text.** Title and text are translatable components with keys in your language files, so they are shown in the
   recipient's language. What a player wrote goes in as an argument, never as the key (see the mistakes below). The
   title names the event in a few words (`New ping`); the text starts with who did it (`Dev: Meet me at the mill`).
-  The banner shows one line of title and two of text; styles are dropped.
+  The banner shows one line of title and two of text; styles are dropped. Emoji show as in apps; a run of
+  characters in a script the phone has no font for becomes one `?`.
 
 <!-- sample: apps/demo/src/main/resources/assets/lnbphone_demo/lang/fr_fr.json -->
 ```json

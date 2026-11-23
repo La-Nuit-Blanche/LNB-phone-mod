@@ -44,7 +44,7 @@ object KitPages {
         HostedPage("Empty: Annonces") { FeedScreen(FeedSession().apply { tab = 0 }, content = FeedContent.EMPTY) },
         HostedPage("Error state") { FeedScreen(FeedSession().apply { tab = 0 }, content = FeedContent.ERROR) },
         HostedPage("Error state, retrying") { FeedScreen(FeedSession().apply { tab = 0 }, content = FeedContent.ERROR_RETRYING) },
-    )
+    ) + EmojiPages.pages
 
     val composed: List<HostedPage> = listOf(
         HostedPage("Annonces (9.4)") { FeedScreen(FeedSession().apply { tab = 0 }) },
