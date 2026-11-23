@@ -29,6 +29,9 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * LNB's website, through LNB Warden's `ApiClient` and its server config (`docs/feed-app.md` 3.2): every route of
@@ -39,7 +42,8 @@ import java.util.concurrent.CompletableFuture
  * `data.problem` and Feed needs `data.oldest` and `Retry-After` too. Every outcome is told to Warden's `ApiHealth`, so
  * operators hear of an outage once.
  *
- * @param timeout how long a call may wait for its answer; tests pass a shorter one.
+ * @param timeout how long a call may wait for its answer's headers; the whole call ends Unavailable a fifth later at
+ * most, body included. Tests pass a shorter one.
  * @param connection the site's base URL and the server's token, read at each call (null when either is blank).
  */
 class SiteBackend(
@@ -49,6 +53,9 @@ class SiteBackend(
     },
 ) : FeedBackend {
     private val events = FeedEvents(connection)
+
+    /** The whole call, body included: the request's timeout and a fifth more. The stream has its own watchdog. */
+    private val deadline: Duration = timeout.plus(timeout.dividedBy(5))
 
     override fun player(player: UUID) = get("player", "/players/$player", SiteJson::playerState)
 
@@ -172,16 +179,23 @@ class SiteBackend(
             // A malformed api.url.
             return done(route, SiteAnswers.network(e), null)
         }
-        return ApiClient.HTTP.sendAsync(request, HttpResponse.BodyHandlers.ofString()).handle { response, error ->
+        val sending = ApiClient.HTTP.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        // The request's timeout covers only the wait for the headers: a site that sends them and then stalls in the
+        // body would keep the call, and whatever its caller holds (a player's slot, the notifier's drain), forever.
+        // Every call gets a total deadline; past it, the exchange is cancelled and the call ends as Unavailable.
+        return sending.copy().orTimeout(deadline.toMillis(), TimeUnit.MILLISECONDS).handle { response, error ->
+            if (error != null && unwrap(error) is TimeoutException) sending.cancel(true)
             val classified = if (response != null) {
                 SiteAnswers.classify(response.statusCode(), response.body(), response.headers().firstValue("Retry-After").orElse(null), decode)
             } else {
-                SiteAnswers.network(error?.cause ?: error ?: IllegalStateException("no answer"))
+                SiteAnswers.network(error?.let(::unwrap) ?: IllegalStateException("no answer"))
             }
             ApiHealth.record(route, classified.health)
             classified.result
         }
     }
+
+    private fun unwrap(error: Throwable): Throwable = if (error is CompletionException) error.cause ?: error else error
 
     private fun <T> done(route: String, classified: SiteAnswers.Classified<T>, reason: String?): CompletableFuture<BackendResult<T>> {
         ApiHealth.record(route, classified.health)

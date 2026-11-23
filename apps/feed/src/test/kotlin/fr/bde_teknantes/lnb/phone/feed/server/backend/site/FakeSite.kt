@@ -25,6 +25,9 @@ class FakeSite : AutoCloseable {
     /** No answer at all, until the site stops: a site that hangs. */
     data object Hang : Answer
 
+    /** The status line and headers, then part of the body, then nothing more until the site stops. */
+    data object Stall : Answer
+
     /**
      * A `text/event-stream` answer, kept open: what the test [send]s goes out as it comes, until [end] (or the client
      * goes away, or the site stops).
@@ -71,6 +74,13 @@ class FakeSite : AutoCloseable {
             requests.put(request)
             when (val answer = answer(request)) {
                 Hang -> Thread.sleep(Long.MAX_VALUE)
+                Stall -> {
+                    exchange.responseHeaders.add("Content-Type", "application/json")
+                    exchange.sendResponseHeaders(200, 100)
+                    exchange.responseBody.write("{\"linked\":".toByteArray())
+                    exchange.responseBody.flush()
+                    Thread.sleep(Long.MAX_VALUE)
+                }
                 is Reply -> {
                     answer.headers.forEach { (name, value) -> exchange.responseHeaders.add(name, value) }
                     if (answer.body.isNotEmpty()) exchange.responseHeaders.add("Content-Type", "application/json")
