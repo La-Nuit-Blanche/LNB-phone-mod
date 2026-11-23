@@ -138,7 +138,7 @@ The site's rules, in memory, for unit tests, the screenshot harness and developi
 | Data | Posts, replies, likes, pins, read state and the notification queue in memory, lost when the server stops. A `Clock` is injected, so tests and screenshots have fixed times. |
 | Identity | Every player is linked, each Minecraft account its own LNB account, `realName` null, except players listed as guests in the config (read only) and the sample authors (who have the art direction's names). |
 | Rights | `moderate` is the op permission level 2 or more (a stand-in for the site's roles, in memory mode only). `announce` is moderate or a grant from `/feed announcer add`. `write` is linked. Nobody is banned. `writing` is true unless `/feed dev writing off`. |
-| Rules | The same as the site's: `FeedText` for text (with `emptyText`, `tooLong`), `anonymousAnnouncement`, idempotency by key with a fingerprint (`replayed`, `idempotencyMismatch`, `notFound` after a delete), 3 pins with `pinLimit` and `replace`, `notPinnable`, deletion of a thread with its main post, 30-day retention ignored (nothing is purged in a session), per-viewer views by the same rules, the rate limits of `feed-mod.md` section 7 (switchable off for tests), page and thread sizes, keyset cursors. |
+| Rules | The same as the site's: `FeedText` for text (with `emptyText`, `tooLong`), anonymous posts in both feeds, idempotency by key with a fingerprint (`replayed`, `idempotencyMismatch`, `notFound` after a delete), 3 pins with `pinLimit` and `replace`, `notPinnable`, deletion of a thread with its main post, 30-day retention ignored (nothing is purged in a session), per-viewer views by the same rules, the rate limits of `feed-mod.md` section 7 (switchable off for tests), page and thread sizes, keyset cursors. |
 | Notifications | Queued as on the site (`players` and `except`), drained by the same `FeedNotifier` code. |
 | Events | `onPost`, `onDeleted`, `onCounts`, `onPins`, `onRights` and `onNotification` as the site sends them; `onConnected` once at start. |
 | Dev switches | `/feed dev offline on|off` makes every call `Unavailable` and reports the stream down (the "Feed unavailable" and "Connection lost" states), `/feed dev disabled on|off` answers `Disabled("feed")` (the switched-off state), `/feed dev writing on|off` the `feed.writing` flag. Operators only, memory mode only. |
@@ -216,7 +216,7 @@ Registered from `FeedMod` on both sides, with `event.registrar("1")`; bump the v
 | `FeedKind` | `ANNOUNCEMENTS` or `GLOBAL` (a byte) |
 | `Author` | `uuid`; `username` (16); `realName` (optional, 128 units: 64 code points); `announcer` |
 | `ReplyRef` | `id` (optional UUID); `anonymous`; `name` (optional, 128) |
-| `PostView` | `id`; `feed`; `threadId` (optional); `replyTo` (optional `ReplyRef`); `text` (560: 280 code points); `createdAt`; `anonymous`; `author` (optional `Author`); `likes`, `replies` (var ints); `pinnedAt` (optional); `liked`, `mine`, `canDelete`, `canPin`, `unseenReplies`, `answersMe` |
+| `PostView` | `id`; `feed`; `threadId` (optional); `replyTo` (optional `ReplyRef`); `text` (560: 280 code points); `createdAt`; `anonymous`; `author` (optional `Author`); `likes`, `replies` (var ints); `pinnedAt` (optional); `liked`, `mine`, `canDelete`, `canPin`; `unseenReplies` (var int); `answersMe` |
 | `Rights` | `write`, `announce`, `moderate` |
 | `Unread` | `announcements`, `global` |
 | `PlayerState` | `linked`, `banned`, `writing`, `me` (optional `Author`), `rights`, `unread` |
@@ -267,14 +267,14 @@ Paths are under `lnbphone_feed:`.
 | `OK` | 2xx | the result |
 | `UNAVAILABLE` | `Unavailable`; a 400 without a problem | a load with nothing on screen: the `feed.unavailable.*` block; over a loaded list: `feed.connection_lost`; loading more: the retry row; a write: `snackbar.send_failed` with Retry (post, reply) or `snackbar.action_failed` (like, pin, delete) (art direction 9.12) |
 | `DISABLED` | 503 `disabled` | a load with nothing on screen: the `feed.disabled.*` block; otherwise as `UNAVAILABLE`. For `feed.writing`, the new state also hides composing |
-| `RATE_LIMITED` | 429, or the server's own limits | `snackbar.too_fast` with the seconds; the draft stays |
+| `RATE_LIMITED` | 429, or the server's own limits | `snackbar.too_fast` with the seconds (`retryAfter`, or 1 for the server's own limits), an error snackbar without an action; the draft stays (art direction 9.11) |
 | `NOT_LINKED` | 404 `notLinked` | `guest.snackbar` (the new state follows, which turns the app to its guest look) |
-| `BANNED` | 403 `banned` | `snackbar.banned` (the new state follows) |
+| `BANNED` | 403 `banned` | `snackbar.banned`, as an error snackbar without an action when a draft was refused (the new state follows) |
 | `NOT_ALLOWED` | 403 `notAllowed` | `snackbar.action_failed` (the new state follows) |
-| `NOT_FOUND` | 404 `notFound` | the post leaves the lists; in its thread, back to the feed with "This post was deleted" |
+| `NOT_FOUND` | 404 `notFound` | the post leaves the lists; in its thread, back to the feed with `thread.deleted` |
 | `PIN_LIMIT` | 409 `pinLimit` | the "Replace a pin?" dialog (it only reaches the server when two announcers pin at once) |
-| `NOT_PINNABLE` | 409 `notPinnable` | "Couldn't do that" |
-| `INVALID` | `emptyText`, `tooLong`, `anonymousAnnouncement`, `idempotencyMismatch`, a payload the server refused | "Couldn't send"; logged on the server |
+| `NOT_PINNABLE` | 409 `notPinnable` | `snackbar.action_failed` |
+| `INVALID` | `emptyText`, `tooLong`, `idempotencyMismatch`, a payload the server refused | `snackbar.send_failed`; logged on the server |
 
 ## 6. Notifications
 
@@ -282,15 +282,15 @@ Paths are under `lnbphone_feed:`.
 
 `FeedNotifier` drains the backend's queue (`pendingNotifications`, deliver, `ackNotifications` with the IDs delivered, again while `more`), one drain at a time: at `onConnected`, on `onNotification`, and every 5 minutes. It delivers with the app ID `lnbphone_feed:feed`:
 
-- **`announcement`**: to every player of the world, minus `except` (the author's accounts): the UUIDs of the `<uuid>.dat` files in `server.getWorldPath(LevelResource.PLAYER_DATA_DIR)` and every online player. `PhoneNotifications.send(players, appId, title, text, target)`, in one call. Not `sendToEveryone`, which can't leave the author out: a player's own action never notifies them.
+- **`announcement`**: `PhoneNotifications.sendToEveryone(appId, title, text, target, except)`, every player of the world but the author's accounts (6.5). A player's own action never notifies them, an anonymous announcement included; `except` is handed to the phone and goes nowhere else (no log, no payload).
 - **`reply`**: to `players`, every account linked to the recipient's LNB account. An empty `players` is acknowledged without sending.
 
 | Kind | Title | Text | Target |
 | --- | --- | --- | --- |
 | `announcement` | `Component.translatable("notif.lnbphone_feed.announcement")` | `Component.translatable("notif.lnbphone_feed.text", name, post.text)` | `post:<postId>` |
-| `reply` | `Component.translatable("notif.lnbphone_feed.reply")` | the same, `name` being `Component.translatable("lnbphone_feed.post.anonymous")` when `post.author` is null | `reply:<feed>:<threadId>:<replyId>` |
+| `reply` | `Component.translatable("notif.lnbphone_feed.reply")` | the same | `reply:<feed>:<threadId>:<replyId>` |
 
-`name` is the author's display name (`realName ?: username`). The player's words are arguments, never a key. The phone cuts the text to 320 characters between graphemes and keeps a banner to two lines. A row is acknowledged once `send` was called: a crash in between delivers it twice at the next drain, which is better than losing it.
+`name` is the author's display name (`realName ?: username`), or `Component.translatable("lnbphone_feed.post.anonymous")` when `post.author` is null (an anonymous announcement or reply): "Anonymous: …". The player's words are arguments, never a key. The phone cuts the text to 320 characters between graphemes and keeps a banner to two lines. A row is acknowledged once `send` was called: a crash in between delivers it twice at the next drain, which is better than losing it.
 
 ### 6.2 Targets
 
@@ -298,7 +298,7 @@ Paths are under `lnbphone_feed:`.
 
 | Target | Opens |
 | --- | --- |
-| `post:<postId>` | `FeedScreen` on Announcements, scrolled to the top, the post highlighted |
+| `post:<postId>` | `FeedScreen` on Announcements, scrolled to the top, or further when the announcement sits under the pinned group out of view, so that it is fully visible; highlighted |
 | `reply:<feed>:<threadId>:<replyId>` | `FeedScreen` on that feed, then `ThreadScreen` of the thread, scrolled to the reply and highlighted |
 
 At most 93 characters. Anything else (an older or unknown target) opens Feed on Announcements.
@@ -309,7 +309,33 @@ On `onDeleted`, for each item, `PhoneNotifications.clearTargetForEveryone(appId,
 
 ### 6.4 What the phone does with them
 
-Badge, LED, banner or peek and chime, delivery at the next login for offline players, 50 slots per player shared by every app, 30 days, the per-mod backstop (a burst of 20, then one every 3 seconds): all of this is the phone's (art direction 10). Opening Feed clears its notifications. A screen that already shows the target says so through `showsTarget` (section 9), and the phone then plays the chime without a banner.
+Badge, LED, banner or peek and chime, delivery at the next login for offline players, 50 slots per player shared by every app, 30 days, the per-mod backstop (a burst of 20, then one every 3 seconds): all of this is the phone's (art direction 10). Opening Feed clears its notifications. A screen that already shows the target says so through `showsTarget` (section 9), and the phone then plays the chime without a banner. `FeedScreen` answers true for a `post:` target only when that announcement is fully visible on screen: a new announcement waiting under the pinned group, out of view, still gets its banner.
+
+### 6.5 The phone's addition: notifying everyone except some players
+
+The phone gains two overloads of `PhoneNotifications.sendToEveryone`, built with the mod's first task (in this repository, in `phone/`). They are **additive**: the existing functions keep their signatures and behaviour, and apps built against an older phone keep working. Feed then requires the phone version that has them (its `lnbphone` range starts there, as the app plugin writes it).
+
+```kotlin
+/**
+ * Notifies every player who has played on this world, connected or not, except [except] (the author of an
+ * announcement, who must not be told of their own post). See the other [sendToEveryone] for who "every player" is,
+ * and the [send] by UUID for the other parameters. [except] is read during the call; UUIDs in it that aren't players
+ * of the world are ignored, and an empty collection sends to everyone.
+ */
+@JvmStatic
+fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, target: String?, except: Collection<UUID>)
+
+/** As the other [sendToEveryone] with [except], leading to your app's first screen. */
+@JvmStatic
+fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, except: Collection<UUID>) =
+    sendToEveryone(appId, title, text, null, except)
+```
+
+- **Who gets it**: the players of `NotificationHost.knownPlayers()` (the world's `playerdata/<uuid>.dat` files and the connected players, read when the sending runs on the server thread) minus `except`. A player in `except` gets nothing, connected or not: no badge, banner, peek or chime.
+- **Offline players** get it as any notification sent by UUID: stored with the world, shown as a badge at their next login (no peek, no chime: art direction 10.2), dropped after 30 days. A player who first joins afterwards doesn't get it.
+- **Checks and threads** as the existing `sendToEveryone`: the arguments are checked in the caller's thread (`Request`), `except` is copied there, and the sending runs on the server thread. The per-mod backstop and the shared 50 slots apply to each recipient as for any notification.
+- **Inside**: `NotificationService.sendToEveryone(host, appId, title, text, target, except: Set<UUID>)` sends to `host.knownPlayers() - except`; the existing service function calls it with an empty set.
+- **Tests** beside the existing ones: an excluded player, connected and offline, gets nothing; the others get it; an empty `except` behaves as before; an unknown UUID in `except` changes nothing.
 
 ## 7. The command
 
@@ -347,15 +373,15 @@ How it moves:
 
 - **Opening Feed** (the root screen shown) sends `open`. The `state` answer sets rights, `me`, the dots and availability. A feed or thread that is missing or stale loads when shown (`load_feed`, `load_thread`).
 - **A page** replaces the feed's first page (or appends a later one), puts the views in `posts`, and clears `stale` and `waiting`.
-- **A live post** (`live`) goes into `posts`. A main post goes to the top of its feed when that list is shown at scroll 0 (highlighted), otherwise into `waiting` (the pill). If the post is in the feed not on screen and isn't `mine`, that tab's dot comes on. A reply joins its thread if loaded; with `answersMe`, the marker comes on for the thread's main post and for the reply it answers, unless that thread is on screen (then it is marked seen at once). A post already held (the author's own, from `result`) is replaced, never doubled.
+- **A live post** (`live`) goes into `posts`. A main post is inserted at its place (the top of Global; under the pinned group in Announcements), highlighted, when it would be fully visible there; otherwise it goes into `waiting`, which feeds the pill (art direction 9.5): its count, and its icon, `arrow_up` when the first waiting post's place is above the visible area, none when it is below or only partly visible (Announcements at scroll 0 with the pinned group pushing it down). A click on the pill, or scrolling until that place is fully visible, inserts the waiting posts and scrolls so the first is fully visible. If the post is in the feed not on screen and isn't `mine`, that tab's dot comes on. A reply joins its thread if loaded; with `answersMe`, the marker comes on for the thread's main post and for the reply it answers, unless that thread is on screen (then it is marked seen at once). A post already held (the author's own, from `result`) is replaced, never doubled.
 - **`removed`** drops the rows from `posts`, the feeds and the threads. The thread on screen whose main post went pops back to the feed with "This post was deleted".
 - **`counts`** and **`pins`** update `posts`; a post unpinned returns to its date order in the Announcements list.
 - **`reset`** marks every feed and thread stale; the screen showing one reloads its first page and **merges** it, so the list catches up without jumping (art direction 9.12): posts newer than the newest held go in as live posts do (at the top at scroll 0, otherwise behind the pill), held posts missing from the page within its time span are dropped (deleted meanwhile), and the rest are updated in place. Drafts stay.
 - **Connection lost.** A `state` with `available: UNAVAILABLE` or `DISABLED` while something is loaded shows `feed.connection_lost` with Retry and keeps everything readable. While unavailable, the client sends `open` again about every 15 seconds, and at once on Retry; an `OK` answer (or the `reset` that follows a reconnection) clears the snackbar with no message.
 - **Viewing a tab** sends `seen_feed` with the newest `createdAt` among the posts shown there (pinned included), once a second at most, and clears that tab's dot. **Opening a thread** sends `seen_thread` once its first page is shown, and clears its markers in `posts`.
-- **Writing.** Sending a draft gives it a key if it has none (`UUID.randomUUID()`), and keeps the key until the draft succeeds or changes (text, toggle, destination or reply target), so the Retry after a failure reuses it. Success clears the draft and inserts the post (at the top of its feed, scrolled to; or at the end of its thread, scrolled into view). Failure keeps the draft and its key.
+- **Writing.** Sending a draft gives it a key if it has none (`UUID.randomUUID()`), and keeps the key until the draft succeeds or changes (text, toggle, destination or reply target), so the Retry after a failure reuses it. Success clears the draft and inserts the post at its place (the top of Global, under the pinned group in Announcements), scrolled so that it is fully visible; a reply at the end of its thread, scrolled into view. Failure keeps the draft and its key.
 - **Likes** show at once and are undone if the result isn't `OK`. **Pins** show at once as well (art direction 9.4); with 3 pinned the dialog comes first, and confirming sends `replace = true`. **Deletes** wait for the result, then collapse the cell.
-- **Guests** (`state.linked` false) get the art direction's guest look (9.11): no compose button, the read-only strip in place of the reply composer, likes drawn but inactive with `guest.snackbar`, no more or pin button (their views never allow them). **Banned players and `writing` off** get the same look with their own snackbar (`snackbar.banned`, `snackbar.writing_off`, section 10); a banned player can't be online in practice, so this is for the moment between a ban and Warden's kick.
+- **Guests** (`state.linked` false) get the art direction's guest look (9.11): no compose button, the read-only strip in place of the reply composer, likes drawn but inactive with `guest.snackbar`, no more or pin button (their views never allow them). **Banned players and `writing` off** get the same look with their own words (`snackbar.banned`, `snackbar.writing_off`, art direction 9.11); a banned player can't be online in practice, so this is for the moment between a ban and Warden's kick.
 
 ## 9. The screens
 
@@ -366,41 +392,25 @@ How each part of the art direction's section 9 is fed. "Session" is `FeedSession
 | 9.1 Structure | `FeedScreen` (root: the two tabs, Announcements first), `ThreadScreen`, `ComposeScreen`. `targetScreens` builds the stack of 6.2. Reopening the phone returns to the screen it was closed on (the phone keeps it). | session |
 | 9.2 Identity | `PostCard`: display name `realName ?: username`, handle `"@" + username` only with a `realName`, the face from `author.uuid` and `author.username` (`Avatar.showPlayer`), the badge from `author.announcer`. The names are the site's: first name and initial. | post `author` |
 | 9.2 Roles | The compose button on Announcements and the destination control in Compose from `state.rights.announce`; on Global from `state.rights.write` and `state.writing`. | session `state` |
-| 9.3 Post card | Counts from `likes` and `replies` (on a reply, the replies that answer it); the heart from `liked`; the more button from `canDelete`; the pin button from `canPin`; the unseen-replies marker from `unseenReplies`; the time from `createdAt` (real time). | post |
-| 9.3 Anonymous | `anonymous` with `author` null: the anonymous avatar and "Anonymous". The private line: "Posted anonymously by you" when `mine`; "Author: {name} {handle}" when `author` is filled and not `mine` (the viewer moderates). | post |
+| 9.3 Post card | Counts from `likes` and `replies` (on a reply, the replies that answer it); the heart from `liked`; the more button from `canDelete`; the pin button from `canPin`; the unseen-replies marker when `unseenReplies` is above 0; the time from `createdAt` (real time). | post |
+| 9.3 Anonymous | `anonymous` with `author` null: the anonymous avatar and "Anonymous", no handle, no badge, in both feeds (an anonymous announcement too). The private line: "Posted anonymously by you" when `mine`; "Author: {name} {handle}" when `author` is filled and not `mine` (the viewer moderates). | post |
 | 9.4 Pins | The pinned group from the feed's pinned IDs, by `pinnedAt`; the dialog from the group's size (and `PIN_LIMIT`); `pins` keeps it in step. | session, `pin`, `pins` |
-| 9.5 Global and new posts | Pages from `load_feed`; the spinner row and "You're all caught up" from `next`; live posts and the pill from `live` and `waiting`. | session, `live` |
+| 9.5 Global and new posts | Pages from `load_feed`; the spinner row and "You're all caught up" from `next`; live posts and the pill from `live` and `waiting` (section 8: a post that would not be fully visible once inserted waits; the pill shows `arrow_up` when the first waiting post's place is above the visible area, and no icon when it is below or only partly visible, as in Announcements under the pins). | session, `live` |
 | 9.6 Unread dots | `Tabs.setUnread` from the session's `unread`; viewing a tab sends `seen_feed`. | session, `state`, `live` |
 | 9.7 Thread | `load_thread`, 50 replies per page, more on scroll with the spinner row at the end; the reply-to line from `replyTo` ("Anonymous" when `replyTo.anonymous`); the composer's target and placeholder from the replied post's display name, or "Anonymous"; "This post was deleted" from `removed` or `NOT_FOUND`. `showsTarget` is true for a `reply:` target of this thread. | session, `thread`, `removed` |
-| 9.8 Compose | The author row from `state.me`; the destination control for announcers; the anonymous row hidden on Announcements; the draft and its key in the session; `create_post`. | session |
+| 9.8 Compose | The author row from `state.me`; the destination control for announcers; the anonymous row usable whichever destination is selected (changing it leaves the toggle as it is); the draft and its key in the session; `create_post`. | session |
 | 9.9 Deleting | The more button from `canDelete`; `delete`; the cell collapses on `OK`. | post, `result` |
-| 9.10 Notifications | Section 6. `FeedScreen` on Announcements, at scroll 0, answers `showsTarget` true for a `post:` target. | phone |
-| 9.11 Guests | `state.linked` false: the guest look (section 8); `empty.global.text_guest` on an empty Global. | session `state` |
+| 9.10 Notifications | Section 6. `FeedScreen` answers `showsTarget` true for a `post:` target only when Announcements is shown and that announcement is fully visible (6.4). | phone |
+| 9.11 Guests, banned players, writing off | `state.linked` false, `state.banned`, or `state.writing` false: the guest look (section 8), with `guest.*`, `snackbar.banned` or `snackbar.writing_off`; `empty.global.text_guest` on an empty Global; `snackbar.too_fast` on `RATE_LIMITED`. | session `state` |
 | 9.12 Feed unavailable (F-3, F-22 to F-24) | `availability` and each load's outcome (5.3): the unavailable or switched-off block when nothing is loaded, `feed.connection_lost` over a loaded list with the 15-second retry, the retry row when a later page fails, the merge on `reset`. | session, `state`, `reset` |
 
 ## 10. Strings the art direction doesn't have yet
 
-The app uses section 13.2 of the art direction (version 6), guests' and unavailability strings included, and needs these besides. They are proposed here for the art direction's owner to place and word; the keys are under the mod's namespace.
-
-| Key | Français | English | Where |
-| --- | --- | --- | --- |
-| `snackbar.banned` | Impossible de publier pendant une sanction | You can't post during a sanction | a banned player (`BANNED`) |
-| `snackbar.writing_off` | La publication est suspendue pour l'instant | Posting is paused for now | `writing` off |
-| `snackbar.too_fast` | Doucement ! Réessaie dans {n} s | Slow down! Try again in {n}s | `RATE_LIMITED` |
-| `command.*` | | | the `/feed announcer` answers (7) |
+Every string the app shows is in the art direction's section 13.2, guests', unavailability and refusal snackbars included (its 9.11 says where each of `guest.*`, `snackbar.banned`, `snackbar.writing_off` and `snackbar.too_fast` shows; `snackbar.too_fast` has no Retry action). What it still lacks are the answers of the `/feed announcer` command (section 7), which are chat lines, not phone strings: `command.lnbphone_feed.announcer.added`, `.removed`, `.already`, `.via_role`, `.not_linked`, `.implied_by_role`, `.not_allowed`, `.unavailable` and `.list` (with `.list.empty`), in `en_us.json` and `fr_fr.json`, to be worded by the art direction's owner.
 
 ## 11. Where the design and the contract differ
 
-Checked against version 6 of the art direction (moderators, announcers as a site role, first names and initials, guests, the unavailable states), which this page follows. What remains for its owner to settle:
-
-1. **The role's name.** The art direction calls the site role `announcer`; the contract names it `feed-announcer`, after the site's other roles (`warden-admin`, `events-manager`, `economy-admin`). Players never see it.
-2. **The reply count of a reply.** Section 9.3 says "the number of replies in the post's thread". The contract counts, on a reply, the replies that answer it; on a main post, its thread.
-3. **Threads are paged**, 50 replies at a time, with the spinner row (and 9.12's retry row) at the end of the list as in feeds; section 9.7 only shows the first load.
-4. **The announcer badge** follows the author's role now (like the name). An announcement by someone who lost the role shows no badge, although 9.4 says every announcement carries it.
-5. **Banned players and `writing` off** aren't drawn; section 8 gives them the guest look with snackbars of their own (section 10).
-6. **The command's syntax** (section 7), which the art direction leaves out, and **no pin command**: pinning is in the app only.
-
-Nothing else in section 9 or flows F-1 to F-25 needs more than the contract gives.
+Checked against the art direction as of commit `e8ced9b` (version 6 with the user's later decisions: `feed-announcer`, anonymous announcements, the reply count of a reply, paged threads, the badge following the role, the banned and writing-off look and its strings, the pill's arrow). Nothing in section 9 or flows F-1 to F-25 needs more than the contract gives, and nothing there contradicts it. What the art direction leaves to this page on purpose is the command's syntax (section 7); pinning has no command and is done in the app.
 
 ## 12. Developing and testing
 
@@ -415,10 +425,11 @@ As `feed-mod.md` section 14 says: the site on `http://localhost:3000` with `feed
 ### 12.3 Tests
 
 - `FeedTextTest`: the text vectors of `feed-mod.md` 13.1, against `FeedText` and `TextLimits.canSend` (whatever the client allows, the rule accepts).
-- `MemoryBackendTest`: the vectors 13.2 to 13.6 (idempotency, anonymity by viewer, pagination, pins, unread and markers).
+- `MemoryBackendTest`: the vectors 13.2 to 13.6 (idempotency, anonymity by viewer with the anonymous announcement, pagination, pins, unread and markers).
+- In `phone/`, the tests of 6.5 for `sendToEveryone` with `except`.
 - `FeedTargetTest`: format, parse, unknown and malformed targets.
 - `PayloadCodecTest`: every payload round-trips, and one past each bound fails to decode.
-- `RelayTest` and `FeedNotifierTest` with the memory backend: a post reaches each watcher as their own view; an announcement leaves its author out; a deletion takes its notifications back; a reconnection drains, refreshes and resets.
+- `RelayTest` and `FeedNotifierTest` with the memory backend: a post reaches each watcher as their own view; an announcement, anonymous or not, leaves its author out, and an anonymous one reads "Anonymous: …"; a deletion takes its notifications back; a reconnection drains, refreshes and resets.
 - `FeedSessionTest`: live posts at the top or in the pill, no doubles, counts and pins applied once, `removed` in an open thread, drafts and keys across failures, `reset`.
 - Screens with `PhoneTester`, fed from `FeedSession`: the art direction's states (empty, unavailable, pinned group, anonymous lines, compose for a player and for an announcer, the pin-limit dialog, the delete dialog).
 - A dedicated server start, which must not mention a client class.
