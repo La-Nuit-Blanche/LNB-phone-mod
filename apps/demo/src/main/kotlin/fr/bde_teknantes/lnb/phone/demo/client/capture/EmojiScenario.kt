@@ -59,6 +59,14 @@ internal object EmojiScenario {
             waitTicks(20)
             shot("emoji_gui${scale}_3_banners")
         }
+        // A hundred emoji joined by ZWJ, in a post and in a banner: groups of five that wrap inside the column.
+        guiScale(3)
+        screen { KitHostScreen(listOf(pages[5])) }
+        waitTicks(16)
+        shot("emoji_gui3_4_chain_post")
+        screen { BannerTestScreen(BannerTestScreen.Mode.CHAIN) }
+        waitTicks(16)
+        shot("emoji_gui3_5_chain_banner")
         forceGuiScale(9)
         screen { KitHostScreen(listOf(pages[4])) }
         waitTicks(20)

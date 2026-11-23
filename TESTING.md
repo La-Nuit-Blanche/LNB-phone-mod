@@ -225,7 +225,7 @@ the home screen with sample icons. A fresh `apps/demo/run/` needs an `options.tx
 | `settings-window` | `-PcaptureSize=1920x1080` | the next launch after `settings`: both choices kept, then the placement's window frames |
 | `notifications` | `-PdemoApps=6 -PcaptureSize=1920x1080` | notifications reaching the phone: peek, banner, badges, the inventory button, the preview off |
 | `notifications-persist` | `-PdemoApps=6` | a notification kept across leaving the world and coming back |
-| `emoji` | | emoji in a text area (caret after one), a field, a snackbar, a post card, rows, every kind of sequence in Regular and SemiBold, the banners, at GUI scale 2 to 4; two hundred distinct emoji at forced scale 9 |
+| `emoji` | | emoji in a text area (caret after one), a field, a snackbar, a post card, rows, every kind of sequence in Regular and SemiBold, the banners, at GUI scale 2 to 4; a hundred emoji joined by ZWJ in a post and a banner; two hundred distinct emoji at forced scale 9 |
 | `notifications-review` | `-PdemoApps=6 -PcaptureSize=1920x1080` | the peek's banner over a chat line, with subtitles, under F1; the inventory button with news on an app's first screen and deeper; the crafting grid after the phone; the recipe book over the button |
 
 Scenarios are in `apps/demo/src/main/kotlin/.../demo/client/capture/`; add one to `CaptureScenarios.kt`. Some click

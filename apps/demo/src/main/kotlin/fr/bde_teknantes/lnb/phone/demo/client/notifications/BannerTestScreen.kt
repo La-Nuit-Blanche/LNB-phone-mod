@@ -21,11 +21,12 @@ import net.minecraft.world.item.Items
  * - [Mode.STATES]: on the app background, the banner's states (normal, hover, pressed) with the storyboard's texts,
  *   then the edge cases: characters the fonts lack and emoji, a long title, an item icon, a one-line text, no text,
  *   and emoji in a title and a text.
+ * - [Mode.CHAIN]: a hundred emoji joined by ZWJ, as a player could paste them, in a banner.
  * - [Mode.FRAMES]: P-10 steps 3 and 2 on the home wallpaper (no icons yet: the home screen is task 4): resting at
  *   app-local (8, 4), and half-way down its slide at `y -36`, clipped to the viewport.
  */
 class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banner test")) {
-    enum class Mode { STATES, FRAMES }
+    enum class Mode { STATES, FRAMES, CHAIN }
 
     private val banner = NotificationBanner()
     private val canvas = SmoothCanvas()
@@ -70,6 +71,7 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
         when (mode) {
             Mode.STATES -> states(graphics)
             Mode.FRAMES -> frames(graphics)
+            Mode.CHAIN -> chain(graphics)
         }
     }
 
@@ -90,6 +92,16 @@ class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banne
             }
         }
     }
+
+    /** A hundred emoji joined by ZWJ in a banner: two lines inside the slot, the second ended by the ellipsis. */
+    private fun chain(graphics: GuiGraphics) {
+        canvas.begin(graphics, 0, 0, width, height)
+        canvas.fillRect(0f, 0f, 256f, 200f, BG)
+        canvas.end()
+        banner.render(graphics, 0, 0, 128, height, BannerLayout.IN_PHONE_X, BannerLayout.IN_PHONE_Y, chainBanner, BannerLook.NORMAL)
+    }
+
+    private val chainBanner = BannerContent(feed, "Nouvelle réponse", fr.bde_teknantes.lnb.phone.demo.client.kit.EmojiPages.CHAIN)
 
     private fun frames(graphics: GuiGraphics) {
         // Resting, then half-way in position (P-10.2: y -36), whatever the easing.

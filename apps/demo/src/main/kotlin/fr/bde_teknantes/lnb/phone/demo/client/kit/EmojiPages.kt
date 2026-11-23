@@ -44,7 +44,20 @@ object EmojiPages {
         HostedPage("Emoji: sequences, Regular") { sequences(semibold = false) },
         HostedPage("Emoji: sequences, SemiBold") { sequences(semibold = true) },
         HostedPage("Emoji: many (atlas)") { many() },
+        HostedPage("Emoji: joined chain") { chain() },
     )
+
+    /**
+     * "Dev: " and a hundred unrelated emoji joined by ZWJ, as a player can paste: 204 code points, within 280. Unicode
+     * makes it one grapheme; the phone cuts it into groups of five emoji, so it wraps inside the column.
+     */
+    val CHAIN = "Dev: " + (0 until 100).joinToString("‍") { String(Character.toChars(0x1F600 + it % 60)) }
+
+    private fun chain() = Gallery.Page("Emoji") {
+        val list = add(ScrollList().at(0f, 44f, 256f, 326f))
+        val dev = Author("Dev_Test", null, { SampleSkins.STEVE })
+        list.add(PostCard(Post(21, dev, { tr("time.minutes", 1) }, CHAIN, 0, 0)))
+    }
 
     private fun inputs() = Gallery.Page("Emoji") {
         caption("Text area, focused, caret after 🔥", 50f)
