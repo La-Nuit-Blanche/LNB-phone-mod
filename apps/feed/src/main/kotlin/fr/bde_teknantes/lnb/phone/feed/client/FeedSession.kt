@@ -540,7 +540,7 @@ class FeedSession(
     fun delete(postId: UUID): Boolean {
         if (postId in deleting || posts[postId]?.canDelete != true) return false
         deleting += postId
-        request(PendingRequest.Delete(postId)) { DeletePayload(it, postId) }
+        request(PendingRequest.Delete(postId, reply = posts[postId]?.isReply == true)) { DeletePayload(it, postId) }
         changed()
         return true
     }
@@ -1198,7 +1198,8 @@ class FeedSession(
     private fun deleteAnswered(request: PendingRequest.Delete, payload: ResultPayload) {
         deleting -= request.postId
         if (payload.outcome == Outcome.OK || payload.outcome == Outcome.NOT_FOUND) {
-            val reply = posts[request.postId]?.isReply == true
+            // Read when it was sent: a `removed` may have taken the post before this answer.
+            val reply = request.reply
             removePost(request.postId)
             collect()
             if (payload.outcome == Outcome.OK) notice = FeedNotice.Deleted(request.postId, reply)

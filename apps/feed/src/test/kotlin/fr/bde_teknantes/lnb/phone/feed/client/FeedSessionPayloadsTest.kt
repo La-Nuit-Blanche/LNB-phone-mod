@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 
 /**
@@ -273,11 +272,6 @@ class FeedSessionPayloadsTest {
     }
 
     @Test
-    @Disabled(
-        "Defect: deleteAnswered reads whether the post was a reply from the post held when the answer comes. The memory " +
-            "backend's `removed` reaches the client before the `result` (and the site's may), so the reply is gone by " +
-            "then and the snackbar says 'Post supprimé' instead of 'Réponse supprimée'.",
-    )
     fun `deleting a reply says a reply was deleted even when the removal arrives first`() {
         r.state()
         val main = post()
