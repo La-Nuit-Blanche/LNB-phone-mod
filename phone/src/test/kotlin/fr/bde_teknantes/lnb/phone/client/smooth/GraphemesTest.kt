@@ -23,7 +23,10 @@ class GraphemesTest {
             "️", "️️", "ç", "田中", "ا", "é̂̃", "👩🏽‍💻", "🧑🏻‍❤️‍💋‍🧑🏼", "©️", "©",
         )
 
-        /** The reference: Java's character [BreakIterator] over the whole text. */
+        /**
+         * The reference: Java's character [BreakIterator] over the whole text, plus the one limit [Graphemes] adds: a
+         * boundary before the emoji that would be a grapheme's [Graphemes.MAX_LINKS] + 1st joined by ZWJ.
+         */
         fun reference(text: String): BooleanArray {
             val mask = BooleanArray(text.length + 1)
             val it = BreakIterator.getCharacterInstance()
@@ -32,6 +35,19 @@ class GraphemesTest {
             while (b != BreakIterator.DONE) {
                 mask[b] = true
                 b = it.next()
+            }
+            var links = 0
+            var previous = -1
+            var i = 0
+            while (i < text.length) {
+                val cp = text.codePointAt(i)
+                if (mask[i]) links = 0
+                if (previous == 0x200D && Character.isExtendedPictographic(cp) && !mask[i] && ++links > Graphemes.MAX_LINKS) {
+                    mask[i] = true
+                    links = 0
+                }
+                previous = cp
+                i += Character.charCount(cp)
             }
             return mask
         }
@@ -130,6 +146,23 @@ class GraphemesTest {
                 }
                 assertEquals(reference(text).count { it } - 1, steps)
             }
+        }
+    }
+
+    @Test
+    fun `a chain of emoji joined by ZWJ is cut into groups of five emoji, real sequences never`() {
+        val chain = (0 until 100).joinToString("‍") { String(Character.toChars(0x1F600 + it % 60)) }
+        val starts = (0 until chain.length).filter { Graphemes.isBoundary(chain, it) }
+        // Each group is five emoji and four joiners, then the joiner that linked it to the next one: 2 x 5 + 5 units.
+        assertEquals(List(20) { it * 15 }, starts)
+        assertTrue(starts.all { Character.isExtendedPictographic(chain.codePointAt(it)) }, "every group starts with an emoji")
+        assertTimeoutPreemptively(Duration.ofSeconds(5)) {
+            val long = (0 until 2000).joinToString("‍") { "😀" }
+            var i = long.length
+            while (i > 0) i = Graphemes.previous(long, i)
+        }
+        for (real in listOf("👨‍👩‍👧‍👦", "🧑🏻‍❤️‍💋‍🧑🏼", "🏴‍☠️", "👩🏽‍💻", "🧑🏻‍🤝‍🧑🏼", "🏳️‍⚧️")) {
+            assertEquals(real.length, Graphemes.next(real + "x", 0), real)
         }
     }
 

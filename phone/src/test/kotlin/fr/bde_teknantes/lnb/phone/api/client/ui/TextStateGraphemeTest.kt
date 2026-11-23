@@ -396,7 +396,7 @@ class TextStateGraphemeTest {
     @Test
     fun `a hundred skin tones, joiners or marks in a row are one deletion and take no time`() {
         assertTimeoutPreemptively(Duration.ofSeconds(10)) {
-            for (tail in listOf(cp(TONE), cp(ZWJ), cp(0x301), cp(ZWJ, THUMB), cp(VS16))) {
+            for (tail in listOf(cp(TONE), cp(ZWJ), cp(0x301), cp(VS16))) {
                 val s = TextState("a" + cp(THUMB) + tail.repeat(100) + "b")
                 s.moveTo(1)
                 s.moveRight()
@@ -407,6 +407,15 @@ class TextStateGraphemeTest {
                 s.moveLeft()
                 check(s)
             }
+            // A hundred emoji joined by ZWJ are not one grapheme but groups of five (Graphemes.MAX_LINKS): a step
+            // takes a group, its joiner to the next one included.
+            val chain = TextState("a" + cp(THUMB) + cp(ZWJ, THUMB).repeat(100) + "b")
+            chain.moveTo(1)
+            chain.moveRight()
+            assertEquals(1 + 15, chain.caret)
+            chain.deleteBackward()
+            assertEquals("a" + cp(THUMB) + cp(ZWJ, THUMB).repeat(95) + "b", chain.text)
+            check(chain)
         }
     }
 

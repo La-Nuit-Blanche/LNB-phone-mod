@@ -109,6 +109,20 @@ class EmojiLayoutTest {
     }
 
     @Test
+    fun `a pasted chain of a hundred emoji joined by ZWJ wraps inside the column and the banner`() {
+        val chain = "Dev: " + (0 until 100).joinToString("‍") { String(Character.toChars(0x1F600 + it % 60)) }
+        val lines = TextLayout.lines(chain, font, 13f, 188f)
+        assertTrue(lines.size > 5, "${lines.size} lines")
+        for (line in lines) assertTrue(line.width <= 188f, "line $line")
+        // Five emoji a group at most: one group is never wider than a sixth of the column.
+        val group = noto.advance(noto.glyph(0x1F600)) * 13f * Graphemes.MAX_LINKS.plus(1)
+        assertTrue(group < 188f)
+        val banner = fr.bde_teknantes.lnb.phone.client.notifications.BannerLayout.textLines(chain, font)
+        assertEquals(2, banner.size)
+        for (line in banner) assertTrue(TextLayout.width(line, font, 13f) <= 164f + 1e-3f, line)
+    }
+
+    @Test
     fun `the banner keeps what the faces draw and drops the rest`() {
         assertEquals("🎉 Party tonight", BannerText.clean("🎉 Party\ntonight", font))
         assertEquals("Bravo 👍🏽 1️⃣ 🇫🇷", BannerText.clean("Bravo 👍🏽 1️⃣ 🇫🇷", font))

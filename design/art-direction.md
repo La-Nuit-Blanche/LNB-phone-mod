@@ -610,7 +610,7 @@ Sequences are composed when the font has them, and otherwise degrade, never to a
 | Flag (🇫🇷), subdivision flag (🏴󠁧󠁢󠁥󠁮󠁧󠁿) | one glyph | an unknown pair shows its two letters; unknown tags leave the black flag |
 | Keycap (1️⃣) | one glyph | |
 
-The caret steps over a grapheme whole, Backspace deletes it whole, and wrapping and truncation never cut one. The 280-character count is unchanged: code points after NFC, so `👍🏽` counts 2 and a flag 2 (8.7).
+The caret steps over a grapheme whole, Backspace deletes it whole, and wrapping and truncation never cut one. One limit departs from Unicode, which joins any number of emoji with ZWJ: a grapheme holds at most five emoji joined that way, so a pasted chain of a hundred unrelated emoji becomes groups of five that wrap like words instead of one line 1,600 dp wide; no real sequence has more than four (a family). The 280-character count is unchanged: code points after NFC, so `👍🏽` counts 2 and a flag 2 (8.7).
 
 **Characters no font has.** Inter covers Latin, Greek and Cyrillic and the emoji font covers emoji; there is no CJK, Arabic or other script. In apps such a character shows one missing-glyph box per grapheme (an emoji newer than the font, with its skin tone, is one box); the text itself is never altered. The notification banner differs: it drops emoji the emoji font lacks and shows one `?` per run of other characters (10.1).
 
