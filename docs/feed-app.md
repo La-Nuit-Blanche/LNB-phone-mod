@@ -109,6 +109,7 @@ sealed interface BackendResult<out T> {
 
 interface FeedEventListener {
     fun onConnected()                                  // after every successful connection (catch up: feed-mod.md 8.3)
+    fun onDisconnected(disabled: Boolean)              // the stream dropped, or answers 503 `disabled`
     fun onPost(id: UUID, feed: FeedKind, threadId: UUID?, createdAt: Instant)
     fun onDeleted(items: List<RemovedItem>)            // { id, feed, threadId }
     fun onCounts(items: List<CountUpdate>)             // { id, likes, replies }
@@ -123,10 +124,10 @@ The model classes carry exactly the JSON fields of `feed-mod.md` (section 3 for 
 ### 3.2 `SiteBackend`
 
 - Reads `api.url` and `api.token` from Warden's `ServerConfig` at each call, as `QuestsApi.connection` does; with either blank, every call is `Unavailable("api.url and api.token aren't set in lnbwarden-server.toml")`.
-- Builds requests with `ApiClient.request(url, path, token)` and sends them with `ApiClient.HTTP.sendAsync`, decoding the bodies itself with `ApiClient.GSON`: `ApiClient.send` only keeps `data.problem`, and Feed needs `data.oldest` (`pinLimit`) and the `Retry-After` header (`rateLimited`). Timeouts: 5 seconds for reads, 10 for writes.
+- Builds requests with `ApiClient.request(url, path, token)` and sends them with `ApiClient.HTTP.sendAsync`, decoding the bodies itself with `ApiClient.GSON`: `ApiClient.send` only keeps `data.problem`, and Feed needs `data.oldest` (`pinLimit`) and the `Retry-After` header (`rateLimited`). Timeout: 10 seconds for every call, the art direction's threshold for "Feed unavailable" (9.12).
 - Records every outcome with `ApiHealth.record("feed <route>", …)`, turned into Warden's `ApiResult` (`Ok`, `Http(status, problem)` or `Network`), so operators hear of an outage once.
 - Maps answers: 2xx is `Ok`; 503 with `disabled` is `Disabled(data.flag)`; 401, other 5xx, timeouts, connection errors and unparsable bodies are `Unavailable`; any other status is `Refused`.
-- `FeedEvents` keeps `GET /api/feed/server/events` open on its own daemon thread, written like `QuestEvents` in `lnb-quests`: `Last-Event-ID` kept in memory, a connection dropped after 75 silent seconds, a backoff from 1 to 30 seconds, 60 seconds while the site answers 503 `disabled`, `onConnected` after each successful connection, events parsed and handed to the listener (which hops to the server thread). Unknown event types are ignored.
+- `FeedEvents` keeps `GET /api/feed/server/events` open on its own daemon thread, written like `QuestEvents` in `lnb-quests`: `Last-Event-ID` kept in memory, a connection dropped after 75 silent seconds, a backoff from 1 to 30 seconds, 60 seconds while the site answers 503 `disabled`, `onConnected` after each successful connection, `onDisconnected` once when a connection is lost or refused (not again for each failed retry), events parsed and handed to the listener (which hops to the server thread). Unknown event types are ignored.
 
 ### 3.3 `MemoryBackend`
 
@@ -140,7 +141,7 @@ The site's rules, in memory, for unit tests, the screenshot harness and developi
 | Rules | The same as the site's: `FeedText` for text (with `emptyText`, `tooLong`), `anonymousAnnouncement`, idempotency by key with a fingerprint (`replayed`, `idempotencyMismatch`, `notFound` after a delete), 3 pins with `pinLimit` and `replace`, `notPinnable`, deletion of a thread with its main post, 30-day retention ignored (nothing is purged in a session), per-viewer views by the same rules, the rate limits of `feed-mod.md` section 7 (switchable off for tests), page and thread sizes, keyset cursors. |
 | Notifications | Queued as on the site (`players` and `except`), drained by the same `FeedNotifier` code. |
 | Events | `onPost`, `onDeleted`, `onCounts`, `onPins`, `onRights` and `onNotification` as the site sends them; `onConnected` once at start. |
-| Dev switches | `/feed dev offline on|off` makes every call `Unavailable` (the "Feed unavailable" screens), `/feed dev writing on|off` the `feed.writing` flag. Operators only, memory mode only. |
+| Dev switches | `/feed dev offline on|off` makes every call `Unavailable` and reports the stream down (the "Feed unavailable" and "Connection lost" states), `/feed dev disabled on|off` answers `Disabled("feed")` (the switched-off state), `/feed dev writing on|off` the `feed.writing` flag. Operators only, memory mode only. |
 | Seed | `sample` loads the art direction's sample content (section 18.3: the authors, posts 1 to 10, replies, likes and pins) for screenshots; `none` starts empty. |
 
 ### 3.4 Choosing one
@@ -195,7 +196,8 @@ Then it calls the backend and maps the result to an `Outcome` (section 5.3).
 | `onPins` | Sends `pins` to the watchers. |
 | `onRights` | Refreshes those players (4.2). |
 | `onNotification` | Drains the queue (6.1). |
-| `onConnected` | Drains the queue, refreshes every online player's state (sent to those who watch), and sends `reset` to the watchers: their caches are stale. |
+| `onConnected` | Drains the queue, refreshes every online player's state (sent to those who watch, with `available: OK`), and sends `reset` to the watchers: their caches are stale. |
+| `onDisconnected` | Sends the watchers `state` with `available: UNAVAILABLE` (or `DISABLED`), keeping their last `PlayerState`: the app shows "Connection lost" over what is loaded (art direction 9.12). |
 
 ### 4.5 When the site is away or Feed is off
 
@@ -248,7 +250,7 @@ Paths are under `lnbphone_feed:`.
 
 | Payload | Fields | Sent to |
 | --- | --- | --- |
-| `state` | `available` (`OK`, `UNAVAILABLE` or `DISABLED`), `state` (optional `PlayerState`) | the sender of `open`; a watcher whose state was refreshed |
+| `state` | `available` (`OK`, `UNAVAILABLE` or `DISABLED`), `state` (optional `PlayerState`) | the sender of `open`; a watcher whose state was refreshed; the watchers when the stream drops or comes back |
 | `page` | `requestId`, `outcome`, `feed`, `pinned` (at most 3), `posts` (at most 50), `next` (optional, 128) | the sender of `load_feed` |
 | `thread` | `requestId`, `outcome`, `post` (optional), `replies` (at most 50), `next` (optional, 128) | the sender of `load_thread` |
 | `result` | `requestId`, `outcome`, `post` (optional), `likes` (optional), `liked` (optional), `pinned` (optional list, at most 3), `unpinned` (optional), `oldestPin` (optional), `retryAfter` (optional seconds) | the sender of a write |
@@ -263,12 +265,12 @@ Paths are under `lnbphone_feed:`.
 | Outcome | From | The app shows |
 | --- | --- | --- |
 | `OK` | 2xx | the result |
-| `UNAVAILABLE` | `Unavailable`; a 400 without a problem | "Feed unavailable" (load) or "Couldn't send" with Retry (write) |
-| `DISABLED` | 503 `disabled` | as `UNAVAILABLE`; for `feed.writing`, the new state hides composing |
-| `RATE_LIMITED` | 429, or the server's own limits | "Slow down" with the seconds; the draft stays |
-| `NOT_LINKED` | 404 `notLinked` | "Link your account" (the new state follows) |
-| `BANNED` | 403 `banned` | "You can't post during a sanction" (the new state follows) |
-| `NOT_ALLOWED` | 403 `notAllowed` | "Couldn't do that" (the new state follows) |
+| `UNAVAILABLE` | `Unavailable`; a 400 without a problem | a load with nothing on screen: the `feed.unavailable.*` block; over a loaded list: `feed.connection_lost`; loading more: the retry row; a write: `snackbar.send_failed` with Retry (post, reply) or `snackbar.action_failed` (like, pin, delete) (art direction 9.12) |
+| `DISABLED` | 503 `disabled` | a load with nothing on screen: the `feed.disabled.*` block; otherwise as `UNAVAILABLE`. For `feed.writing`, the new state also hides composing |
+| `RATE_LIMITED` | 429, or the server's own limits | `snackbar.too_fast` with the seconds; the draft stays |
+| `NOT_LINKED` | 404 `notLinked` | `guest.snackbar` (the new state follows, which turns the app to its guest look) |
+| `BANNED` | 403 `banned` | `snackbar.banned` (the new state follows) |
+| `NOT_ALLOWED` | 403 `notAllowed` | `snackbar.action_failed` (the new state follows) |
 | `NOT_FOUND` | 404 `notFound` | the post leaves the lists; in its thread, back to the feed with "This post was deleted" |
 | `PIN_LIMIT` | 409 `pinLimit` | the "Replace a pin?" dialog (it only reaches the server when two announcers pin at once) |
 | `NOT_PINNABLE` | 409 `notPinnable` | "Couldn't do that" |
@@ -348,11 +350,12 @@ How it moves:
 - **A live post** (`live`) goes into `posts`. A main post goes to the top of its feed when that list is shown at scroll 0 (highlighted), otherwise into `waiting` (the pill). If the post is in the feed not on screen and isn't `mine`, that tab's dot comes on. A reply joins its thread if loaded; with `answersMe`, the marker comes on for the thread's main post and for the reply it answers, unless that thread is on screen (then it is marked seen at once). A post already held (the author's own, from `result`) is replaced, never doubled.
 - **`removed`** drops the rows from `posts`, the feeds and the threads. The thread on screen whose main post went pops back to the feed with "This post was deleted".
 - **`counts`** and **`pins`** update `posts`; a post unpinned returns to its date order in the Announcements list.
-- **`reset`** marks every feed and thread stale; the screen showing one reloads it, keeping the drafts.
+- **`reset`** marks every feed and thread stale; the screen showing one reloads its first page and **merges** it, so the list catches up without jumping (art direction 9.12): posts newer than the newest held go in as live posts do (at the top at scroll 0, otherwise behind the pill), held posts missing from the page within its time span are dropped (deleted meanwhile), and the rest are updated in place. Drafts stay.
+- **Connection lost.** A `state` with `available: UNAVAILABLE` or `DISABLED` while something is loaded shows `feed.connection_lost` with Retry and keeps everything readable. While unavailable, the client sends `open` again about every 15 seconds, and at once on Retry; an `OK` answer (or the `reset` that follows a reconnection) clears the snackbar with no message.
 - **Viewing a tab** sends `seen_feed` with the newest `createdAt` among the posts shown there (pinned included), once a second at most, and clears that tab's dot. **Opening a thread** sends `seen_thread` once its first page is shown, and clears its markers in `posts`.
 - **Writing.** Sending a draft gives it a key if it has none (`UUID.randomUUID()`), and keeps the key until the draft succeeds or changes (text, toggle, destination or reply target), so the Retry after a failure reuses it. Success clears the draft and inserts the post (at the top of its feed, scrolled to; or at the end of its thread, scrolled into view). Failure keeps the draft and its key.
 - **Likes** show at once and are undone if the result isn't `OK`. **Pins** show at once as well (art direction 9.4); with 3 pinned the dialog comes first, and confirming sends `replace = true`. **Deletes** wait for the result, then collapse the cell.
-- **Guests, banned players and `writing` off**: no compose button, no reply composer, likes drawn but inactive (a click plays the error sound and says why, section 10).
+- **Guests** (`state.linked` false) get the art direction's guest look (9.11): no compose button, the read-only strip in place of the reply composer, likes drawn but inactive with `guest.snackbar`, no more or pin button (their views never allow them). **Banned players and `writing` off** get the same look with their own snackbar (`snackbar.banned`, `snackbar.writing_off`, section 10); a banned player can't be online in practice, so this is for the moment between a ban and Warden's kick.
 
 ## 9. The screens
 
@@ -372,15 +375,15 @@ How each part of the art direction's section 9 is fed. "Session" is `FeedSession
 | 9.8 Compose | The author row from `state.me`; the destination control for announcers; the anonymous row hidden on Announcements; the draft and its key in the session; `create_post`. | session |
 | 9.9 Deleting | The more button from `canDelete`; `delete`; the cell collapses on `OK`. | post, `result` |
 | 9.10 Notifications | Section 6. `FeedScreen` on Announcements, at scroll 0, answers `showsTarget` true for a `post:` target. | phone |
-| F-3 Feed unavailable | `availability` and each load's outcome: the error state when nothing is loaded, the snackbar with Retry over loaded posts. | session |
+| 9.11 Guests | `state.linked` false: the guest look (section 8); `empty.global.text_guest` on an empty Global. | session `state` |
+| 9.12 Feed unavailable (F-3, F-22 to F-24) | `availability` and each load's outcome (5.3): the unavailable or switched-off block when nothing is loaded, `feed.connection_lost` over a loaded list with the 15-second retry, the retry row when a later page fails, the merge on `reset`. | session, `state`, `reset` |
 
 ## 10. Strings the art direction doesn't have yet
 
-The app needs these besides section 13.2 of the art direction. They are proposed here for the art direction's owner to place and word; the keys are under the mod's namespace.
+The app uses section 13.2 of the art direction (version 6), guests' and unavailability strings included, and needs these besides. They are proposed here for the art direction's owner to place and word; the keys are under the mod's namespace.
 
 | Key | Français | English | Where |
 | --- | --- | --- | --- |
-| `snackbar.read_only` | Lie ton compte LNB pour publier | Link your LNB account to post | a guest clicks like, or a compose control |
 | `snackbar.banned` | Impossible de publier pendant une sanction | You can't post during a sanction | a banned player (`BANNED`) |
 | `snackbar.writing_off` | La publication est suspendue pour l'instant | Posting is paused for now | `writing` off |
 | `snackbar.too_fast` | Doucement ! Réessaie dans {n} s | Slow down! Try again in {n}s | `RATE_LIMITED` |
@@ -388,18 +391,16 @@ The app needs these besides section 13.2 of the art direction. They are proposed
 
 ## 11. Where the design and the contract differ
 
-Points of the art direction that the contract builds differently, or doesn't cover, for its owner to settle:
+Checked against version 6 of the art direction (moderators, announcers as a site role, first names and initials, guests, the unavailable states), which this page follows. What remains for its owner to settle:
 
-1. **Operators become moderators.** Sections 9.2, 9.3, 9.4, 9.9 and F-15 to F-19 give powers to "operators" (op level 2). The contract gives them to moderators, the site's `admin` and `warden-admin` roles; the op level plays no part (except as a stand-in in the memory backend). The strings `post.op_author.tooltip` ("Visible uniquement par les opérateurs") and any "operator" wording should say moderators.
-2. **Announcers** are the site's `feed-announcer` role plus moderators, given from the admin or by `/feed announcer`, not "operators plus a command".
-3. **Real names** are Warden's first name and initial (`Alexandre M.`), not full names: the layouts get shorter names than the 32-character case they were checked with, which still holds.
-4. **No pin command.** Section 9.4 says "the operator command does the same"; the contract has no command to pin. Pinning is in the app.
-5. **Read-only states** (guests, banned players, `writing` off) aren't drawn: section 8 above hides composing and keeps likes visible but inactive, with the strings of section 10. They need a look and wording.
-6. **The reply count of a reply.** Section 9.3 says "the number of replies in the post's thread". The contract counts, on a reply, the replies that answer it; on a main post, its thread.
-7. **Threads are paged**, 50 replies at a time, with the spinner row at the end of the list as in feeds; section 9.7 only shows the first load.
-8. **The announcer badge** follows the author's role now (like the name). An announcement by someone who lost the role shows no badge, although 9.4 says every announcement carries it.
+1. **The role's name.** The art direction calls the site role `announcer`; the contract names it `feed-announcer`, after the site's other roles (`warden-admin`, `events-manager`, `economy-admin`). Players never see it.
+2. **The reply count of a reply.** Section 9.3 says "the number of replies in the post's thread". The contract counts, on a reply, the replies that answer it; on a main post, its thread.
+3. **Threads are paged**, 50 replies at a time, with the spinner row (and 9.12's retry row) at the end of the list as in feeds; section 9.7 only shows the first load.
+4. **The announcer badge** follows the author's role now (like the name). An announcement by someone who lost the role shows no badge, although 9.4 says every announcement carries it.
+5. **Banned players and `writing` off** aren't drawn; section 8 gives them the guest look with snackbars of their own (section 10).
+6. **The command's syntax** (section 7), which the art direction leaves out, and **no pin command**: pinning is in the app only.
 
-Nothing else in section 9 or flows F-1 to F-21 needs more than the contract gives.
+Nothing else in section 9 or flows F-1 to F-25 needs more than the contract gives.
 
 ## 12. Developing and testing
 
