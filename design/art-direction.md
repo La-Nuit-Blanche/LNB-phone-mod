@@ -12,8 +12,9 @@ Version 6. Feed, the first app, now has its real backing: its data lives on the 
 - **Deleting.** A deleted post disappears for every player at once and cannot be restored from the app, as before. New: moderators can still see deleted posts on the website for 30 days. Nothing changes on the phone (9.9).
 - **The website.** The same Feed can be read and written from the LNB website by signed-in accounts; replies and announcements notify in game only (9.1). A post shows its author's current name setting (9.2).
 - **Known slips fixed**, and the list removed from section 19: (1) F-4.3 now lists Global newest first, posts 1, 2, 8, 3, 4, and the sample table follows that order; (2) P-8 now notifies post 10, the new announcement of F-4, F-14 and F-20, and P-8.7 and F-20.6 no longer put it "at the top" but under the pinned posts (the landing of an announcement scrolls it into view, 9.10); (3) F-7.3 now shows R1 only above the composer, R2 and R3 being below; (4) post 8 has three replies with text (R6, R7, R4) and post 5 two (R8, R9, down from six), so every thread a flow opens has its replies written; (5) the 32-character name is fixed, as above; (6) F-18.8 is split into steps 8 and 9, and F-18 has 9 steps.
+- **Five inconsistencies fixed.** (a) A new post that would not be fully visible once inserted, such as an announcement under the pinned group, waits behind the pill, and a click scrolls it into view; own posts scroll into view too (9.5, 9.8, F-4 now 7 steps, F-14.8). (b) The reply banner of P-9, P-10 and F-20.2 is drawn as 10.1 cuts it to two lines, as in 9.10. (c) P-8.3 no longer points at P-9, the reply peek, but at step 7. (d) F-14.8: every other player gets the notification, not the author. (e) 9.3: the own-post private line wins over the moderator's.
 - **Section 19** records the user's decisions of 2026-11-23 that concern the phone app, and what version 6 chose without asking (guest and unavailable states, the key rename, the landing rule).
-- **Flows.** F-22 to F-25 are new (switched off, connection lost, a list cannot load more, a guest reads); the flow index now counts 206 steps (17.2, 17.3).
+- **Flows.** F-22 to F-25 are new (switched off, connection lost, a list cannot load more, a guest reads); the flow index now counts 207 steps (17.2, 17.3).
 
 ## History
 
@@ -889,7 +890,7 @@ Counts are `caption`; 0 is hidden (icon only); thousands use `count.thousands` (
 
 **Anonymous post:** anonymous avatar (8.7); display name `Anonyme` (`post.anonymous`) in `title-m` `text-2`; no handle, no announcer badge; the time stays. Announcements cannot be anonymous (9.8).
 
-**Private line** (at most one per post, 16 dp, `lock` icon 16 dp in `text-3` at `x 56`, text `caption` `text-3` at `x 76`, truncated at `x 244`):
+**Private line** (at most one per post, 16 dp; when two would apply, the author's own line wins, so a moderator looking at their own anonymous post sees `Publié anonymement par toi`; `lock` icon 16 dp in `text-3` at `x 56`, text `caption` `text-3` at `x 76`, truncated at `x 244`):
 
 | Viewer | Text | Tooltip |
 |---|---|---|
@@ -935,9 +936,9 @@ Global posts cannot be pinned and never show the pin button.
 
 | Scroll position | Behaviour |
 |---|---|
-| At the top (scroll 0) | new posts are inserted at the top at once, with the post highlight |
-| Scrolled down | the list does not move. A pill appears: 28 dp tall, full radius, fill `accent` (hover `accent-hover`, pressed `accent-pressed`), `arrow_up` 16 dp + `2 nouveaux posts` (`feed.new_posts`; in Annonces `feed.new_announcements`) in `caption-strong` `on-accent`, padding 12 dp, centred at `y 52`. Click: the list scrolls to the top (250 ms), the new posts are inserted with the highlight, the pill fades out. Scrolling to the top by hand does the same |
-| Own new post | always inserted at the top and scrolled to (9.8) |
+| The new posts would be fully visible once inserted (Global: at the top, so at scroll 0; Annonces: just under the pinned group, when that spot is in view with room for the post) | inserted at once, with the post highlight |
+| They would not be fully visible (the list is scrolled down; or, in Annonces, the pinned group pushes the post below the fold, even at scroll 0) | the list does not move. A pill appears: 28 dp tall, full radius, fill `accent` (hover `accent-hover`, pressed `accent-pressed`), `arrow_up` 16 dp + `2 nouveaux posts` (`feed.new_posts`; in Annonces `feed.new_announcements`) in `caption-strong` `on-accent`, padding 12 dp, centred at `y 52`. Click: the list scrolls (250 ms) so that the first new post is fully visible, the new posts are inserted with the highlight, the pill fades out. Scrolling by hand until the first new post would be fully visible does the same |
+| Own new post | always inserted at its place (the top of Global; under the pinned group in Annonces) and scrolled so that it is fully visible (9.8) |
 
 The pill counts all posts waiting; it updates in place when more arrive.
 
@@ -1010,7 +1011,7 @@ y 96  +------------------------------------------------+
 | Destination (announcers only) | segmented control 232 x 32 at `(12, 316)`: `Annonces` / `Global`, same order as the tabs; preselected from the FAB that opened Compose. Everyone else never sees it |
 | Bottom | both layouts end at `y 347` |
 | Sending | Publier in its loading state, text area in its sending state, toggle and segmented control disabled, close button disabled |
-| Success | back to the destination tab (back transition), scrolled to the top, the new post inserted with the post highlight, snackbar `Publié` (`compose.posted`); the draft is cleared |
+| Success | back to the destination tab (back transition), scrolled to the top (in Annonces, further if needed so that the new post is fully visible), the new post inserted with the post highlight, snackbar `Publié` (`compose.posted`); the draft is cleared |
 | Failure | Compose stays open with the draft intact, Publier enabled again, error snackbar `Échec de l'envoi` with `Réessayer` (which publishes again) |
 | Cancel | the close button returns to the feed (back transition) and **keeps the draft** (text, toggle, destination) until published; no confirmation dialog |
 
@@ -1540,7 +1541,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | W | normal play, phone closed | no cursor | A new announcement (post 10) is posted while the player is playing. |
 | 2 | W | device mid-rise at `(334, 234)`, peek screen (wallpaper, home status bar, banner) | no cursor | The phone rises 72 px from the bottom-right with the chime (200 ms). |
-| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Kael_Builder : Événement PvP dimanche à 15:00 à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
+| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Kael_Builder : Événement PvP dimanche à 15:00 à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement where step 7 shows it (P-9 shows the same for a reply). |
 | 4 | W | device mid-sink at `(334, 234)` | no cursor | Nothing pressed: the phone sinks away (200 ms). |
 | 5 | W | later, after Up: device open at `(334, 36)` on home (the screen it was closed on), Feed badge `1`, LED lit | `(240, 135)` | Opening the phone later: a red badge on Feed and the LED blinking. |
 | 6 | P | home, hover Feed with badge `1`, label `Feed` | GUI px `(16, 29)` | Hover the badged app. |
@@ -1551,7 +1552,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | W | peek at `(334, 198)`; banner `Nouvelle réponse`, `Mika L. : Je l'ai vu près du moulin, côté est !` | no cursor | Someone replied to Camille's post. The player presses Up during the peek. |
+| 1 | W | peek at `(334, 198)`; banner `Nouvelle réponse`, `Mika L. : Je l'ai vu près du moulin…` | no cursor | Someone replied to Camille's post. The player presses Up during the peek. |
 | 2 | W | device mid-rise at `(334, 117)`, screen showing the thread | no cursor | The phone rises from the peek to fully open (250 ms). |
 | 3 | P | thread of post 8, scrolled to reply R4 with the post highlight; composer collapsed | `(128, 200)` | It lands on the reply. Feed's badge is cleared. |
 
@@ -1561,7 +1562,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P | home, nothing hovered | GUI px `(70, 120)` | Phone open on the home screen. |
 | 2 | P | banner mid-slide at app-local `y -36` (half visible), over the icons | same | A notification: the banner slides down from the top (150 ms), with the chime. |
-| 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin, côté est !`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
+| 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin…`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
 | 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. Pressed, the banner would freeze until released. |
 | 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the banner goes at once, the thread opens (150 ms slide) and the badge clears. |
 
@@ -1642,7 +1643,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 5 | P | skeletons | same | The list reloads. |
 | 6 | P | Annonces loaded | same | Back to normal. If posts were already loaded when the connection drops, they stay (F-23). |
 
-**F-4 Switch tabs and the unread dot** (6 steps)
+**F-4 Switch tabs and the unread dot** (7 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
@@ -1651,7 +1652,8 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 3 | P | Global active, indicator at `x 168..215`, dot gone, posts 1, 2, 8, 3, 4 (newest first) | same | Click: the indicator slides (150 ms) and the dot clears. |
 | 4 | P | Global active; banner `Nouvelle annonce` / `Kael_Builder : Événement PvP…`; Annonces label now with the dot | `(128, 200)` | A new announcement while on Global: a banner and a dot on Annonces. |
 | 5 | P | hover Annonces tab | `(64, 22)` | Back to Annonces. |
-| 6 | P | Annonces active; post 10 first after the pinned group, highlighted; dot gone | same | The new announcement is highlighted; the dot clears. |
+| 6 | P | Annonces active, at the top: pinned posts 5 and 9 fill the screen; pill `1 nouvelle annonce` at `y 52`; dot gone | same | Post 10 would land below the fold, under the pins, so it waits behind the pill; the dot clears. |
+| 7 | P | click on the pill (`(128, 66)`): Annonces scrolled so that post 10, first after the pinned group, is fully visible, highlighted; pill gone | `(128, 66)` | Click: the list scrolls to the new announcement (250 ms), highlighted. |
 
 **F-5 Scroll and new posts** (8 steps)
 
@@ -1762,7 +1764,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 5 | P | anonymous toggle on | `(226, 286)` | Turned on. |
 | 6 | P | `Annonces` selected again; anonymous row hidden; toggle is off | `(70, 332)` | Back to Annonces: the option hides and switches off. |
 | 7 | P | text `Événement PvP dimanche à 15:00 à l'arène. Inscriptions au panneau du spawn.`, `Publier` loading | `(200, 22)` | Publishing the announcement. |
-| 8 | P | Annonces, new post at the top of the non-pinned list, highlighted; snackbar `Publié` | same | It is out; every player gets a New announcement notification. |
+| 8 | P | Annonces scrolled so that the new post, first after the pinned group, is fully visible, highlighted; snackbar `Publié` | same | It is out; every other player gets a New announcement notification. |
 
 **F-15 Pin an announcement** (7 steps; viewer Lune G., moderator)
 
@@ -1821,7 +1823,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Global; post 8 (Camille's) with the unseen-replies marker: dot at `x 50`, reply icon and `2` in `accent` | `(128, 200)` | Your own post got replies you haven't read: the reply count turns blue with a dot. |
-| 2 | P | Global; banner `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin, côté est !` | same | A new reply arrives while browsing. |
+| 2 | P | Global; banner `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin…` | same | A new reply arrives while browsing. |
 | 3 | P | hover banner | `(128, 42)` | Hover. |
 | 4 | P | thread of post 8 scrolled to R4, highlighted | same | Click: straight to the reply (150 ms slide). |
 | 5 | P | Global after back: post 8's marker gone | `(22, 22)` | Back: the marker has cleared. |
@@ -1896,7 +1898,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | F-1 Open Feed | 2 |
 | F-2 Empty feeds | 4 |
 | F-3 Feed unavailable | 6 |
-| F-4 Tabs and unread dot | 6 |
+| F-4 Tabs and unread dot | 7 |
 | F-5 Scroll and new posts | 8 |
 | F-6 Like and unlike | 6 |
 | F-7 Open a thread | 3 |
@@ -1918,7 +1920,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | F-23 Connection lost while reading | 5 |
 | F-24 A list cannot load more | 5 |
 | F-25 A guest reads | 6 |
-| **Total** | **206** |
+| **Total** | **207** |
 
 ---
 
@@ -2040,4 +2042,5 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 2. The unavailable states of 9.12: the error block with a retry for a Feed opened with nothing loaded, the same block with `Feed désactivé` when it is switched off, the snackbar `Connexion perdue` over a list that stays on screen, a retry row when older posts or replies cannot load, a 10 second wait before Feed gives up, and an automatic retry about every 15 seconds.
 3. The two string keys of the moderator line are renamed `post.mod_author` and `post.mod_author.tooltip` (13.2); the demo app of this repository still uses the old names.
 4. A notification for an announcement scrolls Annonces so that the announcement is fully in view, since it sits under the pinned posts and would otherwise land below the fold (9.10).
-5. In the sample content, post 5 has two replies instead of six, and posts 8 and 5 have written replies, so that every thread a flow opens can be drawn (18.3).
+5. The pill rule of 9.5: it shows whenever the new posts would not be fully visible once inserted, also at scroll 0 in Annonces when the pinned group pushes a new announcement below the fold, and a click scrolls so that the first new post is fully visible. Own posts scroll into view as well.
+6. In the sample content, post 5 has two replies instead of six, and posts 8 and 5 have written replies, so that every thread a flow opens can be drawn (18.3).
