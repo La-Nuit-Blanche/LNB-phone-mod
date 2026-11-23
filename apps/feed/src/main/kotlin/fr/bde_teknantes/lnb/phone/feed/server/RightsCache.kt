@@ -21,8 +21,15 @@ class RightsCache(private val backend: FeedBackend, private val host: FeedHost, 
     private class Entry(val state: PlayerState, val at: Long)
 
     private val entries = HashMap<UUID, Entry>()
-    private val refreshing = HashSet<UUID>()
+
+    /** When each player's state was last asked for, answered or not. */
+    private val attempts = HashMap<UUID, Long>()
+
+    /** The newest read started for each player: an older one answered after it is not kept. */
+    private val latest = HashMap<UUID, Long>()
+    private val pending = HashMap<UUID, Int>()
     private val stale = LinkedHashSet<UUID>()
+    private var reads = 0L
 
     /** The last state read for [player], or null if none was read since they joined. */
     fun state(player: UUID): PlayerState? = entries[player]?.state
@@ -30,11 +37,16 @@ class RightsCache(private val backend: FeedBackend, private val host: FeedHost, 
     /**
      * Whether [player] moderates, by the copy at hand, for the command's visibility. A copy older than [MAX_AGE_MS]
      * (or none) is read again at the next [tick] (not from here: this runs while the command tree is being built, and
-     * a fresh state sends the tree again); the answer is the copy until then.
+     * a fresh state sends the tree again), unless the player's state was asked for less than [RETRY_MS] ago, answered
+     * or not: while the site is away or Feed switched off, the command's checks never turn into a read each tick. The
+     * answer is the copy until then.
      */
     fun moderates(player: UUID): Boolean {
         val entry = entries[player]
-        if ((entry == null || host.millis() - entry.at > MAX_AGE_MS) && player !in refreshing && host.isOnline(player)) stale += player
+        val now = host.millis()
+        val old = entry == null || now - entry.at > MAX_AGE_MS
+        val asked = attempts[player]?.let { now - it < RETRY_MS } == true
+        if (old && !asked && player !in pending && host.isOnline(player)) stale += player
         return entry?.state?.rights?.moderate == true
     }
 
@@ -43,21 +55,25 @@ class RightsCache(private val backend: FeedBackend, private val host: FeedHost, 
         if (stale.isEmpty()) return
         val players = stale.toList()
         stale.clear()
-        for (player in players) if (player !in refreshing && host.isOnline(player)) refresh(player)
+        for (player in players) if (player !in pending && host.isOnline(player)) refresh(player)
     }
 
     /**
-     * Reads [player]'s state again. On success it is kept (if they are still online) and sent to them if they watch.
-     * The future completes on the server thread, after that, with the backend's answer.
+     * Reads [player]'s state again. On success it is kept (if they are still online, and no newer read was started
+     * since) and sent to them if they watch. The future completes on the server thread, after that, with the backend's
+     * answer.
      */
     fun refresh(player: UUID): CompletableFuture<BackendResult<PlayerState>> {
         val done = CompletableFuture<BackendResult<PlayerState>>()
-        refreshing += player
+        val read = ++reads
+        latest[player] = read
+        attempts[player] = host.millis()
+        pending.merge(player, 1, Int::plus)
         backend.player(player).whenComplete { result, error ->
             val answer = result ?: BackendResult.Unavailable("player state: ${error?.javaClass?.simpleName}")
             host.execute {
-                refreshing -= player
-                if (answer is BackendResult.Ok && host.isOnline(player)) store(player, answer.body)
+                if (pending.merge(player, -1, Int::plus)!! <= 0) pending.remove(player)
+                if (answer is BackendResult.Ok && host.isOnline(player) && latest[player] == read) store(player, answer.body)
                 done.complete(answer)
             }
         }
@@ -70,7 +86,9 @@ class RightsCache(private val backend: FeedBackend, private val host: FeedHost, 
 
     fun forget(player: UUID) {
         entries.remove(player)
-        refreshing.remove(player)
+        attempts.remove(player)
+        // Reads still out for the visit that ended are not kept: none of them is the latest any more.
+        latest.remove(player)
         stale.remove(player)
     }
 
@@ -83,5 +101,8 @@ class RightsCache(private val backend: FeedBackend, private val host: FeedHost, 
 
     companion object {
         const val MAX_AGE_MS = 5 * 60 * 1000L
+
+        /** After a read, answered or not, the command's checks ask for none before this long. */
+        const val RETRY_MS = 60 * 1000L
     }
 }

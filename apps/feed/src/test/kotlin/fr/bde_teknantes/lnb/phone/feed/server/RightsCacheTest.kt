@@ -123,4 +123,56 @@ class RightsCacheTest {
         rights.tick()
         assertEquals(0, reads(camille))
     }
+
+    @Test
+    fun `while the site refuses, the command's checks ask again once a minute at most, not each tick`() {
+        backend.auto = { call -> if (call.name == "player") BackendResult.Disabled("feed") else null }
+        repeat(100) {
+            rights.moderates(camille)
+            rights.tick()
+            host.time += 50
+        }
+        assertEquals(1, reads(camille), "one read in 5 seconds of ticks")
+        host.time += RightsCache.RETRY_MS
+        rights.moderates(camille)
+        rights.tick()
+        assertEquals(2, reads(camille), "and again a minute after the last attempt")
+        rights.refresh(camille)
+        assertEquals(3, reads(camille))
+        rights.moderates(camille)
+        rights.tick()
+        assertEquals(3, reads(camille), "a read for any reason counts as an attempt")
+    }
+
+    @Test
+    fun `an older read answered after a newer one is not kept`() {
+        rights.refresh(lune)
+        rights.refresh(lune)
+        val (older, newer) = backend.calls("player")
+        newer.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", moderator)))
+        older.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", player)))
+        assertTrue(rights.state(lune)!!.rights.moderate)
+        assertEquals(listOf(lune), host.commandRefreshes)
+    }
+
+    @Test
+    fun `reads in order are each kept`() {
+        rights.refresh(lune)
+        rights.refresh(lune)
+        val (older, newer) = backend.calls("player")
+        older.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", player)))
+        newer.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", moderator)))
+        assertTrue(rights.state(lune)!!.rights.moderate)
+    }
+
+    @Test
+    fun `a read from a visit that ended isn't kept for the next one`() {
+        rights.refresh(lune)
+        rights.forget(lune)
+        rights.refresh(lune)
+        val (before, after) = backend.calls("player")
+        after.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", player)))
+        before.answer(BackendResult.Ok(ScriptedBackend.linked(lune, "p", moderator)))
+        assertFalse(rights.state(lune)!!.rights.moderate)
+    }
 }
