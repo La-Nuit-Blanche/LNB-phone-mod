@@ -15,15 +15,16 @@ import net.minecraft.commands.Commands
 import net.minecraft.commands.SharedSuggestionProvider
 import net.minecraft.core.UUIDUtil
 import net.minecraft.network.chat.Component
+import net.minecraft.server.level.ServerPlayer
 
 /**
  * `/feed announcer add|remove <username>` and `/feed announcer list` (`docs/feed-app.md` 7), and in memory mode the
  * development switches `/feed dev offline|disabled|writing <on>`.
  *
- * Who may run `announcer`: a player whose cached state moderates (a site admin or Warden admin), or the server
- * console (permission level 4, which command blocks and functions don't have). The site checks again: a player's call
- * names them as `issuer`, the console's names nobody. Answers are translatable, so each issuer reads them in their
- * language. The command runs on the server thread and answers when the site does, without waiting for it.
+ * Who may run `announcer`: a player whose cached state moderates (a site admin or Warden admin), typing it as
+ * themselves (never through `execute as`), or the server console (permission level 4, which command blocks and
+ * functions don't have). The site checks again: a player's call names them as `issuer`, the console's names nobody.
+ * Answers are translatable, so each issuer reads them in their language. The command runs on the server thread and answers when the site does, without waiting for it.
  */
 object FeedCommand {
     private const val KEY = "command.${Feed.MOD_ID}"
@@ -48,9 +49,44 @@ object FeedCommand {
         dispatcher.register(root)
     }
 
-    private fun mayManageAnnouncers(source: CommandSourceStack): Boolean {
-        val player = source.player ?: return source.hasPermission(4)
-        return FeedServer.current?.rights?.moderates(player.uuid) == true
+    /** Who may act through `/feed announcer`: a player for themselves, or the console. */
+    internal enum class Actor {
+        /** A player who typed the command, running as themselves: the site gets them as the issuer. */
+        PLAYER,
+
+        /** The server console (or anything else at permission level 4 that isn't a player): no issuer. */
+        CONSOLE,
+
+        /** Anything else: refused. */
+        NONE,
+    }
+
+    /**
+     * Who runs the command, from where it came ([originIsPlayer]: the command source that started it, which `execute`
+     * never changes), whether it still runs as that player ([runsAsOrigin]: `execute as` changes the entity, not the
+     * origin) and the permission level. A player acts only as themselves: `execute as <moderator>` run by an
+     * operator, a command block or a function can't borrow a moderator's name. Nothing below level 4 reaches the
+     * console's path, whatever it runs as, since `execute` never raises the level.
+     */
+    internal fun actor(originIsPlayer: Boolean, runsAsOrigin: Boolean, level4: Boolean): Actor = when {
+        originIsPlayer -> if (runsAsOrigin) Actor.PLAYER else Actor.NONE
+        level4 -> Actor.CONSOLE
+        else -> Actor.NONE
+    }
+
+    private fun actor(source: CommandSourceStack): Actor {
+        val origin = source.source
+        return actor(origin is ServerPlayer, source.entity === origin, source.hasPermission(4))
+    }
+
+    /** The player running the command for themselves, or null for the console. Only after [actor] said either. */
+    private fun issuingPlayer(source: CommandSourceStack): ServerPlayer? =
+        (source.source as? ServerPlayer)?.takeIf { actor(source) == Actor.PLAYER }
+
+    private fun mayManageAnnouncers(source: CommandSourceStack): Boolean = when (actor(source)) {
+        Actor.PLAYER -> FeedServer.current?.rights?.moderates((source.source as ServerPlayer).uuid) == true
+        Actor.CONSOLE -> true
+        Actor.NONE -> false
     }
 
     private fun mayUseDev(source: CommandSourceStack) = source.hasPermission(2) && FeedServer.current?.backend is MemoryBackend
@@ -69,7 +105,12 @@ object FeedCommand {
         val host = service.host
         // The server runs in offline mode: an account's UUID is the offline UUID of its name.
         val target = UUIDUtil.createOfflinePlayerUUID(name)
-        val issuer = source.player?.let { Issuer(it.uuid, it.gameProfile.name) }
+        // `requires` let this through; checked again here, since the issuer is what the site audits.
+        if (actor(source) == Actor.NONE) {
+            source.sendFailure(Component.translatable("$KEY.announcer.not_allowed"))
+            return 0
+        }
+        val issuer = issuingPlayer(source)?.let { Issuer(it.uuid, it.gameProfile.name) }
         // The state before the change tells "done" from "already so": the site answers both the same way.
         service.backend.player(target).whenComplete { before, _ ->
             val announcedBefore = (before as? BackendResult.Ok)?.body?.rights?.announce
