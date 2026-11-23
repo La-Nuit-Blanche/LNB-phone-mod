@@ -44,7 +44,8 @@ Feed (`lnbphone_feed`) is installed with the phone, on the server and on every c
 
 ## Layout
 
-- `phone/`: the phone, mod `lnbphone`. The only jar released. The API for apps is in its `api` package.
+- `phone/`: the phone, mod `lnbphone`. Released with Feed (see [Releasing](#releasing)). The API for apps is in its
+  `api` package.
 - `apps/<name>/`: apps, each a mod of its own that depends on `lnbphone`.
 - `apps/feed/`: Feed, the social app, mod `lnbphone_feed`. Shipped with the phone.
 - `apps/demo/`: Ping, the example app, and the development tools (the UI kit's gallery, "Post sample", a feed of
