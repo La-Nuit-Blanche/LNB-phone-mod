@@ -409,11 +409,12 @@ defaults are French at GUI scale 3 in a 1280 x 960 window, as Camille R. (`Cam_R
 `captureLang` and `captureScale` change the language and the scale the scenario starts with, and with either set the
 scenario leaves out its closing shots in English at GUI scales 2 and 4 (they would repeat the others). Minecraft allows
 GUI scale n only in a window of at least 320n x 240n pixels (1280 x 960 for scale 4, 1600 x 1200 for scale 5): ask for
-the window with `captureSize`. The run stops with `Feed capture stopped: ...` in the log and exit code 2, and takes no
-shot, when the scale in force is not the one asked for, when the window is minimised or when the render target is not
-the window: an early run once came out blank for that reason. The harness also detaches the game's mouse and keyboard
+the window with `captureSize`, which the desktop may still shrink to fit the screen (on the developer's machine a 1600 x 1200
+request came out 1600 x 1175, too small for scale 5, so that scale is for the hand test). The run stops with `Feed capture stopped: ...` in
+the log and a non-zero exit code, and takes no shot, when the scale in force is not the one asked for, when the window
+is minimised or when the render target is not the window: an early run once came out blank for that reason. The harness also detaches the game's mouse and keyboard
 callbacks when it starts, so the real mouse can move over the window while it runs (a click was once lost to that);
-leave the window alone anyway, since it takes focus from the desktop for about a minute.
+leave the window alone anyway: it opens on the desktop for about a minute.
 
 | Scenario | Shows | Needs |
 |---|---|---|
