@@ -65,6 +65,13 @@ class FeedList internal constructor(val kind: FeedKind) {
      */
     internal var shownTop: UUID? = null
 
+    /**
+     * A first page that didn't reach what is held (more than a page posted while the list was stale) waits behind the
+     * pill, and when it is let in the list starts again from it, going on with this cursor ([FeedSession.releaseWaiting]).
+     */
+    internal var restartPending = false
+    internal var restartNext: String? = null
+
     /** For each post held, the cursor its page was loaded with, to load it again once trimmed (null: first page, live). */
     internal val loadedWith = HashMap<UUID, String?>()
 
@@ -101,6 +108,8 @@ class FeedList internal constructor(val kind: FeedKind) {
         reloadNotBefore = 0
         moreNotBefore = 0
         shownTop = null
+        restartPending = false
+        restartNext = null
         scroll.offset = 0f
     }
 }

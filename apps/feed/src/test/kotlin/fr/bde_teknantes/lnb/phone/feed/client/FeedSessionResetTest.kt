@@ -362,15 +362,22 @@ class FeedSessionResetTest {
     }
 
     @Test
-    fun `more than a page posted while away - the page starts the list again, nothing between is lost`() {
+    fun `more than a page posted while away - its posts wait behind the pill, then start the list again, nothing between lost`() {
         val held = (20..24).map { post(minutesAgo = it.toLong()) }
         r.firstPage(FeedKind.GLOBAL, held, next = "c1")
         session.onReset()
         // A page of posts all newer than what is held, and more behind it.
         val fresh = (1..3).map { post(minutesAgo = it.toLong()) }
         r.firstPage(FeedKind.GLOBAL, fresh, next = "c9")
+        // The reader keeps what they read; the new posts wait behind the pill, with the dot, as live posts do.
+        assertEquals(held.map { it.id }, global.posts)
+        assertEquals(fresh.map { it.id }, global.waiting)
+        assertTrue(session.isUnread(FeedKind.GLOBAL))
+        // Let in (the pill, or their place scrolled into view): the list starts again from them, highlighted.
+        session.releaseWaiting(FeedKind.GLOBAL)
         assertEquals(fresh.map { it.id }, global.posts)
         assertTrue(global.waiting.isEmpty())
+        assertTrue(fresh.all { session.wantsHighlight(it.id) })
         // The posts between come with the next page, and the old ones after them, in order.
         val between = (10..11).map { post(minutesAgo = it.toLong()) }
         session.loadMore(FeedKind.GLOBAL)

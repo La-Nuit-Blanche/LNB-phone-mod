@@ -485,6 +485,18 @@ class FeedSession(
         if (list.waitingIds.isEmpty()) return emptyList()
         val released = list.waitingIds.toList()
         list.waitingIds.clear()
+        if (list.restartPending) {
+            // A page that didn't reach what was held: the list starts again from it, as a first load does; older posts load
+            // again on scroll from its cursor.
+            list.restartPending = false
+            list.postIds.clear()
+            list.loadedWith.clear()
+            list.next = list.restartNext
+            list.hasMore = list.restartNext != null
+            list.moreFailed = false
+            list.restartNext = null
+            for (id in released) list.loadedWith[id] = null
+        }
         for (id in released.asReversed()) {
             insertByDate(list, id)
             highlights += id
@@ -1027,8 +1039,9 @@ class FeedSession(
         val heldNewest = list.postIds.firstOrNull()?.let(posts::get)?.createdAt
         if (page.next != null && pageOldest != null && heldNewest != null && heldNewest.isBefore(pageOldest)) {
             // More than a page was posted meanwhile: the page doesn't reach what is held, and what lies between would
-            // never load. The page starts the list again, as a first load does.
-            replaceFirstPage(list, page)
+            // never load. Its posts wait behind the pill as live posts do (the reader stays where they are, with the dot
+            // and then the highlight), and the list starts again from them once they are let in.
+            waitToRestart(list, page)
             return
         }
         if (list.kind == FeedKind.ANNOUNCEMENTS) {
@@ -1068,6 +1081,28 @@ class FeedSession(
             list.next = page.next
             list.hasMore = true
         }
+        list.loaded = true
+    }
+
+    /**
+     * A first page over a held list that it doesn't reach: the pinned group is applied at once; its posts wait behind
+     * the pill, newest first, lighting the tab's dot as live posts do, and the list starts again from them when they
+     * are let in ([releaseWaiting]).
+     */
+    private fun waitToRestart(list: FeedList, page: PagePayload) {
+        if (list.kind == FeedKind.ANNOUNCEMENTS) {
+            val pinned = page.pinned.filter { usable(it, list.kind) && it.pinnedAt != null }
+            for (view in pinned) posts[view.id] = incoming(view)
+            applyPinGroup(pinned.map { Pin(it.id, it.pinnedAt!!) })
+        }
+        for (view in page.posts) {
+            if (!usable(view, list.kind) || view.id in list.pinnedIds || view.id in list.postIds) continue
+            posts[view.id] = incoming(view.copy(pinnedAt = null))
+            insertWaiting(list, view.id)
+            if (!view.mine && viewing != list.kind) unread[list.kind] = true
+        }
+        list.restartPending = true
+        list.restartNext = page.next
         list.loaded = true
     }
 
