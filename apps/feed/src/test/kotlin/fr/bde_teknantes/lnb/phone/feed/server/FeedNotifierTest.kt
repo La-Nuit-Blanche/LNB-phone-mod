@@ -171,6 +171,19 @@ class FeedNotifierTest {
     }
 
     @Test
+    fun `an anonymous post's notification names nobody, even when the backend sent an author with it`() {
+        notifier.drain()
+        val leaky = reply(listOf(kael)).let { it.copy(post = it.post.copy(anonymous = true)) }
+        val leakyAnnouncement = announcement().let { it.copy(post = it.post.copy(anonymous = true)) }
+        fetches().single().answer(batch(leaky, leakyAnnouncement))
+        for (sent in sink.sent) {
+            assertEquals("lnbphone_feed.post.anonymous", key(args(sent.text).first() as Component))
+            assertTrue(args(sent.text).none { it == "Mika L." || it == "MikaPvP" || it == "Kael_Builder" })
+        }
+        assertEquals(2, sink.sent.size)
+    }
+
+    @Test
     fun `rows that can't be sent are acknowledged without sending, and don't stop the others`() {
         notifier.drain()
         val unlinked = reply(emptyList())

@@ -78,7 +78,9 @@ class FeedNotifier(private val backend: FeedBackend, private val host: FeedHost,
 
     private fun send(row: QueuedNotification) {
         val post = row.post
-        val name: Any = post.author?.displayName ?: Component.translatable("${Feed.MOD_ID}.post.anonymous")
+        // An anonymous post names nobody, whatever the backend sent with it.
+        val author = post.author?.takeIf { !post.anonymous }
+        val name: Any = author?.displayName ?: Component.translatable("${Feed.MOD_ID}.post.anonymous")
         // The player's words are arguments of Feed's own key, never a key.
         val text = Component.translatable("notif.${Feed.MOD_ID}.text", name, post.text)
         when (row.kind) {
