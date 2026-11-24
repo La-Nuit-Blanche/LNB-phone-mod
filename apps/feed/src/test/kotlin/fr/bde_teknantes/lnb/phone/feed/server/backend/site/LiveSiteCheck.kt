@@ -567,7 +567,9 @@ class LiveSiteCheck {
         stream.start(listener)
         try {
             assertEquals(Event.Connected, next("the connection", 40))
-            println("LiveSiteCheck: the stream connected after ${Duration.ofNanos(System.nanoTime() - started).toMillis()} ms")
+            val connectedMs = Duration.ofNanos(System.nanoTime() - started).toMillis()
+            println("LiveSiteCheck: the stream connected after $connectedMs ms")
+            assertTrue(connectedMs < 5_000, "the site opens its stream with a ping: connected at once, not after 25 seconds")
 
             val post = browser("mika", "POST", "/api/feed/posts", """{"idempotencyKey":"${UUID.randomUUID()}","feed":"global","text":"Depuis le navigateur","anonymous":false}""")
                 .getAsJsonObject("post")
@@ -617,26 +619,46 @@ class LiveSiteCheck {
             expect("the reconnection", 40) { it == Event.Connected }
             expect("the missed post, replayed after Last-Event-ID") { it == Event.Post(missed, FeedKind.GLOBAL, null) }
 
-            // Feed switched off: an open stream isn't closed by the site; a new connection is refused with 503 disabled.
-            flag("feed", false)
-            browserStatus("mika", "GET", "/api/feed/me").let { assertEquals(503, it, "the flag took effect") }
-            val quiet = events.poll(3, TimeUnit.SECONDS)
-            println("LiveSiteCheck: after switching feed off, the open stream gave ${quiet ?: "nothing"}")
-            offset.addAndGet(100_000)
-            stream.checkSilence()
-            expect("the loss") { it == Event.Disconnected(false) }
-            // The clock jump makes the last connection look a long one, so the backoff may have started over.
-            assertNotNull(sleeps.poll(10, TimeUnit.SECONDS), "a backoff")
-            gate.put(Unit)
-            expect("refused as switched off", 40) { it == Event.Disconnected(true) }
-            assertEquals(60_000L, sleeps.poll(10, TimeUnit.SECONDS), "a minute while switched off")
-            flag("feed", true)
-            gate.put(Unit)
-            expect("connected again once switched on", 40) { it == Event.Connected }
+            // Each flag switched off: the site closes the open stream (feed-mod.md 8.1, 11.2), the reconnection is refused
+            // as disabled, the stream waits a minute, and connects again once the flag is back.
+            for (key in listOf("feed", "feed.serverApi")) {
+                val switched = System.nanoTime()
+                flag(key, false)
+                expect("the stream closed by the site when $key goes off", 20) { it == Event.Disconnected(false) }
+                println("LiveSiteCheck: $key off closed the stream after ${Duration.ofNanos(System.nanoTime() - switched).toMillis()} ms")
+                assertNotNull(sleeps.poll(10, TimeUnit.SECONDS), "a backoff")
+                gate.put(Unit)
+                expect("refused as switched off", 20) { it == Event.Disconnected(true) }
+                assertEquals(60_000L, sleeps.poll(10, TimeUnit.SECONDS), "a minute while switched off")
+                flag(key, true)
+                gate.put(Unit)
+                expect("connected again once $key is back", 20) { it == Event.Connected }
+            }
         } finally {
             stream.stop()
             flagQuietly("feed", true)
         }
+    }
+
+    // ---- 8.1 The stream's first lines, as they come ----
+
+    @Test
+    @Order(16)
+    fun `the stream opens with a ping that has no id, at once`() {
+        val request = HttpRequest.newBuilder(URI.create("$site/api/feed/server/events"))
+            .header("Authorization", "Bearer $token")
+            .header("Accept", "text/event-stream")
+            .timeout(Duration.ofSeconds(5))
+            .GET()
+            .build()
+        val started = System.nanoTime()
+        val response = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
+        assertEquals(200, response.statusCode())
+        val lines = response.body().bufferedReader().use { reader -> generateSequence { reader.readLine() }.takeWhile { it.isNotEmpty() }.toList() }
+        val ms = Duration.ofNanos(System.nanoTime() - started).toMillis()
+        println("LiveSiteCheck: the stream's first event came after $ms ms: $lines")
+        assertEquals(listOf("event: ping", "data: {}"), lines, "a ping with no id, so Last-Event-ID stays where it was")
+        assertTrue(ms < 3_000)
     }
 
     // ---- Plumbing ----
