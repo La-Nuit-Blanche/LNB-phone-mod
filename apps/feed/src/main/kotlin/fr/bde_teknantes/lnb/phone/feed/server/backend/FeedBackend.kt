@@ -64,7 +64,10 @@ interface FeedEventListener {
     /** After every successful connection: catch up (`feed-mod.md` 8.3). */
     fun onConnected()
 
-    /** The stream dropped, or answers 503 `disabled` ([disabled]); once per loss, not for each failed retry. */
+    /**
+     * The stream dropped, or answers 503 `disabled` ([disabled]); once per loss, not for each failed retry, except a
+     * refusal as switched off, told at each try (once a minute).
+     */
     fun onDisconnected(disabled: Boolean)
     fun onPost(id: UUID, feed: FeedKind, threadId: UUID?, createdAt: Instant)
     fun onDeleted(items: List<RemovedItem>)
