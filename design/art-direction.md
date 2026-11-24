@@ -1,9 +1,10 @@
 # LNB Phone: art direction
 
-Version 6. Feed, the first app, now has its real backing: its data lives on the LNB website, which the game and the browser both read and write. After the user's decisions of 2026-11-23, version 6 brings section 9 and the Feed flows in line: names are a first name and an initial, moderators replace operators, announcers become a role of the site, only players with an LNB account write, and Feed has states for when the website cannot be reached. The phone itself (the shell, the kit, notifications and settings, everything outside section 9 and its flows) is as built in version 5; where the two differ, the code is right. The Feed app is not built yet and will be built from this document. Every value here is final unless the user changes it.
+Version 6.1. Feed, the first app, now has its real backing: its data lives on the LNB website, which the game and the browser both read and write. After the user's decisions of 2026-11-23, version 6 brings section 9 and the Feed flows in line: names are a first name and an initial, moderators replace operators, announcers become a role of the site, only players with an LNB account write, and Feed has states for when the website cannot be reached. The phone itself (the shell, the kit, notifications and settings, everything outside section 9 and its flows) is as built in version 5; where the two differ, the code is right. The Feed app is not built yet and will be built from this document. Every value here is final unless the user changes it.
 
 ## Changes since version 5
 
+- **Version 6.1 (2026-11-24): the home icon.** Section 9 said "no bird logo" while 7.4 draws Feed's icon as a white bird on an azure tile. The user decided to keep the bird: section 9 now says the home icon is the bird of 7.4, and keeps the rest of the rule (no Twitter/X colours, our own wording).
 - **Names.** The real name is what LNB Warden shows in the tab list: a first name and an initial (`Alexandre M.`), not a full name. Every sample name follows (9.2, 9.3, 13, 17, 18). The 32-character test name is now really 32 characters: `Marie-Charlotte-Pénélope-Anne V.` (the old one had 33), with the same handle, a face and a post of its own (18.2, 18.3).
 - **Moderators replace operators.** Whoever deletes any post or reply and sees the author of an anonymous one is a moderator: a player whose LNB account has the site's `admin` or `warden-admin` role. Op level no longer matters (9.2, 9.3, 9.4, 9.9, 13.2, 17, 18). The keys `post.op_author` and `post.op_author.tooltip` are renamed `post.mod_author` and `post.mod_author.tooltip`, because "op" is no longer what they are about; their texts say "modérateurs" / "moderators".
 - **Announcers** are players whose LNB account has the `feed-announcer` role on the site, given from the site's admin or by an in-game command that asks the site; moderators are announcers too (9.2). The command's syntax is not in this document.
@@ -810,7 +811,7 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 
 ## 9. The social app: "Feed"
 
-Twitter-like in layout, not in branding: no bird logo, none of Twitter/X's colours (the accent is LNB's Ping Blue, likes are coral `#F2545B`, the announcer badge is violet), and the wording is our own. Home icon: section 7.4. UI strings are given in French; English versions are in section 13.
+Twitter-like in layout, not in Twitter/X's branding: none of its colours (the accent is LNB's Ping Blue, likes are coral `#F2545B`, the announcer badge is violet), and the wording is our own. The home icon is a white bird on the azure tile, as section 7.4 draws it: the user decided on 2026-11-24 to keep it. UI strings are given in French; English versions are in section 13.
 
 ### 9.1 Structure
 
