@@ -316,12 +316,30 @@ class FeedScreenStatesTest {
                 t.click(220f, 334f)
                 t.tick(4)
                 assertInstanceOf(FeedScreen::class.java, t.screen, words)
-                // The keyboard reaches the tabs and Retry, never a hidden button: Enter on every focus stop.
-                repeat(4) {
+                // The keyboard reaches the tabs and Retry, never a hidden button: Enter on every focus stop opens no
+                // Compose. A tab's Enter may switch tabs, and Retry's asks again: every page asked meanwhile fails the
+                // same way, so whichever tab shows, it shows its block.
+                val answered = rec.all<LoadFeedPayload>().map { it.requestId }.toMutableSet()
+                fun failNewLoads() {
+                    for (load in rec.all<LoadFeedPayload>().filter { it.requestId !in answered }) {
+                        answered += load.requestId
+                        rec.session.onPage(PagePayload.failed(load.requestId, outcome, load.feed))
+                    }
+                }
+                repeat(4) { stop ->
                     t.key(GLFW.GLFW_KEY_TAB)
                     t.frame()
+                    t.key(GLFW.GLFW_KEY_ENTER)
+                    t.tick(4)
+                    failNewLoads()
+                    t.frame()
+                    assertInstanceOf(FeedScreen::class.java, t.screen, "$words, focus stop ${stop + 1}")
+                    assertTrue(t.screens.none { it is ComposeScreen }, "$words, focus stop ${stop + 1}: no Compose")
                 }
-                assertInstanceOf(FeedScreen::class.java, t.screen, words)
+                // Back on the tab under test, whichever one Enter left shown.
+                t.click(if (tab == FeedKind.GLOBAL) 192f else 64f, 22f)
+                t.tick(4)
+                t.frame()
                 // Back and loaded: the button is over the list again.
                 rec.state(state)
                 t.tick()
