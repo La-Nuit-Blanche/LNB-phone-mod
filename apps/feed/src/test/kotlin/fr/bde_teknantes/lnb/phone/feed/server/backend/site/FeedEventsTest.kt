@@ -170,13 +170,15 @@ class FeedEventsTest {
     }
 
     @Test
-    fun `a site that answers disabled is tried every 60 seconds, told once as disabled`() {
+    fun `a site that answers disabled is tried every 60 seconds, told as disabled at each refusal`() {
         val disabled = FakeSite.Reply(503, """{"statusCode":503,"data":{"problem":"disabled","flag":"feed"}}""")
         val stream = FakeSite.Stream()
         refuse(disabled, disabled, disabled, FakeSite.Reply(500), stream)
         events.start(listener)
-        assertEquals("disconnected(disabled)", next())
+        // Each refusal, once a minute: a flag switched on and off again meanwhile reaches players whose own read had
+        // found Feed back.
         repeat(3) {
+            assertEquals("disconnected(disabled)", next())
             assertEquals(60_000, nextSleep())
             wake.release()
         }

@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  * that stayed up [HEALTHY_MS]), 60 seconds while the site answers 503 `disabled`.
  *
  * The listener hears [FeedEventListener.onConnected] after each successful connection, and
- * [FeedEventListener.onDisconnected] once when a connection is lost or refused, not again for each failed retry. It is
+ * [FeedEventListener.onDisconnected] once when a connection is lost or refused, not again for each failed retry, except
+ * that each refusal as switched off is told (once a minute). It is
  * called on this thread and hops to the server thread itself. Unknown event types are ignored.
  *
  * @param clock wall-clock milliseconds, for the silence watchdog; tests pass their own.
@@ -111,8 +112,10 @@ class FeedEvents(
             connectedAt = null
             if (since != null && clock() - since >= HEALTHY_MS) backoffMs = MIN_BACKOFF_MS
             if (!running) break
-            // Once per loss, and again only if the reason turns from "unreachable" to "switched off" or back.
-            if (reported != disabled) {
+            // Once per loss, and again only if the reason turns from "unreachable" to "switched off" or back; a refusal
+            // as switched off is told each time (once a minute): a player's own read may have found Feed on in between
+            // (a flag switched on and off again while this waited), and the watchers must hear that it is off again.
+            if (reported != disabled || disabled) {
                 reported = disabled
                 listener.onDisconnected(disabled)
             }
@@ -132,9 +135,9 @@ class FeedEvents(
         val (url, token) = connection() ?: return
         val request = ApiClient.request(url, SiteBackend.BASE + "/events", token)
             .header("Accept", "text/event-stream")
-            // The site sends nothing, its headers included, before the first event or its 25-second ping: a quiet
-            // stream connects after about 25 seconds. Waiting for the headers as long as for silence (75 seconds)
-            // keeps a slow ping from turning every connection into a timeout.
+            // The site opens the stream with a ping, so the headers come at once. Before it did (and through a proxy
+            // that holds the first bytes back) they came only with the 25-second ping: waiting for them as long as
+            // for silence (75 seconds) keeps that case from turning every connection into a timeout.
             .timeout(Duration.ofMillis(SILENCE_MS))
             .apply { lastEventId?.let { header("Last-Event-ID", it) } }
             .GET()
