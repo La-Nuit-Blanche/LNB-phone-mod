@@ -41,6 +41,7 @@ object SiteScenarios {
         "site-outage" -> { { outage() } }
         "site-return" -> { { comeBack() } }
         "site-flags" -> { { flags() } }
+        "site-dots" -> { { dots() } }
         else -> null
     }
 
@@ -487,6 +488,84 @@ object SiteScenarios {
         away()
         shot("e12_after_server_restart")
         log("after the server's restart")
+    }
+
+    /**
+     * As Camille R.: Feed switched off with Global loaded and its dot on; the dot cleared and Annonces shown; then more
+     * than two minutes, so the stream is refused at least twice (each refusal now tells the watchers the availability
+     * alone): the dot must stay out and no snackbar come, shot every 4 seconds. Then on again, with no click. Last, a
+     * player joining while Feed is off: the switched-off block, and Feed back by itself once it is on.
+     */
+    private fun FeedCapture.Script.dots() {
+        join()
+        openPhone()
+        openFeedAndWait()
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(30)
+        click(ANNONCES_TAB_X, 22)
+        waitTicks(20)
+        // A post on Global while Annonces is shown: Global's dot.
+        site("mika", "POST", "/api/feed/posts", newPost("global", "Un nouveau post pour allumer le point de Global."))
+        waitUntil(200, "Global's dot") { session.isUnread(FeedKind.GLOBAL) }
+        away()
+        shot("d01_global_dot_on")
+        mark("off")
+        flag("feed", false)
+        waitUntil(600, "switched off") { session.availability == FeedAvailability.DISABLED }
+        elapsed("off", "feed off: the open Feed is told it is switched off")
+        waitTicks(140)
+        // Global viewed while off: its dot goes; back to Annonces.
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        click(ANNONCES_TAB_X, 22)
+        waitTicks(10)
+        away()
+        shot("d02_dot_cleared_on_annonces")
+        mark("watch")
+        var back = false
+        repeat(33) { i ->
+            waitTicks(80)
+            run {
+                if (session.isUnread(FeedKind.GLOBAL)) back = true
+                FeedMod.LOGGER.info(
+                    "Feed capture dots: {} s, Global dot {}, availability {}, revision {}",
+                    (i + 1) * 4, session.isUnread(FeedKind.GLOBAL), session.availability, session.revision,
+                )
+            }
+            shot("d03_watch_%03ds".format((i + 1) * 4))
+        }
+        run { FeedMod.LOGGER.info("Feed capture dots: the Global dot came back during the watch: {}", back) }
+        elapsed("watch", "watched with Feed off")
+        mark("on")
+        flag("feed", true)
+        waitUntil(2400, "Feed back") { session.availability == FeedAvailability.OK }
+        elapsed("on", "feed on: Feed back, no click")
+        waitTicks(30)
+        away()
+        shot("d04_feed_back")
+
+        // Joining while Feed is off: no state yet, the switched-off block; back by itself once on.
+        flag("feed", false)
+        waitUntil(600, "switched off") { session.availability == FeedAvailability.DISABLED }
+        key(GLFW.GLFW_KEY_ESCAPE)
+        waitTicks(10)
+        leaveServer()
+        waitTicks(40)
+        joinServer(server)
+        waitTicks(60)
+        openPhone()
+        openFeedAndWait()
+        away()
+        shot("d05_joined_while_off")
+        log("joined while off")
+        mark("join on")
+        flag("feed", true)
+        waitUntil(2400, "the block's list back") { session.feed(FeedKind.ANNOUNCEMENTS).let { it.posts.isNotEmpty() || it.pinned.isNotEmpty() } }
+        elapsed("join on", "feed on: the joined player's block replaced by the list, no click")
+        waitTicks(30)
+        away()
+        shot("d06_joined_back")
+        log("joined, back")
     }
 
     /** The Retry button of the unavailable and switched-off blocks, in viewport dp. */
