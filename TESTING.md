@@ -285,9 +285,9 @@ needs no website: it checks Feed with `backend.kind = "site"` where the site can
     content (in memory mode the sample again: what was posted is gone, and the announcers added by command with it),
     never a post or draft of the last visit. A notification that was delivered before the stop is still on the phone.
     With the site backend, redo it (stop the server with `stop` in its console, or over RCON): the client is back on the
-    title screen with no error, the server is up again in about 25 seconds, and once joined Feed shows the site's posts,
-    yours included. Its log says `Feed uses LNB's website` at the start and `Connected to LNB's Feed event stream` about
-    25 seconds later: the site sends nothing on a quiet stream before its first ping, so that wait is expected.
+    title screen with no error, the server is up again in under a minute, and once joined Feed shows the site's posts,
+    yours included. Its log says `Feed uses LNB's website` at the start and `Connected to LNB's Feed event stream` a
+    fraction of a second later (the site opens its stream with a ping).
 39. **The website: posts made in the browser.** B, a plain player, has Feed open on Global at the top. Another person,
     in the browser, posts: the post is at the top of B's Global within two seconds, highlighted. They reply to a post of
     B's: B gets the banner "Nouvelle réponse", "Mika L. : …" (the name as the site gives it), and the reply count and the
@@ -309,12 +309,18 @@ needs no website: it checks Feed with `backend.kind = "site"` where the site can
     down (`closed`, then `ConnectException`, then `HTTP 503` while the site starts again), not one for each retry, and
     Warden's `LNB's API is unreachable` once, then `reachable again` once. Start the site: B's Feed is back within about
     15 seconds of the site answering (the client's own retry), with no click, and `Connected to LNB's Feed event stream`
-    follows about 25 seconds after that.
+    follows at the stream's next try (its backoff is 1 to 30 seconds; in the second run it came 0.1 seconds after the
+    site answered).
 42. **The website: Feed off, writing off.** Switch the `feed` flag off on the site (`/admin/settings/flags`, or the
-    admin's `PATCH /api/admin/flags/feed`). A Feed opened afresh shows "Feed désactivé" with "Réessayer". A Feed already
-    open changes nothing: the site sends no event for a flag and keeps the server's stream open, so it learns of it only
-    from its next action, which says "Action impossible". Switch it on: the switched-off block stays until "Réessayer"
-    is pressed, which loads the list at once; an open Feed never noticed. Switch `feed.writing` off: a Feed opened
+    admin's `PATCH /api/admin/flags/feed`). The site closes the server's event stream (within its 10-second flag cache;
+    at once when switched from the admin) and refuses the reconnection as switched off: a Feed open on a loaded list
+    shows "Connexion perdue" within a second and stays readable, and the server's log says `disconnected (the stream
+    ended)`, then `disconnected (Feed is switched off on the site)`. A Feed opened afresh shows "Feed désactivé" with
+    "Réessayer", and no round button. Switch it on: with no click, an open list is back within 15 seconds (the app asks
+    again by itself), and a "Feed désactivé" block is replaced by the list at the server's next try, within a minute
+    (it tries every 60 seconds while Feed is off). Do the same with `feed.serverApi`: the same, the game's side only.
+    Switched off again within that minute, while the server waits for its next try, an open Feed hears of it at that
+    try, up to a minute later. Switch `feed.writing` off: a Feed opened
     afterwards has no round button, and a heart says "Écriture suspendue"; a Feed already open learns of it from its
     next post, reply or like. A moderator keeps the more buttons and an announcer the pin buttons, as in item 37. Switch
     it on: a Feed opened afterwards has them back.
@@ -517,6 +523,7 @@ real times.
 | `site-player` | a plain player | the site's content, a post made in game read back in the browser, a post, reply, like, pin and deletion from the browser reaching the open phone, writing off and on, Feed off and on, the site killed and started, a reply while offline, the server restarted |
 | `site-outage` | a plain player | Feed off under an open Feed, the switched-off block and its Retry, the site killed under a loaded list and started again |
 | `site-return` | a plain player | the badge for a reply made while the server was stopped, then the announcer role given and taken in the admin |
+| `site-flags` | a plain player | timed, with no click: `feed` and `feed.serverApi` switched off and on under an open Feed, the switched-off block coming back by itself, the site killed and started, a reply while offline, the server restarted |
 | `site-moderator` | a Warden admin | the round, more and pin buttons, the author line of an anonymous post, `/feed announcer` and its answers |
 | `site-announcer` | an announcer | the round and pin buttons, `/feed` unknown |
 | `site-guest` | a username with no LNB account | no round button, a heart refused |
@@ -526,7 +533,8 @@ real times.
 `FeedEvents` against a running site: every route of the backend interface and every outcome, the contract's test
 vectors (text, idempotency, anonymity by viewer, pages, pins, unread dots and markers), the notification queue and its
 pages, the command's calls, the flags, and the stream with each event made through the browser's routes,
-`Last-Event-ID` after a dropped connection and the feature switched off and on. It is skipped unless `FEED_LIVE_SITE` is
+`Last-Event-ID` after a dropped connection, the stream's opening ping (at once, with no `id`), and the stream closed by
+the site when `feed` or `feed.serverApi` goes off, refused while off and made again once it is back. It is skipped unless `FEED_LIVE_SITE` is
 set, and empties Feed's tables in the database it is given:
 
 ```sh
@@ -535,6 +543,9 @@ FEED_LIVE_COOKIES='{"camille": "...", ...}' ./gradlew :apps:feed:test --tests '*
 ```
 
 It takes about four minutes, most of it waiting out the site's rate limits, and prints how long the stream took to
-connect (about 25 seconds: the site's first ping). What the captures can't check: a second player in the game, the sounds, scales
-above 4, the real skins, Warden's authentication, and how it feels in the hand. That is what items 30 to 49
+connect (a few milliseconds since the site opens it with a ping) and to be closed after a flag went off (about a
+second).
+
+What the captures can't check: a second player in the game, the sounds, scales above 4, the real skins, Warden's
+authentication, and how it feels in the hand. That is what items 30 to 49
 are for.

@@ -91,7 +91,9 @@ backend works in any world.
   pins and deletions that fail say so and keep what the player typed. Joining the server is never delayed by the site.
   The server logs the outage once, and again when it ends.
 - **Feed is switched off on the site.** Feed opened with nothing loaded shows "Feed is switched off"; an open one reads
-  as a lost connection. The server asks the site again every minute.
+  as a lost connection within a second or two (the site closes the server's event stream when Feed goes off). The server
+  asks the site again every minute. When Feed is switched on again, nobody has to do anything: an open list comes back
+  within about 15 seconds, and the "Feed is switched off" screen within a minute, at the server's next try.
 - **Writing is switched off on the site (`feed.writing`).** Players read, with no compose button, and a strip where the
   reply field was says "Writing is paused". Deleting and pinning go on: authors delete their own posts, moderators any
   post, announcers pin. The site sends no event when the flag changes: a player's Feed learns of it at its next state
