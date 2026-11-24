@@ -132,7 +132,10 @@ class FeedEvents(
         val (url, token) = connection() ?: return
         val request = ApiClient.request(url, SiteBackend.BASE + "/events", token)
             .header("Accept", "text/event-stream")
-            .timeout(Duration.ofSeconds(30))
+            // The site sends nothing, its headers included, before the first event or its 25-second ping: a quiet
+            // stream connects after about 25 seconds. Waiting for the headers as long as for silence (75 seconds)
+            // keeps a slow ping from turning every connection into a timeout.
+            .timeout(Duration.ofMillis(SILENCE_MS))
             .apply { lastEventId?.let { header("Last-Event-ID", it) } }
             .GET()
             .build()
