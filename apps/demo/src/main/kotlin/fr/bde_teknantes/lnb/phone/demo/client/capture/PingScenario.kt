@@ -12,7 +12,7 @@ import org.lwjgl.glfw.GLFW
 import java.util.UUID
 
 /**
- * Task 10: Ping, the example app, in a world and inside the real phone, driven through the game's input: its icon on
+ * `ping`: Ping, the example app, in a world and inside the real phone, driven through the game's input: its icon on
  * the home screen, the list of players, a ping typed and sent to the player themselves (the server's answer adds it to
  * the conversation, and the ping received shows there too); then pings arriving with the phone closed (the peek, and
  * Up landing on the conversation) and open on home (the banner, the badge, a click on the banner); then the refusals:

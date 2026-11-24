@@ -154,6 +154,31 @@ object PhoneNotifications {
     @JvmStatic
     fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component) = sendToEveryone(appId, title, text, null)
 
+    /**
+     * Notifies every player who has played on this world, connected or not, except [except] (the author of an
+     * announcement, who must not be told of their own post). See the other [sendToEveryone] for who "every player" is,
+     * and the [send] by UUID for the other parameters. [except] is read during the call; UUIDs in it that aren't players
+     * of the world are ignored, and an empty collection sends to everyone. A player in [except] gets nothing, connected
+     * or not: no badge, banner, peek or chime.
+     *
+     * Available from version 0.1.1 of the phone: an app that calls it needs that version (the `lnbphone.app` plugin
+     * writes the range of the phone the app is built against).
+     */
+    @JvmStatic
+    fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, target: String?, except: Collection<UUID>) {
+        val request = Request(appId, title, text, target)
+        val excluded = except.toSet()
+        onServerThread(currentServer("send a notification") ?: return) { server ->
+            val host = ServerNotifications.host(server)
+            ServerNotifications.service.sendToEveryone(host, request.appId, request.title, request.text, request.target, excluded)
+        }
+    }
+
+    /** As the other [sendToEveryone] with [except], leading to your app's first screen. Available from version 0.1.1. */
+    @JvmStatic
+    fun sendToEveryone(appId: ResourceLocation, title: Component, text: Component, except: Collection<UUID>) =
+        sendToEveryone(appId, title, text, null, except)
+
     /** Removes all of [player]'s notifications from [appId], connected or not: the badge goes and no banner comes back. */
     @JvmStatic
     fun clearApp(player: UUID, appId: ResourceLocation) {

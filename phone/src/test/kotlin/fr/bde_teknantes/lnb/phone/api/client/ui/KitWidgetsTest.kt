@@ -105,6 +105,19 @@ class KitWidgetsTest {
     }
 
     @Test
+    fun `a segment's label has the room of its pill less 2 dp each side, 106 dp in a 232 dp two-segment control`() {
+        // Compose's destination in English: `Announcements` measures about 104 dp in Inter (art direction 13.3).
+        screen.add(SegmentedControl(listOf("Announcements", "Global")).at(12f, 316f, 232f, 32f))
+        screen.frame()
+        assertEquals(106f, screen.canvas.room["Announcements"])
+        assertEquals(106f, screen.canvas.room["Global"])
+        assertEquals(106f, SegmentedControl.labelRoom(116f))
+        assertTrue(screen.canvas.drew("Announcements"))
+        // The Settings app's two segments (art direction 12) are as wide: their labels have the same room.
+        assertTrue(SegmentedControl.labelRoom(116f) > 46f)
+    }
+
+    @Test
     fun `a loading button ignores clicks and Enter, and keeps its width`() {
         var clicks = 0
         val button = screen.add(Button("Publier") { clicks++ }.apply { fixedWidth = 88f }.atRight(244f, 6f))

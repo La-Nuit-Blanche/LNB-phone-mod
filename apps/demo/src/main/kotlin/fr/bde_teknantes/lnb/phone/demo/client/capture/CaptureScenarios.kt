@@ -10,8 +10,8 @@ import fr.bde_teknantes.lnb.phone.demo.client.smooth.SmoothTestScreen
 import net.minecraft.client.Minecraft
 
 /**
- * The capture scripts, by name (the value of `-Dlnbphone.capture`). Later tasks add theirs here: the phone shell, the
- * UI kit, the notification banner.
+ * The capture scripts, by name (the value of `-Dlnbphone.capture`): the smooth layer, the UI kit, the phone shell, the
+ * notification banner and the rest, each listed in `TESTING.md`. A new scenario is added here.
  */
 object CaptureScenarios {
     private val scenarios: Map<String, () -> CaptureScript> = linkedMapOf(
@@ -43,7 +43,7 @@ object CaptureScenarios {
     )
 
     /**
-     * Task 3: the smooth layer's test sheet at GUI scale 2, 3 and 4 in one run, again after a resource reload (which
+     * `smooth`: the smooth layer's test sheet at GUI scale 2, 3 and 4 in one run, again after a resource reload (which
      * drops its fonts and atlas), then over a world.
      */
     private fun smooth() = CaptureScript().apply {
@@ -81,7 +81,7 @@ object CaptureScenarios {
     }
 
     /**
-     * Task 5: the UI kit's gallery and the composed Feed screens, two viewports per shot, in French (the mockups'
+     * `kit`: the UI kit's gallery and the post sample's screens, two viewports per shot, in French (the mockups'
      * language) at each GUI scale of [scales]; then Global in English at GUI scale 2 (art direction 18.2, sheet 5).
      */
     private fun kit(scales: IntRange) = CaptureScript().apply {
@@ -106,7 +106,7 @@ object CaptureScenarios {
     }
 
     /**
-     * Task 6: the notification banner's states and its P-10 frames at GUI scale 2, 3 and 4; then, in a world, a real
+     * `banner`: the notification banner's states and its P-10 frames at GUI scale 2, 3 and 4; then, in a world, a real
      * notification sent by `/phonedemo` and read back from the client's store, and cleared.
      */
     private fun banner() = CaptureScript().apply {

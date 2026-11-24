@@ -327,15 +327,20 @@ What the list screen shows:
   home, so no screen built in the old language is seen again. What you keep outside your screens (drafts, scroll
   positions) stays.
 - **Hooks.** `KitScreen` keeps `AppScreen`'s drawing and input methods for itself. You override `onScreenShown`,
-  `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves
-  the phone for good, it is where you stop what the screen started (a listener, a request). Here the rows are rebuilt
-  each time the screen shows, so a player who joined meanwhile is there on the way back.
+  `onScreenHidden`, `onTick`, `onKey` and `onBack`, and `AppScreen`'s `onClosed`: called once when the screen leaves the
+  phone for good, it is where you stop what the screen started (a listener, a request). `onClosed` never comes for a
+  screen that threw, nor for one built for a stack that never opened (another screen of it failed while being created).
+  An app that keeps something running for as long as its screens are open asks `isOnPhone` instead: true from the moment
+  the phone has the screen, under another screen or with the phone put away included, and false for good once it closed
+  or threw (from phone 0.2.0; Feed's session does this). Here the rows are rebuilt each time the screen shows, so a
+  player who joined meanwhile is there on the way back.
 - **Kept state.** The list's position is a `ScrollState` from `PingSession` (step 6): coming back to Ping later, the
   list is where the player left it.
 - **Draw it yourself.** When the kit has no widget for something, extend `Widget` (or `Clickable` for something that
   reacts to clicks) and draw in `render` with the `AppCanvas` methods. The kit's gallery in the demo (the "UI kit"
-  app, `client/kit/Gallery.kt`) shows every widget; the sample Feed (`client/kit/FeedScreens.kt` and `PostCard.kt`)
-  composes them into real screens, with a custom widget.
+  app, `client/kit/Gallery.kt`) shows every widget; the demo's "Post sample" (`client/kit/FeedScreens.kt` and `PostCard.kt`)
+  composes them into feed screens with made-up posts, with a custom widget. For a whole app built on the kit, with a
+  server side, payloads, state and tests, read Feed (below).
 
 ### 5. A second screen and navigation
 
@@ -457,7 +462,10 @@ revision has moved, and reports the server's answer to the last ping (step 7):
 
 The kit plays the tap sound on every click, the error sound on a click on something disabled and with an error
 snackbar. `PhoneSounds` has the others (`sent`, `like`); all of them follow the player's Sounds setting. A snackbar
-shown just before a `pop` is carried over to the screen underneath.
+shown just before a `pop` is carried over to the screen underneath. `showSnackbar` and `showErrorSnackbar` return a `SnackbarHandle`:
+its `dismiss` takes that snackbar away, wherever it was carried, and leaves alone any other that replaced it (a
+"Connection lost" to take back once the connection is back). The handle is new in phone 0.2.0, whose snackbar functions
+returned nothing before: an app built against 0.1 must be rebuilt for 0.2, as its range already says.
 
 ### 7. Talking to your server
 
@@ -578,6 +586,9 @@ What `PhoneNotifications.send` gives the player: a badge on the app's icon and t
 over the open phone, or the closed phone peeking up from the corner with the banner (unless the player turned the
 preview off); a chime (unless sounds are off). A player who is offline gets it when they next log in, as a badge.
 Opening the app, by any route, clears its notifications. `clearApp` and `clearTarget` take them back.
+`send` also takes a collection of UUIDs, and `sendToEveryone` reaches every player who has played on the world, with
+a variant that leaves some out (`except`: an announcement's author, who mustn't be told of their own post; from
+phone 0.1.1).
 
 - **Text.** Title and text are translatable components with keys in your language files, so they are shown in the
   recipient's language. What a player wrote goes in as an argument, never as the key (see the mistakes below). The
@@ -843,7 +854,14 @@ is a safety net, not error handling: the player loses what they were doing.
 - The phone's own Settings app, a second and smaller example: one screen with a segmented control and toggles,
   registered like any app (`phone/.../client/settings/SettingsApp.kt` and `SettingsScreen.kt`; its classes are
   internal to the phone, but it uses only the public kit).
-- The demo's other apps: the kit's gallery ("UI kit") and the sample Feed ("Feed (sample)"), described in
-  `apps/demo/README.md`.
+- Feed, a second and much larger example (`apps/feed`, mod `lnbphone_feed`, described in `apps/feed/README.md` and
+  designed in `docs/feed-app.md`): an app with a server side that talks to a website through two interchangeable
+  backends, its own payloads, a client session that screens are rebuilt from, notifications that land on a
+  thread, rights, drafts, live updates, and its tests (screens played with `PhoneTester`, a fake site, a harness
+  that takes screenshots). It is written with the same pieces as Ping; start with Ping, then read how Feed
+  scales them: `client/FeedSession.kt` for state kept across screens, `client/screens/FeedTargetScreens.kt` for a
+  notification's target, `server/FeedServer.kt` for the server side.
+- The demo's other apps: the kit's gallery ("UI kit") and "Post sample", a feed of made-up posts that shows the kit
+  (it is not the Feed app), described in `apps/demo/README.md`.
 - `design/art-direction.md` for the look of the phone and of the Feed app (section 9), if you need a value the kit
   doesn't give.

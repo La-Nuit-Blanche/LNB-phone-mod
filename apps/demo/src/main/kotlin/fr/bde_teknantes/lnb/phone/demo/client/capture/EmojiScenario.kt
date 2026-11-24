@@ -8,7 +8,7 @@ import fr.bde_teknantes.lnb.phone.demo.client.kit.KitHostScreen
 import fr.bde_teknantes.lnb.phone.demo.client.notifications.BannerTestScreen
 
 /**
- * Task 13: emoji in the apps and the banner at GUI scale 2, 3 and 4, in French: a text area with the caret after an
+ * `emoji`: emoji in the apps and the banner at GUI scale 2, 3 and 4, in French: a text area with the caret after an
  * emoji, a field, a snackbar, a post card and rows; every kind of sequence in Regular and SemiBold; the banners. Then
  * about two hundred distinct emoji at GUI scale 9 for the glyph atlas. Logs how long the emoji face takes to open and
  * what the pre-warm costs with it.

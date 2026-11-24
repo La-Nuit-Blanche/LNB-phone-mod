@@ -16,13 +16,13 @@ import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 
 /**
- * Test sheet for the notification banner (task 6), sized for the window at GUI scale 4 (640 x 480 dp).
+ * Test sheet for the notification banner, sized for the window at GUI scale 4 (640 x 480 dp).
  *
  * - [Mode.STATES]: on the app background, the banner's states (normal, hover, pressed) with the storyboard's texts,
  *   then the edge cases: characters the fonts lack and emoji, a long title, an item icon, a one-line text, no text,
  *   and emoji in a title and a text.
  * - [Mode.CHAIN]: a hundred emoji joined by ZWJ, as a player could paste them, in a banner.
- * - [Mode.FRAMES]: P-10 steps 3 and 2 on the home wallpaper (no icons yet: the home screen is task 4): resting at
+ * - [Mode.FRAMES]: P-10 steps 3 and 2 on the home wallpaper, without icons: resting at
  *   app-local (8, 4), and half-way down its slide at `y -36`, clipped to the viewport.
  */
 class BannerTestScreen(private val mode: Mode) : Screen(Component.literal("Banner test")) {

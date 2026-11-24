@@ -1,22 +1,23 @@
 # Testing LNB Phone
 
-Until now the phone has been checked by unit tests and by an automated client taking screenshots, with the sound
-muted, one player, and no other mod. Nobody has played with it. The first part of this file is the plan for people in
-the game before a release; the second describes the automated checks.
+Until now the phone and Feed have been checked by unit tests and by an automated client taking screenshots, with the
+sound muted, one player, and no other mod. Nobody has played with them. The first part of this file is the plan for
+people in the game before a release (the phone's items first, then Feed's); the second describes the automated checks.
 
 ## In-game test plan
 
 Build with `./gradlew build`. You need:
 
 - a dedicated NeoForge 21.1 server (21.1.264 or later) with Kotlin for Forge 5.12 or later,
-  `phone/build/libs/lnbphone-<version>.jar` and `apps/demo/build/libs/lnbphone_demo-<version>.jar`, and nothing else;
+  `phone/build/libs/lnbphone-<version>.jar` and `apps/demo/build/libs/lnbphone_demo-<version>.jar`, and nothing else
+  (Feed's part below adds two jars);
 - two clients, players A and B (two Minecraft accounts), with the same three mods, the sound on, the master volume up;
   A is an operator. A third client without the phone, for item 18.
 
 The demo mod is never shipped, but it holds what these tests use: Ping (send a short message to a player who is
 online; they get it in their conversation with you, with a notification), Hello (every click opens one more screen,
-a right click opens a vanilla dialog), the "UI kit" gallery, the sample Feed and `/phonedemo` (a test notification
-from Hello). Items 1 to 9 can be done alone in single player with `./gradlew :apps:demo:runClient`. Items 26 to 29
+a right click opens a vanilla dialog), the "UI kit" gallery, "Post sample" (a feed of made-up posts built from the kit,
+which is not the Feed app) and `/phonedemo` (a test notification from Hello). Items 1 to 9 can be done alone in single player with `./gradlew :apps:demo:runClient`. Items 26 to 29
 need the server's real modpack.
 
 Each item says what to do and what should be seen; anything else is a failure to report, with the log
@@ -26,7 +27,8 @@ Each item says what to do and what should be seen; anything else is a failure to
 
 1. **Start.** Both clients start without an error. The mod list shows "LNB Phone" and "LNB Phone Demo". In Controls,
    the "LNB Phone" category has "Open the phone" on the Up arrow. The client log lists the apps:
-   `Phone apps (5): lnbphone_demo:hello, lnbphone_demo:kit, lnbphone_demo:feed_sample, lnbphone_demo:ping, lnbphone:settings`.
+   `Phone apps (5): lnbphone_demo:hello, lnbphone_demo:kit, lnbphone_demo:feed_sample, lnbphone_demo:ping, lnbphone:settings`
+   (six, with `lnbphone_feed:feed`, when Feed's jar is there too).
 2. **Open and close.** In a world, press Up: the phone slides up into the bottom-right corner in a quarter of a second,
    with a soft spyglass sound. The world stays visible, neither darkened nor blurred, and the game isn't paused. The
    mouse is free and the player can't walk. Close it each way: Esc, Up again, a click on the world. It slides down
@@ -54,8 +56,8 @@ Each item says what to do and what should be seen; anything else is a failure to
    with that letter: the letter is typed, the phone stays. Esc puts the phone away and the text is still there when it
    comes back. Also: Shift+arrows, Ctrl+A, Ctrl+C / Ctrl+X / Ctrl+V (paste a long text: it stops at 100 characters),
    Ctrl+Backspace, a double click on a word, Tab to move between the field and the button, Enter to send. Keys that
-   mean something in the game (E, T, Q, the hotbar digits) type into the field and do nothing else. In "Feed
-   (sample)", Compose (the round button): Ctrl+Enter publishes, the counter turns amber in the last 20 characters and
+   mean something in the game (E, T, Q, the hotbar digits) type into the field and do nothing else. In "Post
+   sample", Compose (the round button): Ctrl+Enter publishes, the counter turns amber in the last 20 characters and
    red past 280.
    **Emoji.** In Compose, open Windows' emoji panel (Win+.) and pick a few emoji, one with a skin tone, a family,
    the French flag, a keycap (1️⃣) and the red heart: each appears as a white outline emoji at the size of the text,
@@ -154,7 +156,7 @@ Ping before the switch is still in its field.
     Toggle fullscreen (F11) with the phone open.
 22. **Warm-up.** Join a world and, as soon as you can, have a notification sent (the peek) and open the phone, then
     change the GUI scale and open it again: no stutter on the first peek or the first open.
-23. **A long list.** With the F3 screen's frame time showing, open a list of hundreds of rows (the sample Feed
+23. **A long list.** With the F3 screen's frame time showing, open a list of hundreds of rows ("Post sample"
     scrolled to the end, or Ping's list on a full server) and scroll fast with the wheel and the thumb: the frame time
     stays where it is with the phone closed. A failure is a drop that grows with the number of rows.
 24. **Other systems.** As far as the team can: macOS (Option moves by words in a text field, Cmd is not Ctrl), Linux,
@@ -187,6 +189,214 @@ Warden and more), with their own client settings. Install the phone on that modp
 29. **Shaders.** With the server's shader pack on (Iris or Oculus, if the modpack has one): the phone, its apps and the
     peek draw as without shaders, not dimmed, tinted or hidden by the world's effects.
 
+### Feed
+
+Feed has been checked by unit tests and by an automated client taking screenshots against its in-memory backend, with
+the sound muted and one player. Nobody has played with it in a world, nobody has heard its sounds, and it has never run
+against the real website with a person at the keyboard. This part is the plan for that. It adds to the setup above:
+Feed's jar (`apps/feed/build/libs/lnbphone_feed-<version>.jar`) and LNB Warden's (`apps/feed/libs/lnbwarden-<version>.jar`,
+0.5.0 or later) in the `mods` folder of the server and of both clients.
+
+Items 30 to 38 use Feed's in-memory backend, so they need no website (item 38 ends by redoing it against the website).
+Before the server's first start, put `apps/feed/example-config/lnbphone_feed-server.toml` and `lnbwarden-server.toml` in
+its `config` folder (`./gradlew :apps:feed:prepareMemoryRun` does it for `apps/feed/run/config`, which
+`:apps:feed:runServer` and `:apps:feed:runClient` use). They select `backend.kind = "memory"` with the sample posts, and
+Warden's `auth.mode = "OFF"` so that both accounts may join. A is an operator: in memory mode that makes A a moderator
+(the website's roles are not there). B is a plain player. The sample posts are dated from the server's start, and
+nothing is kept when it stops.
+
+Items 39 to 43, and the end of item 38, need the website: "Feed against a local website", after item 49, says how to
+run one with people of every kind and point the server at it, as it was done the first time (November 2026). Item 44
+needs no website: it checks Feed with `backend.kind = "site"` where the site can't be called.
+
+30. **Start.** The server and both clients start without an error. The server log has the warning `Feed uses its memory
+    backend (sample seed): nothing is kept, for development only`, which is expected here. The mod list shows "LNB
+    Feed"; the client log's list of phone apps holds `lnbphone_feed:feed`; the home screen has Feed's icon, a white glyph
+    on an azure tile. A third client without Feed's jar is refused at once with a message naming the missing mod.
+31. **Reading.** B opens Feed: it opens on "Announcements", with the pinned posts first, each under a "Pinned" line. A
+    sample post's card shows a face, a name (a first name and an initial, bold), the handle in grey, the text, the time
+    (`2m`, `3h`) and the reply and like counts; A's and B's own posts show the username alone, with no handle (the
+    memory backend knows no real names). An anonymous post shows "Anonymous", a grey person and no handle. Scroll, then
+    open "Global": the posts are newest first, and the end of the list reads "You're all caught up" (while a page loads,
+    a spinner shows there). Press Up and Up again: the phone is back on the same tab, at the same place. Leave the world
+    and join again: Feed opens afresh on Announcements, and no post from the last visit shows before the new list
+    arrives.
+32. **Posting.** B, on Global, presses the round button: Compose opens with the field focused. Type: the counter turns
+    amber in the last 20 characters and red past 280, and "Post" is disabled when the text is empty or past 280. Press
+    "Post" (or Ctrl+Enter): the button shows a spinner, then the snackbar says "Posted", and the post is at the top of
+    Global, highlighted. A's phone, with Feed open on Global at the top, shows it at once, highlighted, with no reload.
+    Scroll A's list down and have B post again: A's list does not move, a pill reads "1 new post" with an up arrow; a
+    click scrolls up to it. Post four times within a minute: the fourth is refused with "Slow down! Wait 41s" (the
+    seconds left) and the text stays in the field. Close Compose with text in it and open it again: the draft is still
+    there.
+33. **Replies and their notifications.** A posts on Global. B opens the post and replies, then replies to A's reply.
+    With A's phone closed: it rises with the banner "New reply" and "B: the text", with two chimes; a click on the banner
+    (or Up, then the banner) opens the thread, scrolled to the reply, which is highlighted. With A's phone open on the home
+    screen or in another app: the banner shows over it, and Feed's icon has a badge. With A's phone open on that thread:
+    no banner, the chime only, and the reply appears in the thread. B is never notified of B's own reply. A's reply to
+    B's post notifies B the same way. Then A leaves; B replies; A joins: no banner and no chime at login, a `1` on Feed's
+    icon, and opening Feed clears it. On A's card, a marker shows that the post has replies A has not read, until the
+    thread has been opened.
+34. **Announcements.** A (a moderator, so an announcer) presses the round button on "Announcements": Compose shows a
+    control choosing between "Announcements" and "Global", with "Announcements" selected. A posts an announcement. B,
+    with the phone closed, gets "New announcement" and "A: the text"; B, on Global with the phone open, gets the banner
+    and a dot on the "Announcements" tab (the dot goes when the tab is shown). B, on Announcements, gets a pill without
+    an arrow when the announcement would sit under the pinned posts, out of view. A is not notified of A's own
+    announcement. Post an announcement anonymously: B's banner reads "Anonymous: the text", the card shows "Anonymous" with
+    no badge, and A is not notified. An announcer's cards carry a violet badge, whose tooltip reads "Can post
+    announcements". B, offline when it is posted, finds a badge at login and no banner.
+35. **Likes.** B likes a post of A in both feeds: the heart fills at once and the count goes up. A, with Feed open on that
+    post, sees the count move within a second, with no reload. B unlikes: the count goes back. Click the heart quickly
+    a dozen times: the count never goes negative or counts one player twice, and a like the server refuses (too fast)
+    goes back with "Slow down! Wait 2s" (the seconds left). Likes never notify anyone.
+36. **Announcer and moderator.** A types `/feed` and the chat offers `announcer` and `dev` (the memory backend's
+    switches, item 37); B has no `/feed` command. A is a moderator here only because A is an operator, the memory
+    backend's stand-in for the website's roles; item 43 checks the real roles. A runs `/feed announcer list`: "No
+    announcers besides the moderators." `/feed announcer add B`: "B can now post announcements."; B's phone shows the
+    round button on "Announcements" within a second, with no new login, and the destination control in Compose. `/feed
+    announcer remove B` takes it away again. Adding an operator reads "A is a moderator, so already posts
+    announcements." A pins an announcement with the pin button of its action row, on the feed or on its thread's main
+    post (the more menu holds only "Delete"): "Post pinned", the post moves into the pinned group on B's open
+    "Announcements" within a second. Pin until three are pinned, then a fourth: the dialog "Replace a pin?" appears, and
+    confirming unpins the oldest. Unpin: "Post unpinned". A deletes a post of B's (more menu, "Delete", the dialog
+    "Delete this post?"): it leaves B's open feed within a second, with its replies, and B, inside that thread, is taken
+    back to the feed with "This post was deleted". B has no more menu on A's posts, and has one on B's own. A deletes an
+    announcement while B is offline: B joins and finds no badge for it. On an anonymous post, A (moderator) sees a line
+    "Author: B" with a tooltip "Only moderators can see this", B (the author) sees "Posted anonymously by you", and a
+    third player sees neither.
+37. **A guest, writing paused, and the site away.** Put B's username under `memory.guests` and restart: B has no round
+    button on either tab; a click on a heart shows "LNB account needed" with the error sound and changes no count; a
+    thread shows a strip "LNB account needed to reply" instead of the composer; B has no more or pin button, and still
+    gets the announcements' banners. Remove B from the list and restart. The `/feed dev` switches (A, memory mode only)
+    reach a Feed that is open at once, within the tick the command runs in. `/feed dev writing false`: the server reads
+    the state of every online player again, so B's open Feed loses its round button, a thread shows the strip "Writing
+    is paused" in place of the composer, and a heart click shows "Writing is paused" with the error sound; B keeps the
+    more button on B's own posts. A, a moderator, gets the same look but keeps a more button on every post and the pin
+    button on announcements, since the site still deletes and pins while writing is off: A deletes a post of B's (more
+    menu, "Delete", the dialog "Delete this post?", then "Post deleted", and the post leaves B's feed) and pins and
+    unpins an announcement ("Post pinned", "Post unpinned"). A Feed opened afterwards opens that way. `/feed dev writing
+    true` brings everything back, as fast. `/feed dev offline true`: a Feed that is open keeps its list readable and
+    shows "Connection lost" with "Retry"; a Feed opened afresh shows "Feed unavailable" with "Retry". `/feed dev offline
+    false`: "Connection lost" goes and the lists reload where they are, and a Feed showing "Feed unavailable" loads its
+    list, both with no click. `/feed dev disabled true`: an open Feed shows "Connection lost" as above, a Feed opened
+    afresh shows "Feed is switched off" with "Retry"; `/feed dev disabled false` brings it back as `offline false` does.
+38. **A dedicated server restart.** Stop the server (`stop`) while B has Feed open on a thread: B returns to the menu with
+    no error in either log. Start it again and join: Feed opens afresh on Announcements and shows the new server's
+    content (in memory mode the sample again: what was posted is gone, and the announcers added by command with it),
+    never a post or draft of the last visit. A notification that was delivered before the stop is still on the phone.
+    With the site backend, redo it (stop the server with `stop` in its console, or over RCON): the client is back on the
+    title screen with no error, the server is up again in under a minute, and once joined Feed shows the site's posts,
+    yours included. Its log says `Feed uses LNB's website` at the start and `Connected to LNB's Feed event stream` a
+    fraction of a second later (the site opens its stream with a ping).
+39. **The website: posts made in the browser.** B, a plain player, has Feed open on Global at the top. Another person,
+    in the browser, posts: the post is at the top of B's Global within two seconds, highlighted. They reply to a post of
+    B's: B gets the banner "Nouvelle réponse", "Mika L. : …" (the name as the site gives it), and the reply count and the
+    unseen-replies dot move. A third person likes it: the count moves. An announcer posts an announcement and pins it from
+    the browser: B gets its banner, and the pinned group on "Annonces" holds it. The first person deletes their post: it
+    leaves B's Global. A post B writes in Compose appears on the website's Feed page. Names read as the site gives them:
+    "Camille R." with the handle `@Cam_Roux`, a person who hides their real name as `SteveBuilds` with no handle, a second
+    linked account as "Léa B." with `@Lea_Alt`, an announcer with the violet badge, an anonymous post as "Anonyme".
+40. **The website: a player who was offline.** B leaves. In the browser, another person replies to a post of B's; B joins:
+    Feed's icon shows a badge `1`, with no banner and no sound at login, and B's post carries the unseen-replies dot.
+    Redo it with the Minecraft server stopped while the browser replies, then started: the site's queue is empty within
+    a few seconds of `Done` (the server drains it when it starts, before its stream connects), and B finds the badge `1`
+    at login, exactly once. Players who have played on the world but are offline get every notification the server
+    drains, a checker's own runs included: start from a world whose `data/lnbphone_notifications.dat` holds nothing old
+    if the count matters.
+41. **The website: the site off.** With Feed open on Global on B's phone, kill the site's process. B's list stays,
+    readable, with "Connexion perdue" and "Réessayer" within a second. A Feed opened afresh shows "Feed unavailable".
+    Joining the Minecraft server is as quick as ever. The server's log has one line for each new reason the stream is
+    down (`closed`, then `ConnectException`, then `HTTP 503` while the site starts again), not one for each retry, and
+    Warden's `LNB's API is unreachable` once, then `reachable again` once. Start the site: B's Feed is back within about
+    15 seconds of the site answering (the client's own retry), with no click, and `Connected to LNB's Feed event stream`
+    follows at the stream's next try (its backoff is 1 to 30 seconds; in the second run it came 0.1 seconds after the
+    site answered).
+42. **The website: Feed off, writing off.** Switch the `feed` flag off on the site (`/admin/settings/flags`, or the
+    admin's `PATCH /api/admin/flags/feed`). The site closes the server's event stream (within its 10-second flag cache;
+    at once when switched from the admin) and refuses the reconnection as switched off: a Feed open on a loaded list
+    shows "Connexion perdue" within a second and stays readable, and the server's log says `disconnected (the stream
+    ended)`, then `disconnected (Feed is switched off on the site)`. A Feed opened afresh shows "Feed désactivé" with
+    "Réessayer", and no round button. Switch it on: with no click, an open list is back within 15 seconds (the app asks
+    again by itself), and a "Feed désactivé" block is replaced by the list at the server's next try, within a minute
+    (it tries every 60 seconds while Feed is off). Do the same with `feed.serverApi`: the same, the game's side only.
+    Switched off again within that minute, while the server waits for its next try, an open Feed hears of it at that
+    try, up to a minute later. Switch `feed.writing` off: a Feed opened
+    afterwards has no round button, and a heart says "Écriture suspendue"; a Feed already open learns of it from its
+    next post, reply or like. A moderator keeps the more buttons and an announcer the pin buttons, as in item 37. Switch
+    it on: a Feed opened afterwards has them back.
+43. **The website: roles.** With Feed open on "Annonces", give B the announcer role on the website (the Person page's
+    switch, or `PUT /api/feed/admin/announcers/<user>`): the round button appears on B's phone within two seconds, with
+    no new login; take it away: it goes. A Warden admin in game has the round button on "Annonces", a more button on
+    every post, the pin button on announcements, and the line "Auteur : …" on an anonymous post; the chat offers
+    `/feed announcer`, whose answers read "Annonceurs : Kael M. (Kael_Builder)", "Cam_Roux peut désormais publier des
+    annonces.", "Cam_Roux ne peut plus publier d'annonces.", "Admin_Lune est modérateur : …" and "Visitor42 n'a pas de
+    compte LNB.". An announcer who is not a moderator has the round button and the pin buttons, and `/feed` is an
+    unknown command for them. A username with no LNB account reads with no round button, and a heart says "Compte LNB
+    requis"; a Warden-banned player (who can only join while `auth.mode` is `off`) reads, and a heart says "Écriture
+    bloquée (sanction)". Not yet tried: an operator who is no moderator, a command block, `execute as`, and the
+    console.
+44. **Single-player, and a site that is not set up.** With `backend.kind = "site"` in a single-player world, Feed opens on
+    "Feed unavailable", the log says `Feed calls LNB's website from dedicated servers only`, and the site's access log
+    shows no call from that game. With `api.url` or `api.token` blank on a dedicated server, Feed is unavailable and the
+    log holds no stack trace. With the memory backend, Feed works in single-player.
+45. **Sounds.** With the game's own sounds around, listen to what Feed adds to the phone's: a tap on a heart, a reply
+    button, the round button, "Post" and "Reply" when they succeed, a heart refused to a guest (the low error note), the
+    pin and unpin, a notification from Feed (the same two chimes as every app's). Say if one is too loud, too quiet or
+    grating, as in item 17. "Sounds" off in Settings: Feed makes no sound at all.
+46. **Feed in French.** Set the game to French and open Feed: every text is French, with no raw key (`lnbphone_feed.`) and
+    French typography (`Annonces`, times such as `2 min` and `3 h`, a space before `:` in a banner such as `Lune G. : …`),
+    the commands' answers too (`/feed announcer list`). "Français (Canada)" reads the same. Switch back to English with
+    Feed open: the phone goes home and Feed, opened again, is in English; a draft typed in Compose is still there.
+47. **Other mods' key bindings.** In the server's real modpack, with Compose or a reply field focused: letters that other
+    mods bind (JEI's search key, Emotecraft's wheel, a minimap's keys) type into the field and do nothing else; Ctrl+Enter
+    publishes and no other mod takes it; the phone's key does what item 8 says. Feed's own screens never leave a key press
+    for the world to see.
+48. **GUI scales 5 and above.** At 5, 6 and 9 (a 1440p or 4K screen on "Auto"), Feed's cards, faces, badges, counts, the pill
+    and the snackbars are sharp and evenly spaced; the heart's pop and the pill's slide do not tear; a 1-pixel hairline
+    between cards is even. At GUI scale 1, Feed shows "GUI scale: 2+" like every app.
+49. **Two accounts of one LNB account, and a changed name.** Link two Minecraft accounts to one LNB account and have the
+    person choose, on the website, which posts: a post shows the name chosen on the site. Change the real-name setting on
+    the site ("show my real name" off): the cards in game, old ones included, show the username alone, with no handle,
+    after the next load. Delete the LNB account from the admin: its posts, replies and likes leave the open feeds.
+
+### Feed against a local website
+
+How the first run against the real site was done (November 2026); the scripts are small and live outside the
+repositories. You need the website's repository with its `node_modules` and its `.env`, Docker with its Compose
+PostgreSQL up, and this repository built.
+
+1. **A database of its own.** `docker exec lnb-website-postgres-1 psql -U lnb -d lnb -c 'create database lnb_c1'`.
+2. **The site on a port of its own.** Copy the site's `.env` to a file outside the repository with `DATABASE_URL` ending
+   in `/lnb_c1` and `BETTER_AUTH_URL=http://localhost:3010`, then, in the website's checkout,
+   `pnpm exec nuxt dev --port 3010 --dotenv <that file>`. The migrations apply at the first request; a cold start takes
+   about a minute and a half, a warm one half a minute.
+3. **People.** Insert them in `lnb_c1` as the site's own dev seeds do: a `user` row each (`role` null, `feed-announcer`,
+   `warden-admin` or `admin`), a `warden_player` row (`show_real_name` true or false), a `minecraft_account` row per
+   linked account whose `uuid` is the offline UUID of the username (`UUID.nameUUIDFromBytes("OfflinePlayer:" + name)`),
+   a `warden_ban` row for the banned one, and a `session` row each with a known token, whose cookie
+   `better-auth.session_token` is the token, a dot and its HMAC-SHA256 with `BETTER_AUTH_SECRET` in base64, URL-encoded.
+   The first run had a plain player who shows their name (`Cam_Roux`), one who hides it (`SteveBuilds`), one with two
+   accounts (`LeaBuilds`, `Lea_Alt`), an announcer (`Kael_Builder`), a Warden admin (`Admin_Lune`), a banned player
+   (`Sam_D`), a second plain player for the browser (`MikaPvP`), a site admin with no account for the flags, and a guest
+   with no account at all (`Visitor42`).
+4. **Flags.** As the site admin, `PATCH /api/admin/flags/feed` with `{"enabled":true}` (`feed.serverApi` and
+   `feed.writing` follow it; `feed.live`, the browser's live updates, is seeded off on its own and switched on
+   separately, and the game doesn't need it). This also clears the site's flag cache at once; a change made in the
+   database takes up to 10 seconds. Browser calls need the session cookie and an `Origin` of the site.
+5. **Posts.** Through the routes, not the database, so that events and notifications go out: the server's
+   `POST /api/feed/server/posts` with the secret, or the browser's `/api/feed/posts` with a cookie. The site's limits
+   (3 posts a minute and 15 an hour per account) are in its memory: restarting it resets them.
+6. **The Minecraft server.** In `apps/feed/run/config` (keep a copy of the memory setup first):
+   `lnbphone_feed-server.toml` with `kind = "site"`, `lnbwarden-server.toml` with `url = "http://localhost:3010"`, the
+   site's `WARDEN_SERVER_SECRET` as `token` and `mode = "OFF"`. With `off`, Warden calls nothing and lets anyone join
+   under any name, which is what lets a scripted client be each person in turn; Feed still calls the site. What that
+   leaves untested is Warden's own part: the device link, a banned player refused at the door, a kick on unlink or ban,
+   and `optional` mode's guests. `enable-rcon=true` with a port and a password in `server.properties` lets a script
+   stop it cleanly. Then `./gradlew :apps:feed:runServer -Pserver_port=25591`.
+7. **The checks.** The live check (below, "Feed's automated checks") drives the mod's own `SiteBackend` and stream
+   through every route; it empties Feed's tables, so seed the posts again after it. The `site-*` capture scenarios play
+   a client on the server, as each person.
+
 ## Automated checks
 
 ### Unit tests
@@ -199,7 +409,7 @@ Settings app (played through `PhoneTester`, the test support apps use too, in `p
 check Ping's session, target and conversation screen, and that every code sample of
 `docs/writing-an-app.md` is still found in the file it quotes.
 
-### Screenshots
+### Screenshots of the phone
 
 ```sh
 ./gradlew :apps:demo:runCapture -Pcapture=<scenario> [-PcaptureDir=<absolute directory>] [-PdemoApps=<n>] [-PcaptureSize=<w>x<h>]
@@ -214,8 +424,8 @@ the home screen with sample icons. A fresh `apps/demo/run/` needs an `options.tx
 | Scenario | Flags | Shows |
 |---|---|---|
 | `smooth` | | the smooth layer's test sheet at GUI scale 2 to 4 and forced 5, 6 and 9, after a resource reload, over a world |
-| `kit` | | every page of the kit's gallery and the composed Feed screens, two at a time, at GUI scale 2 to 4 |
-| `kit-phone` | | the kit inside the phone, in a world: hover, a slide caught half way, the sample Feed scrolled, a menu, a dialog, Compose typed into and sent |
+| `kit` | | every page of the kit's gallery and the screens of "Post sample", two at a time, at GUI scale 2 to 4 |
+| `kit-phone` | | the kit inside the phone, in a world: hover, a slide caught half way, "Post sample" scrolled, a menu, a dialog, Compose typed into and sent |
 | `ping` | | Ping, the example app: a ping typed and sent, the peek and the banner of pings arriving, the badge, landing on the conversation, the two refusals; GUI scale 2 to 4 and French |
 | `banner` | | the notification banner's states and frames; a real notification sent by `/phonedemo` and read back |
 | `shell` | `-PdemoApps=6` | the phone's flows: open, close, the home screen, an app, back, the home button, the centred placement, badges, a click outside, GUI scale 1 |
@@ -234,3 +444,111 @@ icon by its app's id.
 
 What the captures can't check: sounds, a second player, a dedicated server, other mods, real skins, scales above 4
 outside forced shots, and how the phone feels in the hand. That is what the plan above is for.
+
+### Feed's automated checks
+
+Feed's unit tests (about 600, `./gradlew :apps:feed:test`, part of `./gradlew build`) cover the text rule and the
+payloads (every one round-trips and a hostile one is refused), the memory backend against the contract's test vectors,
+the website backend against a fake site (answers, errors, a stalled body, the event stream and its reconnections), the
+server's rights, limits, relay, notifier and command, the client's session (live posts, the pill, counts, pins, resets,
+drafts and their keys), and the screens played through `PhoneTester` in each of the art direction's states. The
+phone's own tests cover `sendToEveryone` with `except`. `tools/sprites`' test fails when Feed's icon is stale.
+
+**A dedicated server start** is part of every check of Feed, since a client class loaded on a server is the worst bug
+this project can ship:
+
+```sh
+./gradlew :apps:feed:runServer -Pserver_port=25571
+```
+
+It needs `apps/feed/run/eula.txt` with `eula=true` (accepting Minecraft's EULA is a person's decision: no tool creates
+it), and a configuration in `apps/feed/run/config`: `./gradlew :apps:feed:prepareMemoryRun` writes the memory backend's.
+The log must show the line `Feed uses its memory backend` and `Done`, and never `Attempted to load class
+net/minecraft/client` or `invalid dist`. Stop it with `stop` in its console, or by its process id: the Java process whose
+command line names `serverRunProgramArgs.txt` in this checkout's `apps/feed/build/moddev/` (Feed's client names
+`clientRunProgramArgs.txt` there instead, and both hold `fml.modFolders=lnbphone_feed`). Never stop Java processes by
+name or by port: they may belong to other runs.
+
+**Screenshots of Feed** come from its own harness, a smaller cousin of the demo's (Feed cannot depend on the demo):
+
+```sh
+./gradlew :apps:feed:runCapture -Pcapture=<root|guest|thread|compose> [-PcaptureDir=<absolute directory>] \
+    [-PcaptureLang=<fr_fr|en_us>] [-PcaptureScale=<GUI scale>] [-PcaptureSize=<w>x<h>] [-PcaptureUser=<name>]
+```
+
+The task first writes the run's game folder, `apps/feed/build/capture-run`, from the committed `apps/feed/example-config/`
+(the memory backend with the sample posts, `Visiteur_42` a guest, Warden's authentication off) and an `options.txt` that
+skips the first-launch screen, so nothing is set up by hand and the developer's `apps/feed/run` is never touched. The
+client then plays the scenario in a world of its own (flat, creative, no cheats: the player is not an operator),
+with the sound muted and a fixed clock (12 November 2026, 14:34 in Paris, the moment the mockups draw), and quits; a
+watchdog kills it after 6 minutes. Shots go to `captureDir`, or `apps/feed/build/capture-run/captures/feed/`. The
+defaults are French at GUI scale 3 in a 1280 x 960 window, as Camille R. (`Cam_Roux`), or as `Visiteur_42` for `guest`.
+`captureLang` and `captureScale` change the language and the scale the scenario starts with, and with either set the
+scenario leaves out its closing shots in English at GUI scales 2 and 4 (they would repeat the others). Minecraft allows
+GUI scale n only in a window of at least 320n x 240n pixels (1280 x 960 for scale 4, 1600 x 1200 for scale 5): ask for
+the window with `captureSize`, which the desktop may still shrink to fit the screen (on the developer's machine a 1600 x 1200
+request came out 1600 x 1175, too small for scale 5, so that scale is for the hand test). The run stops with `Feed capture stopped: ...` in
+the log and a non-zero exit code, and takes no shot, when the scale in force is not the one asked for, when the window
+is minimised or when the render target is not the window: an early run once came out blank for that reason. The harness also detaches the game's mouse and keyboard
+callbacks when it starts, so the real mouse can move over the window while it runs (a click was once lost to that);
+leave the window alone anyway: it opens on the desktop for about a minute.
+
+| Scenario | Shows | Needs |
+|---|---|---|
+| `root` | Announcements with its pinned posts, Global, the pill with its arrow and without it, an announcement's banner and the dot on its tab, landing from that banner, the connection lost, Feed unavailable and Feed switched off (on Announcements, and on Global with no compose button over the block), writing paused (a like refused with the reason), then English at GUI scale 2 and 4 | the memory backend with the sample seed |
+| `guest` | the guest's look: no compose button, a like refused, the thread's strip, a refused reply | `Visiteur_42` under `memory.guests`, which `captureUser` defaults to for this scenario |
+| `thread` | a thread from its card, the reply composer collapsed, hovered, expanded and typed into, a reply to a reply, sending, an own reply deleted, the no-replies row, landing on a reply from its notification, deleting an own post | the sample seed |
+| `compose` | Compose as a player (typing, the counter's colours, over the limit, anonymous, sending, posted, a failure, the closed draft kept) and as an announcer (the destination, anonymous), pinning (tooltip, the replace dialog, the group), then English at GUI scale 2 | the sample seed; the scenario makes Camille an announcer itself, through the backend |
+
+`FeedScenarios.kt` and `WriteScenarios.kt` are in `apps/feed/src/capture/`, a source set the jar never holds; a new
+scenario is added to `FeedScenarios.get`.
+
+**Against the website.** `SiteScenarios.kt` holds scenarios that join a dedicated server running on the site backend
+("Feed against a local website") instead of opening a world, as the person `-PcaptureUser` names, and do what other
+people do through the site's browser routes, with the session cookies of `FEED_LIVE_COOKIES` (a JSON object, `root` the
+site admin) on the site `FEED_LIVE_SITE`:
+
+```sh
+FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_COOKIES='{"mika": "better-auth.session_token=...", ...}' \
+./gradlew :apps:feed:runCapture -Pcapture=site-player -PcaptureUser=Cam_Roux -PcaptureServer=localhost:25591 \
+    -PcaptureControl=<folder> -PcaptureWatchdog=1500 -PcaptureDir=<absolute directory>
+```
+
+What a client can't do, killing and starting the site or restarting the server, it asks for by writing
+`req-<kill-site|start-site|restart-server>` in the `captureControl` folder and waiting for `done-<same>`: a small script
+beside the run does it, by the processes' own IDs. The fixed clock is off for these runs, since the site's posts have
+real times.
+
+| Scenario | As | Shows |
+|---|---|---|
+| `site-player` | a plain player | the site's content, a post made in game read back in the browser, a post, reply, like, pin and deletion from the browser reaching the open phone, writing off and on, Feed off and on, the site killed and started, a reply while offline, the server restarted |
+| `site-outage` | a plain player | Feed off under an open Feed, the switched-off block and its Retry, the site killed under a loaded list and started again |
+| `site-return` | a plain player | the badge for a reply made while the server was stopped, then the announcer role given and taken in the admin |
+| `site-flags` | a plain player | timed, with no click: `feed` and `feed.serverApi` switched off and on under an open Feed, the switched-off block coming back by itself, the site killed and started, a reply while offline, the server restarted |
+| `site-dots` | a plain player | Global's dot cleared while Feed is off, watched over two minutes of refusals (a shot every 4 seconds: the dot stays out, no snackbar), Feed back by itself, then a player joining while Feed is off |
+| `site-moderator` | a Warden admin | the round, more and pin buttons, the author line of an anonymous post, `/feed announcer` and its answers |
+| `site-announcer` | an announcer | the round and pin buttons, `/feed` unknown |
+| `site-guest` | a username with no LNB account | no round button, a heart refused |
+| `site-banned` | a Warden-banned player | a heart refused for the ban |
+
+**The live check.** `LiveSiteCheck` (in `apps/feed/src/test/.../backend/site/`) runs the mod's own `SiteBackend` and
+`FeedEvents` against a running site: every route of the backend interface and every outcome, the contract's test
+vectors (text, idempotency, anonymity by viewer, pages, pins, unread dots and markers), the notification queue and its
+pages, the command's calls, the flags, and the stream with each event made through the browser's routes,
+`Last-Event-ID` after a dropped connection, the stream's opening ping (at once, with no `id`), and the stream closed by
+the site when `feed` or `feed.serverApi` goes off, refused while off and made again once it is back. It is skipped
+unless both `FEED_LIVE_CHECK=1` and `FEED_LIVE_SITE` are set (the second alone, which the capture runs use, is not enough), and empties Feed's tables in the
+database it is given:
+
+```sh
+FEED_LIVE_CHECK=1 FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_TOKEN=<WARDEN_SERVER_SECRET> FEED_LIVE_DB=lnb_c1 \
+FEED_LIVE_COOKIES='{"camille": "...", ...}' ./gradlew :apps:feed:test --tests '*LiveSiteCheck*'
+```
+
+It takes about four minutes, most of it waiting out the site's rate limits, and prints how long the stream took to
+connect (a few milliseconds since the site opens it with a ping) and to be closed after a flag went off (about a
+second).
+
+What the captures can't check: a second player in the game, the sounds, scales above 4, the real skins, Warden's
+authentication, and how it feels in the hand. That is what items 30 to 49
+are for.

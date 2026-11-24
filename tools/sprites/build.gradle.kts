@@ -6,15 +6,16 @@ plugins {
 }
 
 val guiTextures = rootProject.layout.projectDirectory.dir("phone/src/main/resources/assets/lnbphone/textures/gui")
+val feedTextures = rootProject.layout.projectDirectory.dir("apps/feed/src/main/resources/assets/lnbphone_feed/textures/gui")
 val mainClassName = "fr.bde_teknantes.lnb.phone.sprites.MainKt"
 
 tasks.register<JavaExec>("generateSprites") {
     group = "lnbphone"
-    description = "Draws every phone sprite into the phone's assets."
+    description = "Draws every phone sprite into the phone's assets, and Feed's home icon into Feed's."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass = mainClassName
     jvmArgs("-Djava.awt.headless=true")
-    args("--out", guiTextures.asFile.absolutePath)
+    args("--out", guiTextures.asFile.absolutePath, "--feed-out", feedTextures.asFile.absolutePath)
 }
 
 tasks.register<JavaExec>("contactSheet") {
@@ -32,5 +33,7 @@ tasks.test {
     // The test checks the committed PNGs against what the generator draws now.
     systemProperty("lnbphone.guiTextures", guiTextures.asFile.absolutePath)
     systemProperty("java.awt.headless", "true")
+    systemProperty("lnbphone.feedTextures", feedTextures.asFile.absolutePath)
     inputs.dir(guiTextures)
+    inputs.dir(feedTextures)
 }

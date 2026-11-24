@@ -8,6 +8,7 @@ import kotlin.system.exitProcess
 // `./gradlew :tools:sprites:contactSheet -Psheet=<file>` (writes a sheet for checking by eye).
 //
 //   --out <dir>          assets/lnbphone/textures/gui of the phone; the sprites go under it
+//   --feed-out <dir>     assets/lnbphone_feed/textures/gui of Feed: its own copy of the home icon (feedSprites())
 //   --sheet <file>       a contact sheet PNG of the whole set
 //
 // What gets exported (folders, densities) is decided in the code alone: SmoothFormat's defaults and shellSprites().
@@ -20,8 +21,9 @@ fun main(args: Array<String>) {
         pair[0].removePrefix("--") to pair[1]
     }
     val out = options["out"]
+    val feedOut = options["feed-out"]
     val sheet = options["sheet"]
-    if (out == null && sheet == null || options.keys.any { it != "out" && it != "sheet" }) usage()
+    if (out == null && feedOut == null && sheet == null || options.keys.any { it !in setOf("out", "feed-out", "sheet") }) usage()
 
     val format = SmoothFormat()
     val shell = shellSprites()
@@ -34,6 +36,10 @@ fun main(args: Array<String>) {
         val unchanged = results.count { it.value == WriteResult.UNCHANGED }
         println("${shell.size + smooth.size} sprites in $out, $unchanged unchanged")
     }
+    if (feedOut != null) {
+        val results = writeSprites(File(feedOut), feedSprites())
+        results.forEach { (path, result) -> println("${result.name.lowercase()}  $path") }
+    }
     if (sheet != null) {
         val file = File(sheet)
         file.absoluteFile.parentFile.mkdirs()
@@ -43,6 +49,6 @@ fun main(args: Array<String>) {
 }
 
 private fun usage(): Nothing {
-    System.err.println("Usage: [--out <textures/gui dir>] [--sheet <png>]")
+    System.err.println("Usage: [--out <textures/gui dir>] [--feed-out <Feed's textures/gui dir>] [--sheet <png>]")
     exitProcess(2)
 }

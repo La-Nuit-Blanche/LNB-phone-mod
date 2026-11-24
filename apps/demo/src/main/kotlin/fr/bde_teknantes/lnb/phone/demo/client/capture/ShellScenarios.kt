@@ -5,7 +5,7 @@ import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
 /**
- * Task 4: the phone shell, in a world, step by step through art direction 17's phone flows. Run with the sample apps
+ * `shell`: the phone shell, in a world, step by step through art direction 17's phone flows. Run with the sample apps
  * so the home screen looks like the reference sheet: `-PdemoApps=6` for [shell], `-PdemoApps=35` for [shellPages].
  *
  * Mid-slide frames hold the animation at half its eased course, which is where the art direction measures them
@@ -170,6 +170,8 @@ internal object ShellScenarios {
     private fun CaptureScript.badges(scale: Int) {
         guiScale(scale)
         run {
+            // `sample_feed` is art direction 7.4's Feed, the first sample app (the reference sheet's icon), not the
+            // demo's "Post sample" (`feed_sample`).
             CaptureHooks.fakeBadges { id -> if (id.path == "sample_feed") 3 else if (id.path == "hello") 12 else 0 }
             CaptureHooks.holdLedOn(true)
             CaptureHooks.fakeLatency(200)

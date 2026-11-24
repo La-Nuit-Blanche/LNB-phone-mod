@@ -125,3 +125,10 @@ enum class Glyph(val id: String, val tile: Tile, grid: String) {
         val ACCENTS = mapOf('O' to Ink.O, 'Y' to Ink.Y, 'G' to Ink.G, 'R' to Ink.R, 'B' to Ink.B)
     }
 }
+
+/**
+ * Feed's own home icon, `assets/lnbphone_feed/textures/gui/feed.png`: the same glyph as the phone's `icon/feed`
+ * sample (7.4), drawn into Feed's folder so that the app doesn't depend on a sprite that belongs to the phone's
+ * internals. Written by `--feed-out`; its path is relative to that folder.
+ */
+fun feedSprites(): List<Sprite> = listOf(Sprite("feed", Glyph.FEED.draw().toImage()))

@@ -47,3 +47,6 @@ libs/
 
 # A reference image of unknown origin, kept locally for the art direction; never committed.
 design/reference/
+
+# Browser automation output (website checks run from this folder)
+.playwright-mcp/

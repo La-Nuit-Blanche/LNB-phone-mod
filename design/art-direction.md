@@ -1,31 +1,28 @@
 # LNB Phone: art direction
 
-Version 5. The user validated a storyboard canvas built from version 4, and ten development tasks then built the phone from it. Along the way developers and reviewers found passages that were wrong, contradicted each other, said nothing or could not be built as written, and decisions were made. Version 5 brings the document in line with what was built; where the two differ, the code is right. The Feed app (section 9) is not built yet and will be built from this document. Every value here is final unless the user changes it.
+Version 6.1. Feed, the first app, now has its real backing: its data lives on the LNB website, which the game and the browser both read and write. After the user's decisions of 2026-11-23, version 6 brings section 9 and the Feed flows in line: names are a first name and an initial, moderators replace operators, announcers become a role of the site, only players with an LNB account write, and Feed has states for when the website cannot be reached. The phone itself (the shell, the kit, notifications and settings, everything outside section 9 and its flows) is as built in version 5; where the two differ, the code is right. The Feed app is not built yet and will be built from this document. Every value here is final unless the user changes it.
 
-## Changes since version 4
+## Changes since version 5
 
-- **Rendering.** Shapes are computed at the screen's real resolution instead of coming from sprites (8.1, 16.2). Icons are exported at one density per GUI scale, now scales 2 to 9 (8.1, 16.2). The `person` icon exists at 12, 20 and 28 dp, one per avatar size (8.6, 16.2). App names are truncated when drawn instead of capped at 16 characters (7.2, 13.3).
-- **GUI scales 2 and up.** The phone supports every integer GUI scale from 2, not only 2 to 4: Minecraft's Auto picks 5 on 1920 x 1200, 6 on 2560 x 1440 and 9 on 4K (Units, 8.1, 16.2). Scale 1 stays unsupported for apps; there, also no notification banner and no peek (the chime and the badge only), and Backspace goes home (8.1, 10.2, 2.3, P-15).
-- **Pixel rules at every scale.** Layout arithmetic of the shell rounds halves to even, the only rule that reproduces the positions of P-3.2 and P-12.4 (2.4, 14). A 1 dp hairline is 2 real pixels at GUI scale 3 and the 3 dp tab indicator is 4 pixels tall there (8.1, 8.7).
-- **Corner phone and hotbar.** The bottom-right phone overlaps the hotbar in any window narrower than about 474 GUI px, which includes the default 854 x 480 window at GUI scale 2. Accepted as it is (2.4).
-- **Keys.** The phone reacts once per real key press, never to key repeats; inside the phone, Esc, the phone key and Backspace act on the first press only, while a focused text field still receives repeats. While a text field has the focus the phone key and Backspace don't close or go back, and typed keys never leave the phone (2.3).
-- **Opening.** The device slides over the HUD for 250 ms and the screen opens when the slide ends; the player can still move during the slide. Another screen opening during the rise sends the phone back down. The crosshair is hidden while the phone is open, and F1 hides the sliding device (2.3, 14, P-1, P-2).
-- **Home pages.** The mouse wheel turns one page per whole notch (2.3).
-- **Inventory button.** With unread notifications the button opens the home screen only if the phone was put away on home or on an app's root screen; deeper in an app it reopens on that screen and shows the newest unread notification as the in-phone banner. This settles a contradiction with 2.3 (the phone keeps its screens and drafts until disconnect) in favour of drafts. Opening the phone closes the inventory properly (crafting grid and cursor items go back) and a fresh inventory opens when the phone closes. With the recipe book open the book covers most of the button: the covered part neither lights up nor takes a click, and the badge sits under the book. No button on the creative inventory (11, P-4, P-5, 19).
-- **Peek and banner.** The peek is two layers: the device stays below the hotbar, the banner is drawn above chat lines; F1 hides the peek and the sliding phone. No peek while another screen is open (chat, a container, the pause menu, the death screen): chime only, the badge waits; a screen opening during a peek sends it down. Several notifications at once: the last one shows and the chime plays once. A pressed banner freezes until released; a banner or peek whose notification the server clears goes away early; clicking the banner removes it at once (10.2, 10.3, 6.1).
-- **Read in place.** A notification whose target is already on screen gives no banner, the chime plays, and it counts as read. Reopening the phone onto an app left open keeps that app's badge, except for notifications the shown screen reports as visible, which are read in place. Notifications received while offline show as badges at login, with no peek and no chime (10.2, 10.3, 6.1).
-- **Banner text.** Each run of characters the fonts lack becomes one `?`, and emoji the emoji font lacks are dropped; the sample texts of P-8.3 and P-11.2 now end where the two lines of 10.1 end (10.1).
-- **Data rules** that the document never stated: 50 notifications per player shared by all apps, the oldest of the busiest mod dropped when full, 30 days of life, titles cut to 128 characters and texts to 320, a per-mod rate backstop (new 10.4).
-- **Sound.** The phone's sounds are its own sound events, each reusing the vanilla sound the document named at the same volume and pitch. Only the notification chime has a subtitle (`Phone notification` / `Notification du téléphone`); the interface sounds have none (15).
-- **Text and keys in apps.** The 280-character limit counts code points after NFC normalisation (an accented letter is 1, an emoji 1, a flag 2); the counter and the Publier button use the same untrimmed count and the text is sent trimmed. Enter makes a new line in a text area and Ctrl+Enter submits; Backspace does nothing while a menu or dialog is open; Tab cycles a menu's or dialog's items; a menu that fits neither below nor above its button covers it; a double click selects a word; selected text has the new `selection` colour `#3A8DF066` (8.3, 8.7, 9.7, 9.8, 2.3).
-- **Feed details.** A 17-character handle does not always fit its line: `@` plus sixteen `W` is about 205 dp, wider than the 188 dp column, so the handle line truncates too (9.2, 9.3, 19). `heart_filled` is drawn filled and stroked so that it keeps the outline heart's size (8.6). Avatars: a face is resolved from the player's UUID and name, and the default skin shows until it is known and for players the session service does not know (8.7, 9.2).
-- **App glyphs and fonts.** A glyph that is not 16 x 16 is fitted: a square multiple of 16 is sampled down, a 16-wide strip shows its first frame, anything else shows the bare tile (7.2). Inter has no non-Latin glyphs: such characters show one missing-glyph box per grapheme in apps (8.4, 19).
-- **Emoji.** Emoji show in apps and in the banner, from a bundled single-colour emoji font (Noto Emoji, SIL OFL), drawn in the text's colour at the text's size and weight. Skin tones, joined sequences, flags and keycaps are composed when the font has them, and degrade to the base emoji or its parts otherwise; the caret, wrapping and truncation never split one. This settles the open question of version 5 (8.4, 10.1, 16.2, 19).
-- **Settings.** Section 12 places the rows 49 dp apart with separate dividers at `y 193` and `y 242`, and 8.7 says where a row's own divider sits. The three settings are stored per Minecraft account in `config/lnbphone-client.json` on the player's computer (2.4, 8.7, 12).
-- **Language.** French is shown for the game languages `fr_fr`, `fr_ca` and `fr_ch`; everything else gets English (13.1).
+- **Version 6.1 (2026-11-24): the home icon.** Section 9 said "no bird logo" while 7.4 draws Feed's icon as a white bird on an azure tile. The user decided to keep the bird: section 9 now says the home icon is the bird of 7.4, and keeps the rest of the rule (no Twitter/X colours, our own wording).
+- **Names.** The real name is what LNB Warden shows in the tab list: a first name and an initial (`Alexandre M.`), not a full name. Every sample name follows (9.2, 9.3, 13, 17, 18). The 32-character test name is now really 32 characters: `Marie-Charlotte-Pénélope-Anne V.` (the old one had 33), with the same handle, a face and a post of its own (18.2, 18.3).
+- **Moderators replace operators.** Whoever deletes any post or reply and sees the author of an anonymous one is a moderator: a player whose LNB account has the site's `admin` or `warden-admin` role. Op level no longer matters (9.2, 9.3, 9.4, 9.9, 13.2, 17, 18). The keys `post.op_author` and `post.op_author.tooltip` are renamed `post.mod_author` and `post.mod_author.tooltip`, because "op" is no longer what they are about; their texts say "modérateurs" / "moderators".
+- **Announcers** are players whose LNB account has the `feed-announcer` role on the site, given from the site's admin or by an in-game command that asks the site; moderators are announcers too (9.2). The command's syntax is not in this document.
+- **Who can write.** Posting, replying and liking need a linked LNB account. A guest, a player with no LNB account, reads only: no compose button, a quiet read-only line where the reply composer was, and a short snackbar on a click on like or on a reply button. New section 9.11, strings `empty.global.text_guest`, `guest.reply`, `guest.snackbar`, flow F-25.
+- **Feed unavailable.** Feed's data lives on the website, so new section 9.12 settles what shows when it cannot be reached or the feature is switched off: the error block with a retry, the same block with other words for a switched-off Feed (`feed.disabled.*`, flow F-22), a snackbar `Connexion perdue` while a list stays on screen (`feed.connection_lost`, F-23), a retry row when older posts or replies cannot load (F-24), and what the per-action failures already cover. F-3 loses its last step, which moves to F-23.
+- **Deleting.** A deleted post disappears for every player at once and cannot be restored from the app, as before. New: moderators can still see deleted posts on the website for 30 days. Nothing changes on the phone (9.9).
+- **The website.** The same Feed can be read and written from the LNB website by signed-in accounts; replies and announcements notify in game only (9.1). A post shows its author's current name setting (9.2).
+- **Known slips fixed**, and the list removed from section 19: (1) F-4.3 now lists Global newest first, posts 1, 2, 8, 3, 4, and the sample table follows that order; (2) P-8 now notifies post 10, the new announcement of F-4, F-14 and F-20, and P-8.7 and F-20.6 no longer put it "at the top" but under the pinned posts (the landing of an announcement scrolls it into view, 9.10); (3) F-7.3 now shows R1 only above the composer, R2 and R3 being below; (4) post 8 has three replies with text (R6, R7, R4) and post 5 two (R8, R9, down from six), so every thread a flow opens has its replies written; (5) the 32-character name is fixed, as above; (6) F-18.8 is split into steps 8 and 9, and F-18 has 9 steps.
+- **Five inconsistencies fixed.** (a) A new post that would not be fully visible once inserted, such as an announcement under the pinned group, waits behind the pill, and a click scrolls it into view; own posts scroll into view too (9.5, 9.8, F-4 now 7 steps, F-14.8). (b) The reply banner of P-9, P-10 and F-20.2 is drawn as 10.1 cuts it to two lines, as in 9.10. (c) P-8.3 no longer points at P-9, the reply peek, but at step 7. (d) F-14.8: every other player gets the notification, not the author. (e) 9.3: the own-post private line wins over the moderator's.
+- **Section 19** records the user's decisions of 2026-11-23 that concern the phone app, and what version 6 chose without asking (guest and unavailable states, the key rename, the landing rule).
+- **After the user validated version 6 (same day).** (a) Announcements can be anonymous: the rule against it is gone (9.3, 9.8), the anonymous row stays usable in Annonces, an anonymous announcement shows `Anonyme` with no handle and no badge, its notification reads `Anonyme : …` (9.10), the private lines apply, and 9.4's "every post carries the badge" now has its exceptions; new sample post 12, F-14 now posts it, F-17 gains a step (5 steps), index total 208. (b) The site role is named `feed-announcer`, and any moderator can give or take it (9.2). (c) The reply count of a reply is the replies that answer it directly; on a main post, its thread (9.3, R2 now counts 1). (d) Threads are paged, 50 replies at a time, with the spinner row and the retry row at the end (9.7). (e) The announcer badge follows the author's current role (9.2, 9.4). (f) Banned players, and everyone while writing is switched off, get the guest look with their own words; strings `snackbar.banned`, `snackbar.writing_off`, `snackbar.too_fast` (9.11, 13.2, 13.3). (g) The pill has no arrow when the first new post is below the visible area, and keeps `arrow_up` when it is above (9.5, F-4.6). (h) Section 19 moves the accepted items into the confirmed lists.
+- **As built: the thread's composer (9.7).** Two departures of the built app, recorded: the collapsed reply field shows the start of the thread's draft when there is one, and the placeholder otherwise; and the replies run under the docked composer instead of the list resizing with it, ending with a spacer that follows the composer's height.
+- **Writing switched off keeps deleting and pinning (9.11).** While `feed.writing` is off, the more button (with `Supprimer`) and the pin button stay for whoever each post allows: an author on their own posts, a moderator on any, an announcer on announcements. The site still does both then, and an incident is when a moderator needs to delete. The rest of the writing-off look is unchanged.
+- **Flows.** F-22 to F-25 are new (switched off, connection lost, a list cannot load more, a guest reads); the flow index now counts 208 steps (17.2, 17.3).
 
 ## History
 
+- **Version 5:** brought the document in line with what ten development tasks built: shapes computed at the screen's real resolution and icons exported per GUI scale, 2 to 9; every GUI scale from 2 up, scale 1 for the shell only; layout arithmetic that rounds halves to even, and hairlines that are whole pixels at every scale; the corner phone overlapping the hotbar in narrow windows; key rules (once per real press, text fields keep their keys); the opening slide with a free mouse, and the crosshair hidden; the inventory button's rule for unread notifications and the recipe book; the peek as two layers and the banner rules (several at once, pressed, cleared, read in place); the banner text cleaning; the data rules of notifications (50 per player, 30 days, cut titles and texts, a rate backstop); the phone's own sounds with one subtitle; the 280-character count by code points after NFC, Enter and Ctrl+Enter, the selection colour; the handle line that can truncate, `heart_filled`, avatar resolution; fitted app glyphs and Inter's missing scripts; the bundled emoji font; the Settings rows and their per-account storage; French for `fr_fr`, `fr_ca` and `fr_ch`.
 - **Version 4:** names swapped (bold real name, grey `@username` handle, two-line post header); pinning (3 at most) and deleting (own posts and replies, operators any); the language rule (English by default, French for French game languages, mockups in French); interaction flows in a new section 17, with the mockup brief and the open questions moved to 18 and 19; the kit components and states they need (danger button, loading button, menu, dialog, tooltip, error snackbar, post highlight, over-limit highlight, more and pin buttons); explicit navigation rules (Esc closes the topmost menu or dialog, otherwise the phone; a click outside closes it; the phone reopens where it was); the banner without a time and with an event title; private lines on own anonymous posts and the unseen-replies marker; the "Feed indisponible" state and new-post arrival in both feeds; proofreading fixes.
 - **Version 3:** Annonces / Global tabs with Annonces first; fixed 48 dp tab indicator; French and English string table; identity from LNB Warden; operator line on anonymous posts; like and reply confirmed; thread screen; announcers and the announcer badge.
 - **Version 2:** one look (Slate); pixel shell with a smooth app layer in dp; the Feed app; smooth notification banner; status bar matches the app background inside apps; moon moved; bottom-right placement by default with a Settings switch.
@@ -723,7 +720,7 @@ In both kinds of field, selected text has a `selection` background, and a double
 
 The knob slides in 100 ms. The whole row around a toggle is clickable.
 
-**Segmented control** (32 dp tall, full radius): track fill `surface` with 1 dp inner border `stroke`; equal segments; the selected segment is a pill inset 3 dp, fill `surface-3`, label `label` `text-1`; unselected labels `text-2`, hover `text-1`. The selected pill slides in 150 ms.
+**Segmented control** (32 dp tall, full radius): track fill `surface` with 1 dp inner border `stroke`; equal segments; the selected segment is a pill inset 3 dp, fill `surface-3`, label `label` `text-1`; unselected labels `text-2`, hover `text-1`. A label is centred on its segment and has the room of the pill less 2 dp each side (the segment's width less 10 dp: 106 dp in each half of a 232 dp control); a longer one ends with an ellipsis. The selected pill slides in 150 ms.
 
 **List row** (full width)
 
@@ -814,36 +811,40 @@ The knob slides in 100 ms. The whole row around a toggle is clickable.
 
 ## 9. The social app: "Feed"
 
-Twitter-like in layout, not in branding: no bird logo, none of Twitter/X's colours (the accent is LNB's Ping Blue, likes are coral `#F2545B`, the announcer badge is violet), and the wording is our own. Home icon: section 7.4. UI strings are given in French; English versions are in section 13.
+Twitter-like in layout, not in Twitter/X's branding: none of its colours (the accent is LNB's Ping Blue, likes are coral `#F2545B`, the announcer badge is violet), and the wording is our own. The home icon is a white bird on the azure tile, as section 7.4 draws it: the user decided on 2026-11-24 to keep it. UI strings are given in French; English versions are in section 13.
 
 ### 9.1 Structure
 
 - Two top-level tabs, nothing else: **Annonces** (left, opens by default) and **Global** (right).
-- Annonces: posts by announcers only. Everyone can like and reply. The compose FAB shows only for announcers.
-- Global: all player posts, newest first, compose FAB for everyone.
+- Annonces: posts by announcers only. Everyone can read it; players with an LNB account can like and reply. The compose FAB shows only for announcers.
+- Global: all player posts, newest first. The compose FAB shows for players with an LNB account, and not for guests, who read only (9.11).
 - Thread: one post, its replies and a docked reply composer (9.7).
 - Compose: full screen, from a FAB (9.8).
 - The Feed root has no back button: the home button leaves the app.
 - Opening Feed from its home icon lands on Annonces, scrolled to the top. Opening it from a notification lands on the notification's target (9.10). Reopening the phone returns to the Feed screen it was closed on.
+- Feed's data lives on the LNB website. The same Feed can be read and written from the website by signed-in LNB accounts, and the game and the browser show the same posts at once. The browser has no notifications: replies and announcements notify in game only (9.2). When the website cannot be reached, or Feed is switched off, Feed says so (9.12).
+- Posts are plain text of at most 280 characters: no editing, links, mentions or hashtags.
 
 ### 9.2 Identity, roles and notifications
 
-There is no registration. Everything comes from the game and from LNB Warden, the same data as the server's tab list.
+There is no registration. Names and faces come from the game and from LNB Warden, the same data as the server's tab list; roles and posts come from the LNB website.
 
 | Item | Rule |
 |---|---|
-| Display name (bold) | the player's **real name** from LNB Warden, exactly the string the tab list shows (unchanged, may contain spaces and accents): `Alexandre Morel` |
+| Display name (bold) | the player's **real name** from LNB Warden, exactly the string the tab list shows: a first name and an initial, `Alexandre M.` (unchanged, may contain spaces, hyphens and accents) |
 | Handle (grey) | `@` + the **Minecraft username**: `@Alex_Craft` |
-| No real name | when Warden has no real name for the player (hidden or guest), the **username is the display name** and there is **no handle**, so the same word is never printed twice: `SteveBuilds` |
+| No real name | when Warden has no real name to show for the player (they hid it), the **username is the display name** and there is **no handle**, so the same word is never printed twice: `SteveBuilds` |
+| Current setting | a post shows its author's **current** name setting, not the one at posting time, also when the author is offline: a player who later hides their real name shows as the username alone on every post and reply they ever wrote, and the name comes back if they show it again. The server sends the current name; the app never keeps the one from when a post was written |
 | Lengths | handles are at most 17 characters (`@` + 16). Real names are capped by Warden (`RealNamesPayload.MAX_NAME_LENGTH`); every layout is checked with a 32-character real name and truncates the real name. The handle line truncates too (9.3) |
 | Avatar | the face of the player's skin, resolved from their UUID and name (8.7) |
-| Operators | players with op permission level 2 or higher |
-| Announcers | operators, plus players an admin has granted the right to by command. Only announcers can post in Annonces, pin, and see the destination choice in Compose |
-| Announcer badge | on every post and reply by an announcer, both feeds (8.7) |
+| Moderators | players whose LNB account has the site's `admin` or `warden-admin` role. Minecraft op level plays no part |
+| Announcers | players whose LNB account has the `feed-announcer` role on the site, given or taken by any moderator from the site's admin or by an in-game command that asks the site, plus all moderators. Only announcers can post in Annonces, pin, and see the destination choice in Compose |
+| Who can write | players with a linked LNB account post, reply and like. A **guest**, a player with no LNB account (possible when Warden runs in `optional` mode), reads only (9.11). So does a banned player, for the moment between a ban and the kick, and so does everyone while writing is switched off on the site (9.11) |
+| Announcer badge | on every post and reply whose author is an announcer **now**, in both feeds (8.7): like the name, it follows the author's current role. Someone who is no longer an announcer shows no badge, on old posts too, and someone who becomes one gets it on old posts. Anonymous posts never show it |
 
 Wherever a name appears in text (reply-to line, composer placeholder, notifications, private lines), it is the display name as defined above.
 
-Feed sends a notification (banner or peek, home badge count, LED, chime) for: **a new post in Annonces**; **a reply to one of the player's posts or replies**. Likes and new Global posts never notify. The player's own actions never notify them.
+Feed sends a notification (banner or peek, home badge count, LED, chime) for: **a new post in Annonces**; **a reply to one of the player's posts or replies**. Likes and new Global posts never notify. The player's own actions never notify them. A guest gets the announcements like anyone (they have no posts, so no replies). Notifications exist in game only: the website shows none.
 
 ### 9.3 Post card anatomy
 
@@ -851,9 +852,9 @@ Full-width cell on `bg`, separated by hairlines (timeline style, no boxed cards)
 
 ```
 x: 12        44 56                                 214    244
-   +--------+  Alexandre Morel (A)                 2 min  [...]   name line, y 10..27
+   +--------+  Alexandre M. (A)                    2 min  [...]   name line, y 10..27
    | avatar |  @Alex_Craft                                        handle line, y 28..43
-   |  32dp  |  [lock] Auteur : Mika Laurent @MikaPvP              private line (when it applies)
+   |  32dp  |  [lock] Auteur : Mika L. @MikaPvP                   private line (when it applies)
    +--------+  Post text wraps here on as many
                lines as it needs, never cut.
                (reply) 3      (heart) 12                  (pin)   action row, 28 dp
@@ -885,20 +886,20 @@ x: 12        44 56                                 214    244
 |---|---|---|---|---|---|
 | Reply | icon `reply` 16 dp at `x 56`, count at `x 78` | icon and count `text-2` | icon and count `accent`, 28 dp `accent-soft` disc behind the icon | disc `accent-soft-2` | none |
 | Like | icon `heart` 16 dp at `x 120`, count at `x 142` | icon and count `text-2` | icon and count `like`, 28 dp `like-soft` disc | disc `like-soft-2` | `heart_filled` and count in `like` |
-| Pin | icon `pin` 16 dp at `x 220`, no count; **announcements only, visible only to announcers and operators** | icon `text-2` | icon `accent`, 28 dp `accent-soft` disc, tooltip `Épingler` (`action.pin`) | disc `accent-soft-2` | `pin_filled` in `accent`; hover tooltip `Désépingler` (`action.unpin`) |
+| Pin | icon `pin` 16 dp at `x 220`, no count; **announcements only, visible only to announcers (moderators included)** | icon `text-2` | icon `accent`, 28 dp `accent-soft` disc, tooltip `Épingler` (`action.pin`) | disc `accent-soft-2` | `pin_filled` in `accent`; hover tooltip `Désépingler` (`action.unpin`) |
 
-Counts are `caption`; 0 is hidden (icon only); thousands use `count.thousands` (`1,2 k` / `1.2k`). The reply count is the number of replies in the post's thread. Reply opens the thread with the composer expanded and focused.
+Counts are `caption`; 0 is hidden (icon only); thousands use `count.thousands` (`1,2 k` / `1.2k`). The reply count of a main post is the number of replies in its thread; that of a reply is the number of replies that answer it directly (the ones whose reply-to line names it). Reply opens the thread with the composer expanded and focused.
 
 **Unseen replies marker**: on the viewer's own posts and replies that received replies they have not seen, the reply icon and count are `accent` and a 6 dp `accent` dot sits centred at `x 50`, vertically centred on the icon. It clears when the viewer opens that thread.
 
-**Anonymous post:** anonymous avatar (8.7); display name `Anonyme` (`post.anonymous`) in `title-m` `text-2`; no handle, no announcer badge; the time stays. Announcements cannot be anonymous (9.8).
+**Anonymous post:** anonymous avatar (8.7); display name `Anonyme` (`post.anonymous`) in `title-m` `text-2`; no handle, no announcer badge; the time stays. Announcements can be anonymous too (9.8): an anonymous announcement is drawn the same way, keeps its place in Annonces (9.4), and its notification reads `Anonyme : …` (9.10).
 
-**Private line** (at most one per post, 16 dp, `lock` icon 16 dp in `text-3` at `x 56`, text `caption` `text-3` at `x 76`, truncated at `x 244`):
+**Private line** (at most one per post, 16 dp; when two would apply, the author's own line wins, so a moderator looking at their own anonymous post sees `Publié anonymement par toi`; `lock` icon 16 dp in `text-3` at `x 56`, text `caption` `text-3` at `x 76`, truncated at `x 244`):
 
 | Viewer | Text | Tooltip |
 |---|---|---|
 | The author of an anonymous post or reply | `Publié anonymement par toi` (`post.own_anonymous`) | none |
-| An operator, on someone else's anonymous post or reply | `Auteur : Mika Laurent @MikaPvP` (`post.op_author`: display name, then the handle when there is a real name; `Auteur : SteveBuilds` without). The handle truncates first, then the name | `Visible uniquement par les opérateurs` (`post.op_author.tooltip`) |
+| A moderator, on someone else's anonymous post or reply | `Auteur : Mika L. @MikaPvP` (`post.mod_author`: display name, then the handle when there is a real name; `Auteur : SteveBuilds` without). The handle truncates first, then the name | `Visible uniquement par les modérateurs` (`post.mod_author.tooltip`) |
 | Everyone else | no line; the server never sends the author to them | |
 
 ### 9.4 Annonces feed and pinning
@@ -906,15 +907,15 @@ Counts are `caption`; 0 is hidden (icon only); thousands use `count.thousands` (
 | Element | Value |
 |---|---|
 | Top | tabs at `y 0..43`, Annonces active |
-| Authors | announcers only; every post carries the announcer badge |
+| Authors | announcers only, anonymously or not. Every post carries the announcer badge, except an anonymous one and one whose author is no longer an announcer (9.2); such a post stays where it is |
 | Pinned group | on top, **at most 3**, most recent pin first |
 | Pinned cell | fill `surface`; a 16 dp meta line above the header: `pin` icon 16 dp at `x 28, y 8` in `text-2`, `Épinglé` (`post.pinned`) in `caption-strong` `text-2` at `x 56, y 8`. The rest of the cell moves down 18 dp |
 | After the pins | other announcements newest first, on `bg` |
-| Actions | reply and like for everyone; pin for announcers and operators |
+| Actions | reply and like for players with an LNB account (guests read only, 9.11); pin for announcers, moderators included |
 | FAB | announcers only; opens Compose with Annonces selected |
 | Empty | icon `megaphone`, title `Aucune annonce`, text `Les annonces du serveur apparaîtront ici.`; announcers also see the FAB |
 
-**Pinning** (any announcer or operator can pin or unpin any announcement, from the feed or from the thread's main post; the operator command does the same):
+**Pinning** (any announcer, moderators included, can pin or unpin any announcement, from the feed or from the thread's main post):
 
 | Case | Steps |
 |---|---|
@@ -931,17 +932,17 @@ Global posts cannot be pinned and never show the pin button.
 |---|---|
 | Top | tabs, Global active |
 | List | post cards from `y 44`, scroll bar on the right |
-| FAB | compose FAB at `(196, 310)`, everyone; opens Compose with Global selected |
-| Empty | icon `inbox`, title `Aucun post pour l'instant`, text `Lance la conversation !`, primary button `Écrire un post` (136 dp wide), which opens Compose |
-| End of list | when older posts are loading: a 48 dp spinner row; when there are no more: a 48 dp row `Tu as tout vu` (`feed.end`) in `caption` `text-3`, centred; then 72 dp of empty space so the FAB never covers an action row |
+| FAB | compose FAB at `(196, 310)`, for players with an LNB account; opens Compose with Global selected. Guests have none (9.11) |
+| Empty | icon `inbox`, title `Aucun post pour l'instant`, text `Lance la conversation !`, primary button `Écrire un post` (136 dp wide), which opens Compose. Guests: text `Les posts des joueurs apparaîtront ici.` (`empty.global.text_guest`) and no button (9.11) |
+| End of list | when older posts are loading: a 48 dp spinner row; if they cannot be loaded, that row becomes a 48 dp row with the text button `Réessayer` (`error.retry`) centred, and a click shows the spinner again (9.12); when there are no more: a 48 dp row `Tu as tout vu` (`feed.end`) in `caption` `text-3`, centred; then 72 dp of empty space so the FAB never covers an action row (kept for guests, so that layouts are the same) |
 
 **New posts while the feed is open** (same rule in Annonces and Global; posts arrive live from the server):
 
 | Scroll position | Behaviour |
 |---|---|
-| At the top (scroll 0) | new posts are inserted at the top at once, with the post highlight |
-| Scrolled down | the list does not move. A pill appears: 28 dp tall, full radius, fill `accent` (hover `accent-hover`, pressed `accent-pressed`), `arrow_up` 16 dp + `2 nouveaux posts` (`feed.new_posts`; in Annonces `feed.new_announcements`) in `caption-strong` `on-accent`, padding 12 dp, centred at `y 52`. Click: the list scrolls to the top (250 ms), the new posts are inserted with the highlight, the pill fades out. Scrolling to the top by hand does the same |
-| Own new post | always inserted at the top and scrolled to (9.8) |
+| The new posts would be fully visible once inserted (Global: at the top, so at scroll 0; Annonces: just under the pinned group, when that spot is in view with room for the post) | inserted at once, with the post highlight |
+| They would not be fully visible (the list is scrolled down; or, in Annonces, the pinned group pushes the post below the fold, even at scroll 0) | the list does not move. A pill appears: 28 dp tall, full radius, fill `accent` (hover `accent-hover`, pressed `accent-pressed`), `arrow_up` 16 dp + 4 dp gap + `2 nouveaux posts` (`feed.new_posts`; in Annonces `feed.new_announcements`) in `caption-strong` `on-accent`, padding 12 dp, centred at `y 52`. **The arrow shows only when the first new post's place is above the visible area** (the list is scrolled past it). When that place is below the visible area, or only partly visible at the bottom, as in Annonces at scroll 0 under the pins, the pill has **no icon**: the label alone with padding 12 dp each side, 20 dp narrower than with the arrow (about 169 dp for `2 nouvelles annonces`), same height and position. Click: the list scrolls (250 ms) so that the first new post is fully visible, the new posts are inserted with the highlight, the pill fades out. Scrolling by hand until the first new post would be fully visible does the same |
+| Own new post | always inserted at its place (the top of Global; under the pinned group in Annonces) and scrolled so that it is fully visible (9.8) |
 
 The pill counts all posts waiting; it updates in place when more arrive.
 
@@ -960,39 +961,39 @@ y 44   main post (anatomy 9.3, no hover, no relative time)
        replies, oldest first (post cards)
        ...
 y 306  ------------------------------------------------   composer (collapsed)
-       [ Répondre à Alexandre Morel…                  ]
+       [ Répondre à Alexandre M.…                     ]
 ```
 
 | Element | Value |
 |---|---|
 | Header | back button; title `Publication` (`thread.title`) |
 | Main post | at `y 44`, post anatomy without hover and without the relative time on the name line (the more button still shows when allowed); pinned line, private line and pin button apply. After the body: 8 dp gap, full timestamp in `caption` `text-2` (`time.full`, `14:32 · 12 nov.`), 4 dp gap, action row, 4 dp, full-width hairline |
-| Replies | post cards, oldest first, flat (one level). Each reply has reply and like (never pin) |
-| Replies loading | a 48 dp spinner row under the main post |
-| Reply to a reply | the composer targets that reply; the posted reply joins the same thread and shows a reply-to line `En réponse à Mika Laurent` (`post.reply_to`, `caption` `text-2`, at `x 56`) as its first optional line. Replying to the main post adds no reply-to line. An anonymous target is named `Anonyme` |
+| Replies | post cards, oldest first, flat (one level), loaded 50 at a time: at the end of the replies, as at the end of a feed, a 48 dp spinner row while the next 50 load, or the retry row of 9.12 when they cannot. Each reply has reply and like (never pin) |
+| Replies loading | a 48 dp spinner row under the main post; if the replies cannot be loaded, a 48 dp row with the text button `Réessayer` centred, and a click shows the spinner again (9.12) |
+| Reply to a reply | the composer targets that reply; the posted reply joins the same thread and shows a reply-to line `En réponse à Mika L.` (`post.reply_to`, `caption` `text-2`, at `x 56`) as its first optional line. Replying to the main post adds no reply-to line. An anonymous target is named `Anonyme` |
 | No replies | 48 dp row under the main post, `Aucune réponse pour l'instant` (`thread.no_replies`) in `caption` `text-2`, centred |
-| Bottom spacer | the composer's height + 12 dp after the last reply |
+| Bottom spacer | the replies run under the docked composer, which covers the bottom of the list; after the last reply, a spacer of the composer's height + 12 dp, which follows that height while the composer expands and collapses, so the last reply can always be scrolled clear of it |
 | Opening | from a card click (composer collapsed, scrolled to the top), from a reply action (composer expanded and focused), from a notification (scrolled so the notified reply is fully visible, with the post highlight) |
 | Post deleted while open | back to the feed (back transition), snackbar `Ce post a été supprimé` (`thread.deleted`) |
 
-**Reply composer** (docked at the bottom of the thread, fill `bg`, 1 dp `hairline` on its top edge):
+**Reply composer** (docked at the bottom of the thread, fill `bg`, 1 dp `hairline` on its top edge; a guest has a read-only strip in its place, 9.11):
 
 | State | Layout (app-local, dp) |
 |---|---|
-| Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre Morel…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. Hover: field hover state. Click: expands |
-| Expanded, 200 dp (`y 170..369`) | `En réponse à Alexandre Morel` (`post.reply_to`) in `caption` `text-2`, line box at `(12, 182)`; text area 232 x 112 at `(12, 202)` with the `n/280` counter (4 text lines visible, then it scrolls); at `y 326`: toggle at `(12, 332)` with label `Anonyme` (`reply.anonymous`) in `body-strong` at `x 56`, line box `y 333`; primary button `Répondre` (`reply.send`, 96 dp wide) right-aligned to `x 244`, `y 326` |
+| Collapsed, 64 dp (`y 306..369`) | text field 232 x 40 at `(12, 318)`, placeholder `Répondre à Alexandre M.…` (`reply.placeholder`, the target's display name or `Anonyme`), truncated with `…` before the field's right padding. When the thread has a draft, the field shows its start instead: its first line that is not blank, in `body` `text-1`, truncated the same way. Hover: field hover state. Click: expands |
+| Expanded, 200 dp (`y 170..369`) | `En réponse à Alexandre M.` (`post.reply_to`) in `caption` `text-2`, line box at `(12, 182)`; text area 232 x 112 at `(12, 202)` with the `n/280` counter (4 text lines visible, then it scrolls); at `y 326`: toggle at `(12, 332)` with label `Anonyme` (`reply.anonymous`) in `body-strong` at `x 56`, line box `y 333`; primary button `Répondre` (`reply.send`, 96 dp wide) right-aligned to `x 244`, `y 326` |
 | Répondre button | disabled while the text is empty (after trimming) or over 280 characters (counted as in 8.7, untrimmed; the text is sent trimmed) |
 | Sending | button in its loading state, text area in its sending state, toggle disabled |
 | Back while expanded | collapses the composer and keeps the draft (one draft per thread) |
 | Success | collapses, clears the draft and the toggle, the new reply appears at the end with the post highlight and is scrolled into view, snackbar `Réponse envoyée` (`reply.sent`) |
 | Failure | stays expanded with the draft intact, button enabled again, error snackbar `Échec de l'envoi` (`snackbar.send_failed`) with the action `Réessayer` |
-| Expand / collapse | 150 ms, ease-out / ease-in, the thread list area resizes with it |
+| Expand / collapse | 150 ms, ease-out / ease-in; the list keeps its size, and the part of it that shows above the composer shrinks and grows with it (the bottom spacer follows) |
 
 ### 9.8 Compose
 
 ```
 y 0   [X]                                        ( Publier )   header, 44 dp
-y 52  (av)  Alexandre Morel
+y 52  (av)  Alexandre M.
             @Alex_Craft
 y 96  +------------------------------------------------+
       | Quoi de neuf sur le serveur ?                  |  text area
@@ -1010,11 +1011,11 @@ y 96  +------------------------------------------------+
 | Author row | avatar 32 dp at `(12, 52)`; display name `title-m` at `x 56`, line box `y 52`; handle `caption` `text-2` at `x 56`, line box `y 70`. Without a real name: the username alone as display name, line box `y 59` (centred on the avatar) |
 | Author row, anonymous on | anonymous avatar; `Anonyme` in `title-m` `text-2` at line box `y 52`; `Masqué aux joueurs` (`compose.anon_sub`) in `caption` `text-2` at line box `y 70` |
 | Text area | at `(12, 96)`, 232 dp wide; **196 dp tall for players**, **152 dp for announcers**; placeholder `Quoi de neuf sur le serveur ?` (`compose.placeholder`); counter `n/280`; focused on open; Enter makes a new line, Ctrl+Enter publishes |
-| Anonymous row | 44 dp, `x 12..244`, 12 dp under the text area: `Publier anonymement` (`compose.anonymous`) in `body-strong` (line box at row `y 4`), `Nom masqué aux joueurs` (`compose.anonymous.help`) in `caption` `text-2` (line box at row `y 22`), toggle right-aligned to `x 244`, centred at row `y 22`. Default off. **Hidden while Annonces is selected**; selecting Annonces also turns it off. The slot stays empty so nothing jumps |
-| Destination (announcers only) | segmented control 232 x 32 at `(12, 316)`: `Annonces` / `Global`, same order as the tabs; preselected from the FAB that opened Compose. Everyone else never sees it |
+| Anonymous row | 44 dp, `x 12..244`, 12 dp under the text area: `Publier anonymement` (`compose.anonymous`) in `body-strong` (line box at row `y 4`), `Nom masqué aux joueurs` (`compose.anonymous.help`) in `caption` `text-2` (line box at row `y 22`), toggle right-aligned to `x 244`, centred at row `y 22`. Default off. **Visible and usable whichever destination is selected, Annonces included**; changing the destination leaves the toggle as it is |
+| Destination (announcers only) | segmented control 232 x 32 at `(12, 316)`: `Annonces` / `Global`, same order as the tabs; preselected from the FAB that opened Compose. A draft already started keeps the destination it had (see Cancel): the FAB decides only for a fresh draft. Everyone else never sees it |
 | Bottom | both layouts end at `y 347` |
 | Sending | Publier in its loading state, text area in its sending state, toggle and segmented control disabled, close button disabled |
-| Success | back to the destination tab (back transition), scrolled to the top, the new post inserted with the post highlight, snackbar `Publié` (`compose.posted`); the draft is cleared |
+| Success | back to the destination tab (back transition), scrolled to the top (in Annonces, further if needed so that the new post is fully visible), the new post inserted with the post highlight, snackbar `Publié` (`compose.posted`); the draft is cleared |
 | Failure | Compose stays open with the draft intact, Publier enabled again, error snackbar `Échec de l'envoi` with `Réessayer` (which publishes again) |
 | Cancel | the close button returns to the feed (back transition) and **keeps the draft** (text, toggle, destination) until published; no confirmation dialog |
 
@@ -1022,9 +1023,9 @@ y 96  +------------------------------------------------+
 
 | Who | What |
 |---|---|
-| Any player | their own posts and replies, including their anonymous ones |
-| Operators | any post or reply |
-| Announcers (not operators) | only their own, like any player |
+| Any player with an LNB account | their own posts and replies, including their anonymous ones |
+| Moderators | any post or reply |
+| Announcers (not moderators) | only their own, like any player |
 
 The more button (9.3) shows on exactly the posts and replies the viewer can delete. Its menu has one item: `trash` + `Supprimer` (`menu.delete`), destructive.
 
@@ -1036,16 +1037,58 @@ The more button (9.3) shows on exactly the posts and replies the viewer can dele
 | Cancel | the dialog closes, nothing changes |
 | Failure | the dialog closes, error snackbar `Action impossible` |
 
-Deleting a post deletes its whole thread. Nothing is restorable from the app.
+Deleting a post deletes its whole thread. A deleted post disappears for every player at once, in open feeds and threads (9.7, F-21), and cannot be restored from the app. Moderators can still see deleted posts on the LNB website for 30 days, after which they are purged; nothing changes on the phone. The posts, replies and likes of an LNB account that is deleted disappear the same way, without a dialog, and the counts follow.
 
 ### 9.10 Feed notifications: content and landing
 
 | Event | Banner title | Banner text | Landing |
 |---|---|---|---|
-| New announcement | `Nouvelle annonce` (`notif.announcement`) | `Lune Garnier : La saison 2 commence…` (`notif.text`: display name, then the post text) | Annonces tab, scrolled to the top, the announcement highlighted |
-| Reply to your post or reply | `Nouvelle réponse` (`notif.reply`) | `Mika Laurent : Je l'ai vu près du moulin…` (`Anonyme : …` for an anonymous reply) | the thread, scrolled to the reply, highlighted; the unseen-replies marker clears |
+| New announcement | `Nouvelle annonce` (`notif.announcement`) | `Lune G. : La saison 2 commence…` (`notif.text`: display name, then the post text; `Anonyme : …` for an anonymous announcement) | Annonces tab, scrolled to the top, or further when the announcement is not in view there (it sits under the pinned posts): scrolled so that it is fully visible, as for a reply in a thread; the announcement highlighted |
+| Reply to your post or reply | `Nouvelle réponse` (`notif.reply`) | `Mika L. : Je l'ai vu près du moulin…` (`Anonyme : …` for an anonymous reply) | the thread, scrolled to the reply, highlighted; the unseen-replies marker clears |
 
 When several notifications are waiting, a click on the app icon follows the usual rule (Annonces); the reply markers show which own posts have new replies.
+
+### 9.11 Guests: reading without writing
+
+A **guest** is a player with no LNB account (possible when LNB Warden runs in `optional` mode). A guest reads everything a player reads and writes nothing: no post, no reply, no like. The server tells Feed which one the viewer is. Nothing new is added to the kit: the write controls go, and one quiet line takes the place of the reply composer.
+
+| Where | What a guest sees |
+|---|---|
+| Compose button | none, in Global as in Annonces (where non-announcers have none either). Nothing takes its place |
+| Global, empty | icon `inbox`, title `Aucun post pour l'instant`, text `Les posts des joueurs apparaîtront ici.` (`empty.global.text_guest`); no button |
+| Reply button on a post card | unchanged: it opens the thread, where no composer expands |
+| Reply composer, in a thread | replaced by a **strip**, 40 dp at `y 330..369`: fill `bg`, 1 dp `hairline` on its top edge, `lock` icon 16 dp `text-3` at `(12, 342)`, text `Compte LNB requis pour répondre` (`guest.reply`) in `caption` `text-3` at `x 36`, line box `y 342`, truncated at `x 244`. Not clickable: no hover, no pressed state, no focus. The bottom spacer of the thread is the strip's height + 12 dp |
+| Like button | still drawn and hovered like anyone's. A click does not fill the heart, makes no pop and does not change the count; nothing is sent. A plain snackbar `Compte LNB requis` (`guest.snackbar`) shows (3000 ms), with the error sound of a disabled tap (15) |
+| Reply button on a reply | same: a click shows the snackbar `Compte LNB requis`; no composer, no target |
+| More button, pin button | never shown: a guest deletes and pins nothing |
+| The rest | reading, scrolling, threads, the announcements' notifications, the unread dots and the new-posts pill: as for a player |
+
+The controls stay drawn, rather than disappearing, so that a guest sees the same cards and counts as everyone and nothing jumps when an account is linked.
+
+**Banned players, and writing switched off.** A banned player (possible for a moment between a ban and the kick) and everyone while writing is switched off on the site get this look: no compose button, the strip, the like and reply buttons drawn but inactive. One exception: the more and pin buttons follow what each post allows the viewer, as for any player. The site still deletes and pins while writing is off, the read-only mode of an incident, which is when a moderator needs to delete: an author keeps the more button and its `Supprimer` on their own posts, a moderator on every post, and an announcer the pin button on announcements' main posts, with the usual dialogs and snackbars (9.4, 9.9). A guest's posts never allow them, and a banned player keeps only what their posts allow. Otherwise only the words differ:
+
+| Case | Strip text (in place of `guest.reply`) | Plain snackbar on a click on like or on a reply button (in place of `guest.snackbar`) |
+|---|---|---|
+| Banned | `Écriture bloquée (sanction)` (`snackbar.banned`) | the same text |
+| Writing switched off | `Écriture suspendue` (`snackbar.writing_off`) | the same text |
+
+These snackbars last 3000 ms and play the error sound, like `guest.snackbar`. When a draft that was already open (Compose, a reply) is refused for one of these reasons, the same text shows as an error snackbar without an action, since retrying cannot help, and the draft stays. A third refusal, sending too often, shows `Doucement ! Attends {n} s` (`snackbar.too_fast`, `{n}` the seconds to wait) as an error snackbar without an action; the draft stays, the look does not change, and Publier or Répondre sends again once the time has passed.
+
+### 9.12 Feed unavailable
+
+Feed's data lives on the LNB website. The Minecraft server fetches it for the phone; the phone never talks to the site. Feed is unavailable when the server cannot reach the site, when the site does not answer within 10 seconds, or when the feature is switched off on the site.
+
+| Case | What shows |
+|---|---|
+| Opened with nothing loaded, site unreachable | in the content area of the tab (each tab loads on its own; in a thread, under the header): the error state of 8.7, an `EmptyState` with the `globe` icon, `Feed indisponible` (`feed.unavailable.title`), `Réessaie dans un instant.` (`feed.unavailable.text`) and the secondary button `Réessayer` (`error.retry`, 104 dp). A click: the button shows its spinner; on success the skeletons then the list show (F-3), otherwise the block returns |
+| Opened with nothing loaded, Feed switched off | the same block, with its own words: `Feed désactivé` (`feed.disabled.title`), `Réessaie plus tard.` (`feed.disabled.text`) and the same `Réessayer`, which is how a player finds out that it is back (F-22) |
+| Connection lost while a list or a thread is on screen | the list stays as it is: it scrolls, threads open, everything loaded can be read, and nothing is dimmed or replaced. An error snackbar says `Connexion perdue` (`feed.connection_lost`) with the action `Réessayer`; the FAB lifts for it (8.7). Feed tries again by itself about every 15 seconds; when it is back, the list catches up as new posts arrive (9.5: inserted at once at the top, or the pill when scrolled down), with no message. `Réessayer` tries at once, and if it fails the snackbar shows again (F-23) |
+| Switched off while a list is on screen | treated as a lost connection: the list stays and the snackbar shows. Only a Feed opened with nothing loaded shows the switched-off block |
+| Older posts or replies cannot be loaded | the 48 dp spinner row becomes a 48 dp row with the text button `Réessayer` centred (9.5, 9.7). A click shows the spinner again. The rest of the list is untouched (F-24) |
+| An action fails (like, reply, post, pin, delete) | already covered, nothing added: the heart goes back with `Action impossible` (F-6); a reply or a post keeps its draft with `Échec de l'envoi` and `Réessayer` (F-8, F-12); pin and delete show `Action impossible` (9.4, 9.9). An unreachable site or a switched-off Feed fails these the same way |
+| A notification whose target cannot be loaded | the thread opens with its header and the error block, as above |
+
+Notifications are not affected by any of this: they are the phone's own and keep working (10.4).
 
 ---
 
@@ -1196,8 +1239,8 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | `post.pinned` | Épinglé | Pinned | pinned meta line |
 | `post.reply_to` | En réponse à {name} | Replying to {name} | reply-to line, expanded composer |
 | `post.own_anonymous` | Publié anonymement par toi | Posted anonymously by you | private line, author |
-| `post.op_author` | Auteur : {name} {handle} | Author: {name} {handle} | private line, operators ({handle} omitted without a real name) |
-| `post.op_author.tooltip` | Visible uniquement par les opérateurs | Only operators can see this | operator line tooltip |
+| `post.mod_author` | Auteur : {name} {handle} | Author: {name} {handle} | private line, moderators ({handle} omitted without a real name) |
+| `post.mod_author.tooltip` | Visible uniquement par les modérateurs | Only moderators can see this | moderator line tooltip |
 | `badge.announcer` | Peut publier des annonces | Can post announcements | announcer badge tooltip |
 | `action.pin` | Épingler | Pin | pin button tooltip |
 | `action.unpin` | Désépingler | Unpin | filled pin button tooltip |
@@ -1209,16 +1252,20 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | `time.days` | {n} j | {n}d | under 7 days |
 | `time.date` | {d} {mois} (`12 nov.`) | {d} {Mon} (`12 Nov`) | 7 days and older; year added when not the current year |
 | `time.full` | {HH:mm} · {date} (`14:32 · 12 nov.`) | {HH:mm} · {date} (`14:32 · 12 Nov`) | thread main post, 24-hour in both |
-| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts |
+| `count.thousands` | {n},{d} k (`1,2 k`) | {n}.{d}k (`1.2k`) | action row counts; the decimal is cut, never rounded, and a zero decimal is dropped (`1 k` / `1k` for 1,000, `1,9 k` / `1.9k` for 1,999) |
 | `feed.new_posts` | 1 nouveau post / {n} nouveaux posts | 1 new post / {n} new posts | new posts pill, Global |
 | `feed.new_announcements` | 1 nouvelle annonce / {n} nouvelles annonces | 1 new announcement / {n} new announcements | new posts pill, Annonces |
 | `feed.end` | Tu as tout vu | You're all caught up | end of list |
-| `feed.unavailable.title` | Feed indisponible | Feed unavailable | error state, error snackbar |
+| `feed.unavailable.title` | Feed indisponible | Feed unavailable | error state |
 | `feed.unavailable.text` | Réessaie dans un instant. | Try again in a moment. | error state |
-| `error.retry` | Réessayer | Retry | error state, snackbar action |
+| `feed.disabled.title` | Feed désactivé | Feed is switched off | error state, Feed switched off |
+| `feed.disabled.text` | Réessaie plus tard. | Try again later. | error state, Feed switched off |
+| `feed.connection_lost` | Connexion perdue | Connection lost | error snackbar, connection lost while a list is on screen |
+| `error.retry` | Réessayer | Retry | error states, snackbar action, retry rows |
 | `empty.global.title` | Aucun post pour l'instant | No posts yet | Global empty state |
 | `empty.global.text` | Lance la conversation ! | Be the first to post! | Global empty state |
 | `empty.global.button` | Écrire un post | Write a post | Global empty state |
+| `empty.global.text_guest` | Les posts des joueurs apparaîtront ici. | Players' posts will show up here. | Global empty state, guests |
 | `empty.announcements.title` | Aucune annonce | No announcements | Annonces empty state |
 | `empty.announcements.text` | Les annonces du serveur apparaîtront ici. | Server announcements will show up here. | Annonces empty state |
 | `thread.title` | Publication | Post | thread header |
@@ -1228,6 +1275,11 @@ Built-in app, always last on the home grid, graphite gear icon (7.4). It holds t
 | `reply.anonymous` | Anonyme | Anonymous | composer toggle label |
 | `reply.send` | Répondre | Reply | composer button |
 | `reply.sent` | Réponse envoyée | Reply sent | snackbar |
+| `guest.reply` | Compte LNB requis pour répondre | LNB account needed to reply | guest strip in a thread |
+| `guest.snackbar` | Compte LNB requis | LNB account needed | snackbar, a guest taps like or a reply button |
+| `snackbar.banned` | Écriture bloquée (sanction) | Writing blocked (sanction) | guest strip and plain snackbar for a banned player; error snackbar when a draft is refused |
+| `snackbar.writing_off` | Écriture suspendue | Writing is paused | guest strip and plain snackbar while writing is switched off; error snackbar when a draft is refused |
+| `snackbar.too_fast` | Doucement ! Attends {n} s | Slow down! Wait {n}s | error snackbar, a draft sent too often |
 | `compose.post` | Publier | Post | Compose button |
 | `compose.placeholder` | Quoi de neuf sur le serveur ? | What's new on the server? | Compose text area |
 | `compose.anonymous` | Publier anonymement | Post anonymously | Compose toggle row |
@@ -1277,16 +1329,22 @@ Estimates use Inter at the given style: about 7.3 dp per character for 13 dp Sem
 | Dialog confirm `Supprimer`, `Épingler` | `Supprimer`, about 66 dp | button **104 dp** | fixed |
 | Menu item (168 dp, label from `x 40`) | `Supprimer`, about 62 dp | fits | |
 | Settings segments (116 dp each) | `Corner` / `Centre`, about 46 dp | fits | fixed by the control |
+| Compose destination segments (116 dp each, label room 106 dp) | `Announcements`, about 104 dp | fits, tight | fixed by the control (8.7) |
 | Compose toggle label (184 dp) | `Publier anonymement`, about 139 dp | fits | |
 | Compose helper (184 dp) | `Name hidden from players`, about 150 dp | fits on one line | |
 | Settings row label (184 dp) | `Aperçu des notifications`, about 175 dp | fits | |
 | Banner title (164 dp) | `New announcement` / `Nouvelle annonce`, about 128 dp | fits | |
-| New posts pill | `{n} nouvelles annonces`, about 145 dp + icon | fits (pill about 189 dp) | |
-| Private line (168 dp from `x 76`) | `Posted anonymously by you`, about 156 dp | fits; operator line truncates | handle first, then name |
-| Tooltips (max 200 dp) | `Visible uniquement par les opérateurs`, about 230 dp | wraps to 2 lines | up to 2 lines |
+| New posts pill | `{n} nouvelles annonces`, about 145 dp + icon | fits (pill about 189 dp, about 169 dp without the arrow) | |
+| Private line (168 dp from `x 76`) | `Posted anonymously by you`, about 156 dp | fits; moderator line truncates | handle first, then name |
+| Tooltips (max 200 dp) | `Visible uniquement par les modérateurs`, about 235 dp | wraps to 2 lines | up to 2 lines |
 | Empty-state texts (200 dp) | `Server announcements will show up here.` | wraps to 2 lines | up to 2 lines |
 | Dialog texts (200 dp) | `Its replies will be deleted too. This can't be undone.` | wraps to 2 lines | up to 3 lines |
 | Collapsed composer placeholder (208 dp) | `Répondre à` + a long name | truncates with `…` | |
+| Error snackbar text beside `Réessayer` (about 116 dp from `x 38`) | `Connexion perdue` / `Échec de l'envoi`, about 113 dp | fits, tight | no longer `Feed indisponible` (about 116 dp) in a snackbar |
+| Plain snackbar text (212 dp from `x 14`) | `Compte LNB requis`, about 120 dp; `Écriture bloquée (sanction)`, about 185 dp | fits | |
+| Error snackbar text without an action (188 dp from `x 38`) | `Écriture bloquée (sanction)` about 185 dp; `Doucement ! Attends 10 s` about 165 dp | fits, tight | |
+| Guest strip text (208 dp from `x 36`) | `Compte LNB requis pour répondre`, about 197 dp; `Écriture bloquée (sanction)`, about 185 dp | fits, tight | truncates with an ellipsis |
+| Error-state title (200 dp) | `Feed is switched off`, about 160 dp | fits on one line | up to 2 lines |
 | Pixel label line (120 px) | `Réglages` / `Settings`, 8 characters | fits | app names of 16 characters or fewer recommended (7.2); the line cuts a longer name at 20 characters or 120 px |
 | Pixel `gui.scale` line (128 px) | `Échelle GUI : 2+`, 16 characters, about 92 px | fits | |
 
@@ -1419,7 +1477,7 @@ Every flow is a numbered list of frames. Each step is one frame of the storyboar
 | **P** | the device alone (140 x 228 GUI px) with its screen | GUI scale 3 (420 x 684 CSS px) |
 | **P1** | the device alone at GUI scale 1 | 1 CSS px per GUI px |
 
-Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W frames); French UI; the viewer is **Camille Roux `@Cam_Roux`**, a regular player who is neither operator nor announcer. Operator steps use **Lune Garnier `@Admin_Lune`** (operator and announcer); announcer steps use **Kael_Builder** (announcer by command, no real name). Sample content is in 18.3.
+Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W frames); French UI; the viewer is **Camille R. `@Cam_Roux`**, a regular player with an LNB account who is neither moderator nor announcer. Moderator steps use **Lune G. `@Admin_Lune`** (moderator and announcer); announcer steps use **Kael_Builder** (announcer by role, no real name); guest steps use **Visiteur_42** (no LNB account, no real name). Sample content is in 18.3.
 
 **Cursor**: the standard arrow cursor, its tip at the given point. "No cursor" means the mouse is captured by the game. In P frames, positions are app-local dp unless marked "GUI px"; in W frames, window GUI px.
 
@@ -1499,20 +1557,20 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | W | normal play, phone closed | no cursor | A new announcement is posted while the player is playing. |
+| 1 | W | normal play, phone closed | no cursor | A new announcement (post 10) is posted while the player is playing. |
 | 2 | W | device mid-rise at `(334, 234)`, peek screen (wallpaper, home status bar, banner) | no cursor | The phone rises 72 px from the bottom-right with the chime (200 ms). |
-| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Lune Garnier : La saison 2 commence samedi à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement (P-9). |
+| 3 | W | device at `(334, 198)`; banner: Feed icon, `Nouvelle annonce`, `Kael_Builder : Événement PvP dimanche à 15:00 à…`; LED lit | no cursor | The banner holds for 4 s. Pressing Up now opens the announcement where step 7 shows it (P-9 shows the same for a reply). |
 | 4 | W | device mid-sink at `(334, 234)` | no cursor | Nothing pressed: the phone sinks away (200 ms). |
 | 5 | W | later, after Up: device open at `(334, 36)` on home (the screen it was closed on), Feed badge `1`, LED lit | `(240, 135)` | Opening the phone later: a red badge on Feed and the LED blinking. |
 | 6 | P | home, hover Feed with badge `1`, label `Feed` | GUI px `(16, 29)` | Hover the badged app. |
-| 7 | P | Feed, Annonces, post 6 at the top with the post highlight | GUI px `(16, 29)` | Feed opens on Annonces with the new post highlighted (150 ms slide). The badge is cleared. |
+| 7 | P | Feed, Annonces, scrolled so that post 10 shows under the pinned posts 5 and 9, with the post highlight | GUI px `(16, 29)` | Feed opens on Annonces and scrolls to the new post, highlighted (150 ms slide). The badge is cleared. |
 | 8 | P | home (after the home button), Feed icon without badge, LED off | GUI px `(70, 218)` | Back home: no badge, LED off. |
 
 **P-9 Open straight from the peek** (3 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | W | peek at `(334, 198)`; banner `Nouvelle réponse`, `Mika Laurent : Je l'ai vu près du moulin, côté est !` | no cursor | Someone replied to Camille's post. The player presses Up during the peek. |
+| 1 | W | peek at `(334, 198)`; banner `Nouvelle réponse`, `Mika L. : Je l'ai vu près du moulin…` | no cursor | Someone replied to Camille's post. The player presses Up during the peek. |
 | 2 | W | device mid-rise at `(334, 117)`, screen showing the thread | no cursor | The phone rises from the peek to fully open (250 ms). |
 | 3 | P | thread of post 8, scrolled to reply R4 with the post highlight; composer collapsed | `(128, 200)` | It lands on the reply. Feed's badge is cleared. |
 
@@ -1522,7 +1580,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P | home, nothing hovered | GUI px `(70, 120)` | Phone open on the home screen. |
 | 2 | P | banner mid-slide at app-local `y -36` (half visible), over the icons | same | A notification: the banner slides down from the top (150 ms), with the chime. |
-| 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika Laurent : Je l'ai vu près du moulin, côté est !`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
+| 3 | P | banner at `(8, 4)`: `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin…`; Feed badge `1` under it | same | The banner holds 4 s over the icons. |
 | 4 | P | hover banner (fill `surface-3`) | `(128, 42)` | Hover. Pressed, the banner would freeze until released. |
 | 5 | P | thread of post 8, reply R4 highlighted | `(128, 42)` | Click: the banner goes at once, the thread opens (150 ms slide) and the badge clears. |
 
@@ -1592,7 +1650,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 3 | P | hover `Écrire un post` (fill `accent-hover`) | on the button | Hover. |
 | 4 | P | Compose, empty, focused | on the button position | Click: Compose slides in (150 ms). |
 
-**F-3 Feed unavailable** (7 steps)
+**F-3 Feed unavailable** (6 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
@@ -1601,19 +1659,19 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 3 | P | hover `Réessayer` (fill `overlay-hover`) | on the button | Hover Retry. |
 | 4 | P | `Réessayer` loading (accent spinner, 104 dp) | on the button | Click: the button spins while Feed retries. |
 | 5 | P | skeletons | same | The list reloads. |
-| 6 | P | Annonces loaded | same | Back to normal. |
-| 7 | P | Global with posts shown from the cache; error snackbar `Feed indisponible` + `Réessayer`; FAB lifted to `y 262` | `(128, 200)` | If posts were already loaded, they stay and a snackbar offers a retry. |
+| 6 | P | Annonces loaded | same | Back to normal. If posts were already loaded when the connection drops, they stay (F-23). |
 
-**F-4 Switch tabs and the unread dot** (6 steps)
+**F-4 Switch tabs and the unread dot** (7 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Annonces active; Global label with the unread dot | `(128, 200)` | Global has posts Camille hasn't seen: a blue dot. |
 | 2 | P | hover Global tab (label `text-1`, `overlay-hover`) | `(192, 22)` | Hover the Global tab. |
-| 3 | P | Global active, indicator at `x 168..215`, dot gone, posts 8, 1, 2, 3, 4 | same | Click: the indicator slides (150 ms) and the dot clears. |
+| 3 | P | Global active, indicator at `x 168..215`, dot gone, posts 1, 2, 8, 3, 4 (newest first) | same | Click: the indicator slides (150 ms) and the dot clears. |
 | 4 | P | Global active; banner `Nouvelle annonce` / `Kael_Builder : Événement PvP…`; Annonces label now with the dot | `(128, 200)` | A new announcement while on Global: a banner and a dot on Annonces. |
 | 5 | P | hover Annonces tab | `(64, 22)` | Back to Annonces. |
-| 6 | P | Annonces active; post 10 first after the pinned group, highlighted; dot gone | same | The new announcement is highlighted; the dot clears. |
+| 6 | P | Annonces active, at the top: pinned posts 5 and 9 fill the screen; pill `1 nouvelle annonce` at `y 52`, without an arrow; dot gone | same | Post 10 would land below the fold, under the pins, so it waits behind the pill, which has no arrow because the post is below; the dot clears. |
+| 7 | P | click on the pill (`(128, 66)`): Annonces scrolled so that post 10, first after the pinned group, is fully visible, highlighted; pill gone | `(128, 66)` | Click: the list scrolls to the new announcement (250 ms), highlighted. |
 
 **F-5 Scroll and new posts** (8 steps)
 
@@ -1645,14 +1703,14 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P | Global; hover post 1 (cell `overlay-hover`) | `(150, 70)` on post 1's text | Hover a post. |
 | 2 | P | pressed post 1 (`overlay-pressed`) | same | Press. |
-| 3 | P | thread of post 1: main post with `14:32 · 12 nov.`, replies R1, R2, R3, collapsed composer `Répondre à Alexandre Morel…` | same | The thread slides in (150 ms): the post, its replies, and a reply field at the bottom. |
+| 3 | P | thread of post 1: main post with `14:32 · 12 nov.` (to `y 205`), reply R1 (`y 205..305`) above the collapsed composer `Répondre à Alexandre M.…`; R2 and R3 are below the fold | same | The thread slides in (150 ms): the post, the first reply, and a reply field at the bottom. The other two replies are reached by scrolling. |
 
 **F-8 Write and send a reply** (8 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | thread of post 1; hover collapsed field (border `stroke-hover`) | `(128, 338)` | Hover the reply field. |
-| 2 | P | composer expanded: `En réponse à Alexandre Morel`, empty focused text area with caret, counter `0/280`, toggle off, `Répondre` disabled | same | Click: the composer opens (150 ms) and is ready to type. |
+| 2 | P | composer expanded: `En réponse à Alexandre M.`, empty focused text area with caret, counter `0/280`, toggle off, `Répondre` disabled | same | Click: the composer opens (150 ms) and is ready to type. |
 | 3 | P | text `J'arrive dans 5 min`, counter `19/280`, `Répondre` enabled | same | Typing. |
 | 4 | P | hover `Répondre` (fill `accent-hover`) | `(196, 342)` | Hover Reply. |
 | 5 | P | `Répondre` loading; text area sending (text `text-2`, no caret); toggle disabled | same | Sending: the button spins. |
@@ -1674,10 +1732,10 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Global; hover reply on post 1 (icon and `3` in `accent`, `accent-soft` disc) | on post 1's reply icon | The reply button on a post. |
-| 2 | P | thread of post 1 with the composer expanded and focused, `En réponse à Alexandre Morel` | same | Click: the thread opens with the composer ready (150 ms slide). |
-| 3 | P | in the thread, hover reply on R1 (Mika Laurent) | on R1's reply icon | Replying to a reply instead. |
-| 4 | P | composer retargeted: `En réponse à Mika Laurent` | same | The composer now targets Mika. |
-| 5 | P | after sending: new reply with reply-to line `En réponse à Mika Laurent` above its text | `(128, 200)` | The reply joins the same thread and says whom it answers. |
+| 2 | P | thread of post 1 with the composer expanded and focused, `En réponse à Alexandre M.` | same | Click: the thread opens with the composer ready (150 ms slide). |
+| 3 | P | in the thread, hover reply on R1 (Mika L.) | on R1's reply icon | Replying to a reply instead. |
+| 4 | P | composer retargeted: `En réponse à Mika L.` | same | The composer now targets Mika. |
+| 5 | P | after sending: new reply with reply-to line `En réponse à Mika L.` above its text | `(128, 200)` | The reply joins the same thread and says whom it answers. |
 
 **F-11 Compose a post (player)** (12 steps)
 
@@ -1685,7 +1743,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 |---|---|---|---|---|
 | 1 | P | Global; hover FAB (`accent-hover`) | `(220, 334)` | The compose button. |
 | 2 | P | pressed FAB (`accent-pressed`) | same | Press. |
-| 3 | P | Compose: author row Camille Roux / `@Cam_Roux`, empty text area focused, placeholder, `0/280`, toggle off, `Publier` disabled | same | Compose slides in (150 ms), ready to type. |
+| 3 | P | Compose: author row Camille R. / `@Cam_Roux`, empty text area focused, placeholder, `0/280`, toggle off, `Publier` disabled | same | Compose slides in (150 ms), ready to type. |
 | 4 | P | text = 18.3 text C1 cut at 142 characters, counter `142/280` `text-2`, `Publier` enabled | `(128, 200)` | Typing. |
 | 5 | P | 265 characters, counter `265/280` `warning` | same | The counter turns amber in the last 20 characters. |
 | 6 | P | 285 characters, counter `-5` `danger`, the last 5 characters on `danger-soft`, `Publier` disabled | same | Over 280: red, the excess is marked, Publish is off. |
@@ -1718,19 +1776,19 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Annonces with the FAB (announcers only); hover FAB | `(220, 334)` | Announcers get a compose button on Annonces. |
-| 2 | P | Compose: author row `Kael_Builder` alone (no handle), text area 152 dp, anonymous slot empty, segmented `Annonces` selected | same | Compose opens with Annonces chosen. No anonymous option for announcements. |
+| 2 | P | Compose: author row `Kael_Builder` alone (no handle), text area 152 dp, anonymous row visible (toggle off), segmented `Annonces` selected | same | Compose opens with Annonces chosen. The anonymous option is there for announcements too. |
 | 3 | P | hover `Global` segment | `(186, 332)` | The destination switch. |
-| 4 | P | `Global` selected; the anonymous row appears | same | For Global, posting anonymously is possible. |
-| 5 | P | anonymous toggle on | `(226, 286)` | Turned on. |
-| 6 | P | `Annonces` selected again; anonymous row hidden; toggle is off | `(70, 332)` | Back to Annonces: the option hides and switches off. |
-| 7 | P | text `Événement PvP dimanche à 15:00 à l'arène. Inscriptions au panneau du spawn.`, `Publier` loading | `(200, 22)` | Publishing the announcement. |
-| 8 | P | Annonces, new post at the top of the non-pinned list, highlighted; snackbar `Publié` | same | It is out; every player gets a New announcement notification. |
+| 4 | P | `Global` selected; the anonymous row stays where it is | same | Changing the destination changes nothing about the toggle. |
+| 5 | P | `Annonces` selected again; anonymous row unchanged | `(70, 332)` | Back to Annonces: the option is still there. |
+| 6 | P | anonymous toggle on; author row: anonymous avatar, `Anonyme`, `Masqué aux joueurs` | `(226, 286)` | An announcement can be posted anonymously. |
+| 7 | P | text `Le marché est fermé samedi matin pour travaux. Merci de votre patience.`, `Publier` loading | `(200, 22)` | Publishing the announcement. |
+| 8 | P | Annonces scrolled so that the new post 12, first after the pinned group, is fully visible: anonymous avatar, `Anonyme`, no badge, no handle, private line `Publié anonymement par toi`; snackbar `Publié` | same | It is out as Anonyme; every other player gets `Nouvelle annonce` / `Anonyme : Le marché est fermé samedi…`. |
 
-**F-15 Pin an announcement** (7 steps; viewer Lune Garnier, operator)
+**F-15 Pin an announcement** (7 steps; viewer Lune G., moderator)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | P | Annonces; pinned posts 5 and 9; post 6 with the pin button (outline) in its action row | `(128, 200)` | Announcers and operators see a pin button on announcements. |
+| 1 | P | Annonces; pinned posts 5 and 9; post 6 with the pin button (outline) in its action row | `(128, 200)` | Announcers, moderators included, see a pin button on announcements. |
 | 2 | P | hover post 6's pin (accent, `accent-soft` disc); tooltip `Épingler` above it | on post 6's pin | Hover: Pin. |
 | 3 | P | post 6 now in the pinned group (3 pins), highlighted, `pin_filled` in `accent`; snackbar `Post épinglé` | same position | Click: it joins the pinned posts at the top. |
 | 4 | P | 3 pinned (6, 5, 9); hover the pin on post 7 | on post 7's pin | A fourth one. |
@@ -1738,7 +1796,7 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 6 | P | hover `Épingler` in the dialog | on the confirm button | Confirm. |
 | 7 | P | pinned group 7, 6, 5; post 9 back in date order; post 7 highlighted; snackbar `Post épinglé` | same | The oldest pin drops back into the list. |
 
-**F-16 Unpin** (3 steps; viewer Lune Garnier)
+**F-16 Unpin** (3 steps; viewer Lune G.)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
@@ -1746,16 +1804,17 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 2 | P | post 7 back in date order, outline pin; snackbar `Post désépinglé` | same position | Click: it returns to its place. No confirmation. |
 | 3 | P | thread of post 5 (pinned): main post with the filled pin in its action row | on the pin | The same button exists on the post in its thread. |
 
-**F-17 What an operator sees on an anonymous post** (4 steps; viewer Lune Garnier)
+**F-17 What a moderator sees on an anonymous post** (5 steps; viewer Lune G.)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | P | Global; post 2 (anonymous) with the private line `Auteur : Mika Laurent @MikaPvP` and a more button | `(128, 300)` | Operators see who wrote an anonymous post, in grey with a lock. |
-| 2 | P | hover the private line; tooltip `Visible uniquement par les opérateurs` (2 lines) | on the line | Only operators see this. |
+| 1 | P | Global; post 2 (anonymous) with the private line `Auteur : Mika L. @MikaPvP` and a more button | `(128, 300)` | Moderators see who wrote an anonymous post, in grey with a lock. |
+| 2 | P | hover the private line; tooltip `Visible uniquement par les modérateurs` (2 lines) | on the line | Only moderators see this. |
 | 3 | P | thread of post 1: reply R2 (anonymous) shows the private line `Auteur : SteveBuilds` | `(128, 200)` | Anonymous replies get the line too (here without a handle: SteveBuilds has no real name). |
-| 4 | P | the same post 2 as Camille (regular player): no private line, no more button | same | Everyone else sees only Anonymous. |
+| 4 | P | Annonces; post 12 (anonymous announcement): anonymous avatar, `Anonyme`, no badge, private line `Auteur : Kael_Builder` and a more button | `(128, 300)` | Anonymous announcements get the same line. |
+| 5 | P | the same post 2 as Camille (regular player): no private line, no more button | same | Everyone else sees only Anonymous. |
 
-**F-18 Delete your own post** (8 steps)
+**F-18 Delete your own post** (9 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
@@ -1766,13 +1825,14 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | 5 | P | `Supprimer` loading | same | Deleting. |
 | 6 | P | dialog gone; post 8's cell half collapsed, content at 50% | same | The post folds away (150 ms). |
 | 7 | P | Global without post 8; snackbar `Post supprimé` | same | Deleted. |
-| 8 | P | (cancel branch, from step 3) hover `Annuler`; then the feed unchanged | on `Annuler` | Cancel, Esc or a click on the dark area leaves everything as it was. |
+| 8 | P | (cancel branch, from step 3) hover `Annuler` (`overlay-hover`) | on `Annuler` | Cancel, Esc or a click on the dark area closes the dialog and does nothing else. |
+| 9 | P | (cancel branch) dialog gone, Global unchanged, post 8 still there | same | Everything is as it was. |
 
-**F-19 An operator deletes a reply** (4 steps; viewer Lune Garnier)
+**F-19 A moderator deletes a reply** (4 steps; viewer Lune G.)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | P | thread of post 1; every reply has a more button; menu open on R2 | on `Supprimer` | Operators can delete any post or reply. |
+| 1 | P | thread of post 1; every reply has a more button; menu open on R2 | on `Supprimer` | Moderators can delete any post or reply. |
 | 2 | P | dialog `Supprimer cette réponse ?` / `C'est définitif.` | `(128, 200)` | Confirm. |
 | 3 | P | R2 collapsing | same | It folds away. |
 | 4 | P | thread without R2; R3's reply-to line still reads `En réponse à Anonyme`; snackbar `Réponse supprimée` | same | Deleted. Replies to it stay. |
@@ -1782,18 +1842,58 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
 | 1 | P | Global; post 8 (Camille's) with the unseen-replies marker: dot at `x 50`, reply icon and `2` in `accent` | `(128, 200)` | Your own post got replies you haven't read: the reply count turns blue with a dot. |
-| 2 | P | Global; banner `Nouvelle réponse` / `Mika Laurent : Je l'ai vu près du moulin, côté est !` | same | A new reply arrives while browsing. |
+| 2 | P | Global; banner `Nouvelle réponse` / `Mika L. : Je l'ai vu près du moulin…` | same | A new reply arrives while browsing. |
 | 3 | P | hover banner | `(128, 42)` | Hover. |
 | 4 | P | thread of post 8 scrolled to R4, highlighted | same | Click: straight to the reply (150 ms slide). |
 | 5 | P | Global after back: post 8's marker gone | `(22, 22)` | Back: the marker has cleared. |
-| 6 | P | from a `Nouvelle annonce` banner: Annonces at the top, the announcement highlighted | `(128, 42)` | A new-announcement banner lands on Annonces with the post highlighted. |
+| 6 | P | from a `Nouvelle annonce` banner: Annonces scrolled so that the announcement (post 10, under the pinned posts) is fully in view, highlighted | `(128, 42)` | A new-announcement banner lands on Annonces, scrolled to the post, highlighted. |
 
 **F-21 A thread's post is deleted while you read it** (2 steps)
 
 | # | Frame | State | Cursor | Caption |
 |---|---|---|---|---|
-| 1 | P | thread of post 3 | `(128, 200)` | An operator deletes this post while Camille reads it. |
+| 1 | P | thread of post 3 | `(128, 200)` | A moderator deletes this post while Camille reads it. |
 | 2 | P | Global (after the 150 ms back slide), post 3 gone; snackbar `Ce post a été supprimé` | same | Back to the feed, with a note. |
+
+**F-22 Feed switched off** (4 steps)
+
+| # | Frame | State | Cursor | Caption |
+|---|---|---|---|---|
+| 1 | P | Feed, Annonces, skeletons | `(128, 300)` | Feed is loading... |
+| 2 | P | Annonces: globe disc, `Feed désactivé`, `Réessaie plus tard.`, `Réessayer`; Global tab beside it | same | ...but Feed is switched off on the website. It is the block of F-3 with other words. |
+| 3 | P | `Réessayer` loading (accent spinner, 104 dp) | on the button | A retry is how a player finds out that it is back. |
+| 4 | P | the same block again | same | Still off: back to the block. Once it is on again, a retry shows the skeletons, then the list (F-3 steps 5 and 6). |
+
+**F-23 Connection lost while reading** (5 steps)
+
+| # | Frame | State | Cursor | Caption |
+|---|---|---|---|---|
+| 1 | P | Global scrolled 300 dp (as F-5 step 2) | `(128, 200)` | Reading Global. |
+| 2 | P | same scroll, nothing dimmed; error snackbar `Connexion perdue` + `Réessayer`; FAB lifted to `y 262` | same | The connection to the website drops. The list stays and keeps working; a snackbar says so (6 s). |
+| 3 | P | list scrolled 36 dp further, snackbar gone, nothing else changed | same | Reading goes on: scrolling, threads, everything already loaded. |
+| 4 | P | like on post 3 pressed: heart back to its previous state; error snackbar `Action impossible` | on post 3's heart | Writing does not work meanwhile: the usual message of the action (F-6 step 6). |
+| 5 | P | later: pill `1 nouveau post` at `y 52` | `(128, 200)` | Feed reconnected by itself and caught up, with no message. As for any new post, the list does not jump (9.5). |
+
+**F-24 A list cannot load more** (5 steps)
+
+| # | Frame | State | Cursor | Caption |
+|---|---|---|---|---|
+| 1 | P | Global scrolled to the end: last post, then a spinner row | `(128, 200)` | Older posts are loading (as F-5 step 7)... |
+| 2 | P | last post, then a 48 dp row with the text button `Réessayer` centred | same | ...but they cannot be fetched: the row offers a retry. The list above is untouched. |
+| 3 | P | hover `Réessayer` (fill `accent-soft`) | on the button | Hover. |
+| 4 | P | the spinner row again | same | Click: it tries again. |
+| 5 | P | thread of post 1: main post, then the same row with `Réessayer` where the replies should be | `(128, 200)` | Replies that cannot be loaded get the same row under the main post. |
+
+**F-25 A guest reads** (6 steps; viewer Visiteur_42, no LNB account)
+
+| # | Frame | State | Cursor | Caption |
+|---|---|---|---|---|
+| 1 | P | Global as a guest: the posts as usual, no FAB | `(128, 200)` | A guest reads everything. There is no compose button. |
+| 2 | P | hover like on post 3 (heart and `8` in `like`, `like-soft` disc) | on post 3's heart | The heart reacts to the pointer like anyone's. |
+| 3 | P | heart unchanged (`heart`, `8`); plain snackbar `Compte LNB requis` | same | Click: nothing is liked, the snackbar says why, and the error sound plays. |
+| 4 | P | thread of post 1: main post, reply R1, and at the bottom the strip: hairline, `lock`, `Compte LNB requis pour répondre` | `(128, 200)` | In a thread the reply field is replaced by one quiet line. It is not clickable. |
+| 5 | P | same; click on R1's reply button: plain snackbar `Compte LNB requis`, no composer | on R1's reply icon | The reply button of a reply says the same. |
+| 6 | P | Global empty as a guest: inbox disc, `Aucun post pour l'instant`, `Les posts des joueurs apparaîtront ici.`, no button, no FAB | `(128, 300)` | An empty Global offers no way to write the first post. |
 
 ### 17.3 Flow index
 
@@ -1816,8 +1916,8 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | P-15 GUI scale 1 | 3 |
 | F-1 Open Feed | 2 |
 | F-2 Empty feeds | 4 |
-| F-3 Feed unavailable | 7 |
-| F-4 Tabs and unread dot | 6 |
+| F-3 Feed unavailable | 6 |
+| F-4 Tabs and unread dot | 7 |
 | F-5 Scroll and new posts | 8 |
 | F-6 Like and unlike | 6 |
 | F-7 Open a thread | 3 |
@@ -1830,12 +1930,16 @@ Unless a step says otherwise: placement bottom-right (device at `(334, 36)` in W
 | F-14 An announcer composes | 8 |
 | F-15 Pin an announcement | 7 |
 | F-16 Unpin | 3 |
-| F-17 Operator view of an anonymous post | 4 |
-| F-18 Delete your own post | 8 |
-| F-19 An operator deletes a reply | 4 |
+| F-17 Moderator view of an anonymous post | 5 |
+| F-18 Delete your own post | 9 |
+| F-19 A moderator deletes a reply | 4 |
 | F-20 Feed notifications and landing | 6 |
 | F-21 Post deleted while reading | 2 |
-| **Total** | **186** |
+| F-22 Feed switched off | 4 |
+| F-23 Connection lost while reading | 5 |
+| F-24 A list cannot load more | 5 |
+| F-25 A guest reads | 6 |
+| **Total** | **208** |
 
 ---
 
@@ -1855,30 +1959,39 @@ The canvas is the storyboard of section 17, plus a few reference sheets. The use
 ### 18.2 Reference sheets (before the flows)
 
 1. **Home** (P): the 5 example apps on row 0, Settings hovered (`Réglages` on the label line), Feed with badge 3; the moon visible.
-2. **Feed screens** (P): Annonces (as Camille), Global (as Camille), thread of post 1 (as Lune, operator, so R2 shows its private line), Compose (as Camille).
-3. **Name layouts** (P, one post each): real name and handle (post 1); no real name (post 3); a 32-character real name truncated (`Marie-Charlotte de La Villemarqué`, `@MCVillemarque`); anonymous as a regular player; anonymous as its author; anonymous as an operator.
+2. **Feed screens** (P): Annonces (as Camille), Global (as Camille), thread of post 1 (as Lune, moderator, so R2 shows its private line), Compose (as Camille).
+3. **Name layouts** (P, one post each): real name and handle (post 1); no real name (post 3); a 32-character real name truncated (`Marie-Charlotte-Pénélope-Anne V.`, `@MCVillemarque`, post 11); anonymous as a regular player; anonymous as its author; anonymous as a moderator; an anonymous announcement (post 12) in Annonces.
 4. **Kit sheet** (P scale): every component of 8.7 in every listed state, the announcer badge, the icon set at 12/16/20/24/40 dp, the type scale.
 5. **English check** (P at GUI scale 2): Feed Global in English UI (post text stays as written), to check legibility and the longer English strings.
+6. **Guest and unavailable** (P, French): Global as a guest (no FAB), the guest strip in the thread of post 1 and the snackbar `Compte LNB requis`, Annonces with the error block, the switched-off block, and the snackbar `Connexion perdue` over a list.
 
 ### 18.3 Sample content
 
 | # | Where | Display name | Handle | Author role | Time | Text | Replies | Likes |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Global | Alexandre Morel | @Alex_Craft | player | 2 min | Des diamants à la mine du spawn, couche -54. Premier arrivé, premier servi ! | 3 | 12 (liked by the viewer) |
-| 2 | Global | Anonyme (author Mika Laurent @MikaPvP) | | player | 5 min | Merci à celui qui a laissé tourner la ferme à creepers près du marché, j'ai de la poudre à canon pour un mois. | 4 | 31 |
+| 1 | Global | Alexandre M. | @Alex_Craft | player | 2 min | Des diamants à la mine du spawn, couche -54. Premier arrivé, premier servi ! | 3 | 12 (liked by the viewer) |
+| 2 | Global | Anonyme (author Mika L. @MikaPvP) | | player | 5 min | Merci à celui qui a laissé tourner la ferme à creepers près du marché, j'ai de la poudre à canon pour un mois. | 4 | 31 |
+| 8 | Global | Camille R. | @Cam_Roux | the viewer | 20 min | Quelqu'un a vu mon loup ? Il s'appelle Biscuit et il porte un collier bleu. | 3 (two unseen before R4 arrives) | 4 |
 | 3 | Global | SteveBuilds | (none) | player, no real name | 1 h | J'ouvre ma boutique ce soir à 21:00 près de la porte nord. Kits redstone, livres enchantés et quelques teintures rares. Venez tôt, le stock est petit ! | 0 | 8 |
-| 4 | Global | Mika Laurent | @MikaPvP | player | 3 h | gg à tous à l'arène | 0 | 0 |
-| 8 | Global | Camille Roux | @Cam_Roux | the viewer | 20 min | Quelqu'un a vu mon loup ? Il s'appelle Biscuit et il porte un collier bleu. | 2 (unseen) | 4 |
-| 5 | Annonces, pinned 2 nov. | Lune Garnier | @Admin_Lune | operator, announcer | 2 j | Règlement mis à jour : lisez /rules avant vendredi. Le grief dans la zone du marché vaut désormais 3 jours de ban. | 6 | 54 |
-| 9 | Annonces, pinned 28 oct. | Lune Garnier | @Admin_Lune | operator, announcer | 26 oct. | Bienvenue sur le serveur ! Le guide des débutants est au spawn, derrière la fontaine. | 12 | 88 |
-| 6 | Annonces | Lune Garnier | @Admin_Lune | operator, announcer | 1 j | La saison 2 commence samedi à 18:00. L'End sera réinitialisé à 17:00. | 2 | 40 |
-| 7 | Annonces | Kael_Builder | (none) | announcer by command | 3 j | Maintenance cette nuit de 02:00 à 02:30, le serveur redémarrera deux fois. | 0 | 17 |
-| 10 | Annonces (F-4, F-14) | Kael_Builder | (none) | announcer by command | à l'instant | Événement PvP dimanche à 15:00 à l'arène. Inscriptions au panneau du spawn. | 0 | 0 |
-| N1, N2 | Global (F-5) | Alexandre Morel / Mika Laurent | @Alex_Craft / @MikaPvP | players | à l'instant | Quelqu'un pour une partie de spleef ? / Je suis partant ! | 0 | 0 |
-| R1 | thread of 1 | Mika Laurent | @MikaPvP | player | 1 min | J'arrive ! | 0 | 1 |
-| R2 | thread of 1 | Anonyme (author SteveBuilds) | | player | à l'instant | Il en reste encore ? | 0 | 0 |
-| R3 | thread of 1, reply to R2 | Alexandre Morel | @Alex_Craft | player | à l'instant | Oui, deux filons côté est. (reply-to line `En réponse à Anonyme`) | 0 | 2 |
-| R4 | thread of 8 | Mika Laurent | @MikaPvP | player | à l'instant | Je l'ai vu près du moulin, côté est ! | 0 | 0 |
+| 4 | Global | Mika L. | @MikaPvP | player | 3 h | gg à tous à l'arène | 0 | 0 |
+| 11 | sheet 3 only, not in the Global list of the flows | Marie-Charlotte-Pénélope-Anne V. | @MCVillemarque | player | 6 h | Quelqu'un a des graines de betterave en trop ? Je les échange contre du blé. | 0 | 2 |
+| 5 | Annonces, pinned 2 nov. | Lune G. | @Admin_Lune | moderator, announcer | 2 j | Règlement mis à jour : lisez /rules avant vendredi. Le grief dans la zone du marché vaut désormais 3 jours de ban. | 2 | 54 |
+| 9 | Annonces, pinned 28 oct. | Lune G. | @Admin_Lune | moderator, announcer | 26 oct. | Bienvenue sur le serveur ! Le guide des débutants est au spawn, derrière la fontaine. | 12 | 88 |
+| 6 | Annonces | Lune G. | @Admin_Lune | moderator, announcer | 1 j | La saison 2 commence samedi à 18:00. L'End sera réinitialisé à 17:00. | 2 | 40 |
+| 7 | Annonces | Kael_Builder | (none) | announcer (role) | 3 j | Maintenance cette nuit de 02:00 à 02:30, le serveur redémarrera deux fois. | 0 | 17 |
+| 10 | Annonces (P-8, P-11, F-4, F-20) | Kael_Builder | (none) | announcer (role) | à l'instant | Événement PvP dimanche à 15:00 à l'arène. Inscriptions au panneau du spawn. | 0 | 0 |
+| 12 | Annonces (F-14, F-17) | Anonyme (author Kael_Builder) | | announcer (role) | à l'instant | Le marché est fermé samedi matin pour travaux. Merci de votre patience. | 0 | 0 |
+| N1, N2 | Global (F-5) | Alexandre M. / Mika L. | @Alex_Craft / @MikaPvP | players | à l'instant | Quelqu'un pour une partie de spleef ? / Je suis partant ! | 0 | 0 |
+| R1 | thread of 1 | Mika L. | @MikaPvP | player | 1 min | J'arrive ! | 0 | 1 |
+| R2 | thread of 1 | Anonyme (author SteveBuilds) | | player | à l'instant | Il en reste encore ? | 1 (R3) | 0 |
+| R3 | thread of 1, reply to R2 | Alexandre M. | @Alex_Craft | player | à l'instant | Oui, deux filons côté est. (reply-to line `En réponse à Anonyme`) | 0 | 2 |
+| R6 | thread of 8 | Alexandre M. | @Alex_Craft | player | 12 min | Il traînait vers la ferme à moutons tout à l'heure. | 0 | 1 |
+| R7 | thread of 8 | SteveBuilds | (none) | player, no real name | 6 min | Un loup avec un collier bleu ? J'en ai croisé un au marché. | 0 | 0 |
+| R4 | thread of 8 | Mika L. | @MikaPvP | player | à l'instant | Je l'ai vu près du moulin, côté est ! | 0 | 0 |
+| R8 | thread of 5 | Mika L. | @MikaPvP | player | 1 j | Lu, merci pour la précision ! | 0 | 3 |
+| R9 | thread of 5 | Alexandre M. | @Alex_Craft | player | 1 j | Trois jours de ban, ça calme tout le monde. | 0 | 1 |
+
+A thread is drawn only for posts 1, 5 and 8, so only their replies are written: the reply counts of the other posts are numbers. Post 5 has two replies, so that its thread (F-16) can be drawn in full. Post 8 has three at the end of F-20: R6 and R7 are the two unseen replies of F-20 step 1, and R4 arrives in step 2.
 
 Thread of post 1: main post timestamp `14:32 · 12 nov.` Text C1 (F-11): `Qui est chaud pour une virée dans le Nether ce soir ? Rendez-vous au portail du spawn à 21:00. Prenez des potions de résistance au feu, des blocs pour faire des ponts et de quoi manger, on risque d'y passer un bon moment avant de trouver une forteresse.` (repeat or cut it to reach the counts in F-11).
 
@@ -1901,9 +2014,10 @@ Mika:  K #1C1C22  S #C68E6A  W #FFFFFF  E #2B6E4F  M #8A5038
 Lune:  P #7A5CE6  S #E8BFA0  W #FFFFFF  E #3A8DF0  M #B07A60
 Kael:   Mika's grid with K = #6B3A1E
 Camille: Alex's grid with O = #2F1F0F
+Marie-Charlotte: Lune's grid with P = #C0568A and E = #2B6E4F
 ```
 
-Faces by username: SteveBuilds = Steve, Alex_Craft = Alex, MikaPvP = Mika, Admin_Lune = Lune, Kael_Builder = Kael, Cam_Roux = Camille.
+Faces by username: SteveBuilds = Steve, Alex_Craft = Alex, MikaPvP = Mika, Admin_Lune = Lune, Kael_Builder = Kael, Cam_Roux = Camille, MCVillemarque = Marie-Charlotte.
 
 ---
 
@@ -1914,7 +2028,7 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 **Confirmed by the user on 2026-11-22**, after the storyboard canvas:
 
 1. Without a real name, the Minecraft username becomes the bold name and no handle is shown.
-2. Deleting is in version 1: players delete their own posts and replies, operators delete anything, with a confirmation. Deleting a post deletes its replies. Nothing can be restored.
+2. Deleting is in version 1: players delete their own posts and replies, operators delete anything, with a confirmation. Deleting a post deletes its replies. Nothing can be restored. (Since 2026-11-23, "operators" are the moderators below.)
 3. Pinning: limit of 3 pinned announcements; pinning a 4th asks to replace the oldest.
 4. The player cannot walk while the phone is open in version 1 (it is a normal game screen). They can still move during the 250 ms slide that precedes it (2.3).
 
@@ -1929,11 +2043,32 @@ Accepted defaults: the app is called "Feed", the clock shows in-game time, the b
 
 1. Other scripts. Inter has no CJK, Arabic or other non-Latin glyphs (8.4), so such characters show one missing-glyph box per grapheme in the apps and one `?` per run in the banner. Emoji are settled: the user chose to bundle an emoji font so that they show in the apps (8.4).
 
-**Known slips in the Feed sample data** (found while drawing the canvas; to fix before the Feed app is built, they do not affect the phone):
+**Confirmed by the user on 2026-11-23**, for the Feed that is backed by the LNB website (the decisions that concern the phone app; the ones that concern only the website, such as how the browser is built or how an account with several Minecraft accounts chooses one, are not repeated here):
 
-1. F-4.3 lists Global as posts 8, 1, 2, 3, 4, but post 8 is 20 minutes old; newest first is 1, 2, 8, 3, 4.
-2. P-8.7 puts post 6 "at the top" although pinned posts 5 and 9 sit above it, and dates it `1 j` although it was just announced. P-8 notifies post 6 while F-4, F-14 and F-20 use post 10 as the new announcement.
-3. F-7.3 promises replies R1 to R3 visible; with the reply field docked at `y 306`, only R1 fits under the main post.
-4. Post 8 has 2 unseen replies but only R4 has text; post 5 has 6 replies with no text.
-5. The "32-character" name `Marie-Charlotte de La Villemarqué` is 33 characters and has no face or post text.
-6. F-18.8 asks for two states in one frame.
+1. Feed's data lives on the LNB website and is the source of truth: the game and the browser show the same posts, replies, likes, pins and announcer rights, at once. The same Feed can be read and written from the website by signed-in LNB accounts (9.1).
+2. Writing (post, reply, like) needs a linked LNB account, in game and in the browser. Guests, the players without an LNB account (Warden in `optional` mode), read only (9.2, 9.11).
+3. Moderators are the accounts with the site's `admin` or `warden-admin` role, not Minecraft op level. They delete any post or reply and see the author of an anonymous post, in game and on the website (9.2, 9.3, 9.9).
+4. Announcers are a role of the site, given from the site's admin or by an in-game command that asks the site. Moderators are announcers too (9.2).
+5. A deleted post is hidden from everyone at once, kept 30 days for moderators on the website, then purged (9.9).
+6. There is no "Report" in version 1.
+7. A post shows its author's current name setting, not the one at posting time (9.2).
+8. Deleting an LNB account deletes its posts, replies and likes (9.9).
+9. No notifications in the browser: replies and announcements notify in game only (9.1, 9.2).
+10. Plain text only: no editing, links, mentions or hashtags; 280 characters, counted as 8.7 says (9.1).
+
+**Confirmed by the user on 2026-11-23**, after the contract and the website mocks (the decisions that concern the phone app):
+
+1. The guest state of 9.11 (no compose button, a 40 dp read-only strip in place of the reply composer, a plain snackbar `Compte LNB requis` on like and on reply buttons, the buttons staying drawn).
+2. The unavailable states of 9.12: the error block with a retry for a Feed opened with nothing loaded, the same block with `Feed désactivé` when it is switched off, the snackbar `Connexion perdue` over a list that stays on screen, a retry row when older posts or replies cannot load, a 10 second wait before Feed gives up, and an automatic retry about every 15 seconds.
+3. The two string keys of the moderator line are renamed `post.mod_author` and `post.mod_author.tooltip` (13.2); the demo app of this repository still uses the old names.
+4. The pill rule of 9.5: it shows whenever the new posts would not be fully visible once inserted, also at scroll 0 in Annonces when the pinned group pushes a new announcement below the fold; a click scrolls so that the first new post is fully visible. Own posts scroll into view as well.
+5. **Announcements can be anonymous**, in game and in the browser: `Anonyme`, no handle, no announcer badge, a notification reading `Anonyme : …`, the author visible to moderators and to the author as for any anonymous post (9.3, 9.8, 9.10).
+6. **In the pill, no arrow when the new post is below the visible area rather than above it** (9.5).
+7. The site role is named `feed-announcer`; any moderator can give or take it (9.2).
+8. The other choices of the contract are accepted as written, those that touch the phone being: the announcer badge follows the author's current role (9.2, 9.4); the reply count of a reply is the replies that answer it directly (9.3); threads are paged 50 replies at a time (9.7).
+
+**Chosen in version 6 without asking** (to show on the canvas; built this way unless the user says otherwise):
+
+1. A notification for an announcement scrolls Annonces so that the announcement is fully in view, since it sits under the pinned posts and would otherwise land below the fold (9.10).
+2. Banned players and everyone while writing is switched off get the guest look with their own words (9.11): `snackbar.banned` `Écriture bloquée (sanction)`, `snackbar.writing_off` `Écriture suspendue`, and `snackbar.too_fast` `Doucement ! Attends {n} s`, shortened from the wordings proposed in `docs/feed-app.md` so that each fits one snackbar line. The user later decided that writing switched off keeps the more and pin buttons for whoever each post allows (9.11).
+3. In the sample content, post 5 has two replies instead of six, posts 8 and 5 have written replies, and post 12 is an anonymous announcement, so that every thread and sheet a flow needs can be drawn (18.3).

@@ -4,10 +4,10 @@ import fr.bde_teknantes.lnb.phone.demo.client.smooth.SampleSkins
 import net.minecraft.client.resources.language.I18n
 import net.minecraft.resources.ResourceLocation
 
-/** A Feed string of the demo's language files (art direction 13.2, under `lnbphone_demo.feed.`). */
+/** A string of the post sample, in the demo's language files (art direction 13.2, under `lnbphone_demo.feed.`). */
 fun tr(key: String, vararg args: Any): String = I18n.get("lnbphone_demo.feed.$key", *args)
 
-/** Someone who writes posts, as Feed would know them from LNB Warden (art direction 9.2). */
+/** Someone who writes posts, as the Feed app knows them from LNB Warden (art direction 9.2). */
 class Author(val username: String, val realName: String?, val skin: () -> ResourceLocation, val announcer: Boolean = false) {
     /** The bold name: the real name, or the username without one. */
     val displayName get() = realName ?: username

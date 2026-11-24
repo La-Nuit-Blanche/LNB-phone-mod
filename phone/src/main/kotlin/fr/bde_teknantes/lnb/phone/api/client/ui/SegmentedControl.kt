@@ -81,13 +81,22 @@ class SegmentedControl(labels: List<String>) : Widget() {
                 selected == index || look == Interaction.HOVER || look == Interaction.PRESSED -> Colors.TEXT_1
                 else -> Colors.TEXT_2
             }
-            val text = canvas.truncate(label, TextStyle.LABEL, width - 2 * INSET - 16f)
+            val text = canvas.truncate(label, TextStyle.LABEL, labelRoom(width))
             canvas.drawTextCentered(text, width / 2f, (height - TextStyle.LABEL.lineHeight) / 2f, TextStyle.LABEL, color)
             if (showsFocusRing) KitDrawing.focusRing(canvas, INSET, INSET, width - 2 * INSET, height - 2 * INSET, Radius.FULL)
         }
     }
 
-    private companion object {
+    internal companion object {
         const val INSET = 3f
+
+        /** Space kept between a label and its pill's edge, each side. */
+        const val LABEL_PAD = 2f
+
+        /**
+         * The room a label has in a segment [segmentWidth] dp wide (art direction 8.7): the selected pill's width, less
+         * [LABEL_PAD] each side. 106 dp in each half of a 232 dp control, where `Announcements` (about 104 dp) fits.
+         */
+        fun labelRoom(segmentWidth: Float) = segmentWidth - 2 * INSET - 2 * LABEL_PAD
     }
 }

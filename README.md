@@ -13,28 +13,48 @@ screen, and the phone runs apps. Apps are mods of their own: other mods add them
 - **For app authors**: an API to register apps and navigate between screens, a UI kit (headers, lists, buttons, text
   fields, dialogs, snackbars...) in the phone's look, and the server-side notification API.
 
-The first real app, Feed (a Twitter-like for the server), is planned, as is access to LNB's website; neither exists
-yet. In English, and in French for players whose game is in French.
+- **Feed**, the first real app (`apps/feed`, mod `lnbphone_feed`): a Twitter-like for the server, with the server's
+  announcements and the players' posts, replies and likes, pinned announcements, anonymous posts, and a notification
+  for each announcement and each reply. Its data lives on LNB's website, so the game and the browser show the same
+  posts; the Minecraft server calls the site (through the connection of LNB Warden), never the player's game. It needs
+  LNB Warden and the website; for development it has an in-memory stand-in for the site. See
+  [`apps/feed/README.md`](apps/feed/README.md).
+
+The phone and Feed are in English, and in French for players whose game is in French.
 
 ## Documents
 
 - [`docs/writing-an-app.md`](docs/writing-an-app.md): how to write an app, through the example app Ping.
 - [`apps/demo/README.md`](apps/demo/README.md): what is in the demo mod, the example app and the development tools.
+- [`apps/feed/README.md`](apps/feed/README.md): Feed, for a server owner (install, configuration, the command) and for
+  a developer (layout, backends, running, tests, captures).
+- [`docs/feed-app.md`](docs/feed-app.md): how Feed is designed: its modules, the backend, the payloads, the server side
+  and the client's state. A second, larger example of an app, next to Ping.
 - [`TESTING.md`](TESTING.md): what to try in the game before a release, and the automated checks.
 - [`design/art-direction.md`](design/art-direction.md): the look, sizes, timings and strings of the phone and of Feed.
 
 ## Install
 
-`lnbphone` is required on the server and on every client, with Kotlin for Forge. An app's mod is required on both
-sides too. The phone depends on nothing else. Each player's settings are in `config/lnbphone-client.json` on their
-computer.
+`lnbphone` is required on the server and on every client, with NeoForge 21.1.264 or newer for Minecraft 1.21.1, and
+Kotlin for Forge 5.12 or newer. An app's mod is required on both sides too. The phone depends on nothing else. Each
+player's settings are in `config/lnbphone-client.json` on their computer.
+
+Feed (`lnbphone_feed`) is installed with the phone, on the server and on every client, and also needs LNB Warden
+(0.5.0 or later, not part of this repository). Warden has no releases: build its jar from
+`https://github.com/Charles-Mahoudeau/lnb-warden` with `./gradlew jar` (the commands are under [Building](#building)), or
+get it from whoever runs the server's mods. Feed is built and tested against Warden 0.5.0 at commit `5a9dba1`, the
+commit CI pins (`ref` in `.github/workflows/build.yml`). `apps/feed/README.md` has the details and Feed's
+configuration.
 
 ## Layout
 
-- `phone/`: the phone, mod `lnbphone`. The only jar released. The API for apps is in its `api` package.
+- `phone/`: the phone, mod `lnbphone`. Released with Feed (see [Releasing](#releasing)). The API for apps is in its
+  `api` package.
 - `apps/<name>/`: apps, each a mod of its own that depends on `lnbphone`.
-- `apps/demo/`: Ping, the example app, and the development tools (the UI kit's gallery, a sample of Feed, test
-  screens, `/phonedemo`, the screenshot harness). Never shipped.
+- `apps/feed/`: Feed, the social app, mod `lnbphone_feed`. Shipped with the phone.
+- `apps/demo/`: Ping, the example app, and the development tools (the UI kit's gallery, "Post sample", a feed of
+  made-up posts that shows the kit and is not the Feed app, test screens, `/phonedemo`, the screenshot harness). Never
+  shipped.
 - `tools/sprites/`: draws every image of the phone from the numbers of the art direction. Nothing is drawn by hand:
   to change an image, change its number there, run `./gradlew :tools:sprites:generateSprites` and commit the PNGs.
   `./gradlew :tools:sprites:contactSheet -Psheet=<file.png>` draws the whole set enlarged, for checking by eye.
@@ -54,6 +74,22 @@ means checking both files.
 
 Needs Java 21 (`JAVA_HOME`). Runs the unit tests too. The phone's jar is `phone/build/libs/lnbphone-<version>.jar`.
 
+Feed compiles against LNB Warden, which is in no Maven repository and is never committed. A fresh clone gets its jar by
+building it from Warden's public repository, once:
+
+```
+git clone https://github.com/Charles-Mahoudeau/lnb-warden
+cd lnb-warden
+git checkout 5a9dba1
+./gradlew jar
+cp build/libs/lnbwarden-*.jar <this repository>/apps/feed/libs/
+```
+
+(`apps/feed/libs/` is ignored by git; create it if it isn't there. `5a9dba1` is Warden 0.5.0, the commit CI pins and
+builds the same way.)
+Without that jar a local build leaves Feed out, with a warning, and builds the rest. Feed's jar is
+`apps/feed/build/libs/lnbphone_feed-<version>.jar`.
+
 ## Running
 
 ```
@@ -65,6 +101,18 @@ Both load the phone and the demo mod. The game runs in `apps/demo/run/`; the ser
 `apps/demo/run/eula.txt`. The server listens on 25565; `-Pserver_port=25566` picks another port, for servers from
 several checkouts at once. Every app has the same two runs (`./gradlew :apps:<name>:runClient`).
 
+Feed runs the same way, in `apps/feed/run/`, with the phone, Feed and Warden loaded (not the demo). Without a website,
+use its in-memory backend with the sample posts:
+
+```
+./gradlew :apps:feed:prepareMemoryRun
+./gradlew :apps:feed:runClient
+```
+
+`prepareMemoryRun` copies `apps/feed/example-config/` into `apps/feed/run/config`, so no file is written by hand. In a
+single-player world you are the only player; start `:apps:feed:runServer` and join it with `runClient` to be two.
+`apps/feed/README.md` says more, and how to run Feed against a local copy of the site.
+
 ## Screenshots
 
 ```
@@ -72,7 +120,18 @@ several checkouts at once. Every app has the same two runs (`./gradlew :apps:<na
 ```
 
 Starts a client that plays a capture scenario by itself and quits. The scenarios and their options are listed in
-[`TESTING.md`](TESTING.md).
+[`TESTING.md`](TESTING.md). Feed has its own, which sets its game folder up itself:
+
+```
+./gradlew :apps:feed:runCapture -Pcapture=root|guest|thread|compose [-PcaptureDir=<absolute directory>]
+```
+
+## Releasing
+
+A tag `v<version>` (for example `v0.2.0`) makes CI build every jar as that version and publish a GitHub release with
+two jars: `lnbphone-<version>.jar` (the phone) and `lnbphone_feed-<version>.jar` (Feed), whose dependency on the phone
+is written by the build as `[<version>, next minor)`, so the two load together. The demo's jar and LNB Warden's are not
+part of a release. A branch build uploads both jars as artifacts without releasing them.
 
 ## License
 

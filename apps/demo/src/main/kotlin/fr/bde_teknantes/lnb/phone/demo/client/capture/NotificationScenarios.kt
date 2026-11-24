@@ -10,9 +10,9 @@ import net.minecraft.world.item.Items
 import org.lwjgl.glfw.GLFW
 
 /**
- * Task 7: notifications reaching the phone, in a world, through art direction 17's flows P-4, P-5, P-8 to P-11 and
- * P-14, at GUI scale 2, 3 and 4. Real notifications, sent by `/phonedemo notify` to the demo's Hello app (home slot 5
- * with `-PdemoApps=6`). Run with `-PcaptureSize=1920x1080`: at GUI scale 4 the window is the flows' 480 x 270.
+ * `notifications`: notifications reaching the phone, in a world, through art direction 17's flows P-4, P-5, P-8 to P-11
+ * and P-14, at GUI scale 2, 3 and 4. Real notifications, sent by `/phonedemo notify` to the demo's Hello app (home slot
+ * 5 with `-PdemoApps=6`). Run with `-PcaptureSize=1920x1080`: at GUI scale 4 the window is the flows' 480 x 270.
  *
  * Mid-slide frames hold the animation at half its eased course, where the flows measure them.
  */
@@ -40,9 +40,10 @@ internal object NotificationScenarios {
     }
 
     /**
-     * What the review of task 7 changed, at GUI scale 4 in a 480 x 270 window: the peek's banner over a chat line (in a
-     * narrow window, where the chat reaches it), with subtitles on, under F1; the inventory button with news on an
-     * app's root screen and deeper; the crafting grid after the phone; the open recipe book over the button.
+     * `notifications-review`: what a review of the notifications changed, at GUI scale 4 in a 480 x 270 window: the
+     * peek's banner over a chat line (in a narrow window, where the chat reaches it), with subtitles on, under F1; the
+     * inventory button with news on an app's root screen and deeper; the crafting grid after the phone; the open recipe
+     * book over the button.
      */
     fun review() = CaptureScript().apply {
         enterWorld()

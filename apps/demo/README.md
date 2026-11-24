@@ -32,8 +32,10 @@ should be written: some reach into the phone's internals, by reflection, to show
 - **Apps on the home screen** (`client/DemoAppClient.kt`): "Hello" (`client/HelloScreen.kt`), a bare `AppScreen`
   drawn without the kit, where every click opens one more screen, to try navigation, and a right click opens a
   vanilla dialog over the phone; "UI kit" (`client/kit/Gallery.kt`,
-  `KitPages.kt`), every widget of the kit in every state; "Feed (sample)" (`client/kit/FeedScreens.kt`,
-  `PostCard.kt`, `FeedSample.kt`), the screens of the planned Feed app rebuilt from the kit with made-up posts.
+  `KitPages.kt`), every widget of the kit in every state; "Post sample" (`client/kit/FeedScreens.kt`,
+  `PostCard.kt`, `FeedSample.kt`), a feed of made-up posts (two tabs, a thread, Compose) built from the kit, the kit's
+  showcase. It is not the Feed app, which is a mod of its own, [`apps/feed`](../feed/README.md); it has its own name and
+  its own teal tile so that the two can't be mistaken for each other on one home screen.
   `-PdemoApps=<n>` adds n sample icons, to fill the home screen.
 - **`/phonedemo`** (`DemoCommands.kt`, operators): `notify <players> [depth] [text]` sends a test notification from
   Hello, leading to its screen at that depth; `clear <players>` removes them.
