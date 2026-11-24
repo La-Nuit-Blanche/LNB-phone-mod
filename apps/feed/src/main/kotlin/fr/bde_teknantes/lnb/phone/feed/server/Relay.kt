@@ -95,10 +95,15 @@ class Relay(
         toWatchers(ResetPayload)
     }
 
-    /** "Connection lost" over what is loaded: the watchers keep their last state. */
+    /**
+     * "Connection lost" over what is loaded, or switched off: the availability alone. Each client keeps the state it
+     * has, which may be newer than this server's copy (its tab dots cleared since), and a client with none yet shows
+     * its block without one. A refusal as switched off comes once a minute, so a copy sent here would put back stale
+     * dots every minute.
+     */
     override fun onDisconnected(disabled: Boolean) = host.execute {
         val available = if (disabled) Availability.DISABLED else Availability.UNAVAILABLE
-        for (watcher in watchers.toList()) host.send(watcher, StatePayload(available, rights.state(watcher)))
+        toWatchers(StatePayload(available, null))
     }
 
     private fun toWatchers(payload: CustomPacketPayload) {

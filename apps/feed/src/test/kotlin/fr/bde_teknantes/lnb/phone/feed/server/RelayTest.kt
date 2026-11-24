@@ -15,6 +15,7 @@ import fr.bde_teknantes.lnb.phone.feed.network.ResetPayload
 import fr.bde_teknantes.lnb.phone.feed.network.StatePayload
 import fr.bde_teknantes.lnb.phone.feed.server.backend.BackendResult
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -167,12 +168,13 @@ class RelayTest {
     }
 
     @Test
-    fun `a lost stream sends each watcher their own last state, and a reconnection refreshes everyone and resets the watchers`() {
+    fun `a lost stream sends the watchers the availability alone, and a reconnection refreshes everyone and resets the watchers`() {
         val (camille, mika) = watchers(2)
         relay.onDisconnected(false)
         assertEquals(Availability.UNAVAILABLE, host.received<StatePayload>(camille).last().available)
-        assertEquals(camille, host.received<StatePayload>(camille).last().state?.me?.uuid)
-        assertEquals(mika, host.received<StatePayload>(mika).last().state?.me?.uuid)
+        // No copy of a player's state: their client's own may be newer (a tab's dot cleared since the last read).
+        assertNull(host.received<StatePayload>(camille).last().state)
+        assertNull(host.received<StatePayload>(mika).last().state)
         relay.onDisconnected(true)
         assertEquals(Availability.DISABLED, host.received<StatePayload>(mika).last().available)
         assertTrue(host.sentTo(bystander).isEmpty())
@@ -185,6 +187,22 @@ class RelayTest {
         assertEquals(1, host.received<ResetPayload>(camille).size)
         assertEquals(Availability.OK, host.received<StatePayload>(camille).last().available)
         assertTrue(host.sentTo(bystander).none { it is ResetPayload || it is StatePayload })
+    }
+
+    @Test
+    fun `a refusal as switched off after a player's own read found Feed back tells that watcher again`() {
+        val (camille) = watchers(1)
+        relay.onDisconnected(true)
+        assertEquals(Availability.DISABLED, host.received<StatePayload>(camille).last().available)
+        // Feed switched on: the player's own open (the app's 15-second retry) reads the state and finds it back.
+        host.time += 60_000
+        service.handleOpen(camille)
+        assertEquals(Availability.OK, host.received<StatePayload>(camille).last().available)
+        // Switched off again before the stream's next try: the next refusal reaches the watcher, with no stale state.
+        relay.onDisconnected(true)
+        val last = host.received<StatePayload>(camille).last()
+        assertEquals(Availability.DISABLED, last.available)
+        assertNull(last.state)
     }
 
     @Test

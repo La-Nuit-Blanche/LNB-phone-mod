@@ -64,6 +64,37 @@ class FeedSessionStateTest {
     }
 
     @Test
+    fun `a client with no state yet takes the availability alone, and writes nothing`() {
+        session.open()
+        session.onState(StatePayload(Availability.DISABLED, null))
+        assertEquals(FeedAvailability.DISABLED, session.availability)
+        assertNull(session.state)
+        assertFalse(session.canCompose(FeedKind.GLOBAL))
+        assertNull(session.takeNotice(), "nothing loaded: the block says it, not a snackbar")
+    }
+
+    @Test
+    fun `a refusal told again keeps the dots the player cleared since, and raises no new snackbar`() {
+        r.state(PLAYER.copy(unread = Unread(announcements = false, global = true)))
+        r.firstPage(FeedKind.GLOBAL, listOf(post()))
+        session.show(FeedKind.ANNOUNCEMENTS)
+        r.state(PLAYER.copy(unread = Unread(announcements = false, global = true)), available = Availability.DISABLED)
+        assertEquals(FeedNotice.ConnectionLost, session.takeNotice())
+        // Global read while Feed is off: its dot goes.
+        session.show(FeedKind.GLOBAL)
+        session.markViewed(FeedKind.GLOBAL)
+        session.show(FeedKind.ANNOUNCEMENTS)
+        assertFalse(session.isUnread(FeedKind.GLOBAL))
+        // The server tells each refusal as switched off, once a minute, with the availability alone.
+        repeat(3) {
+            session.onState(StatePayload(Availability.DISABLED, null))
+            assertFalse(session.isUnread(FeedKind.GLOBAL), "the dot stays out")
+            assertNull(session.takeNotice(), "no new snackbar")
+            assertEquals(FeedAvailability.DISABLED, session.availability)
+        }
+    }
+
+    @Test
     fun `the block's Retry gives up waiting after 15 seconds without an answer`() {
         session.loadIfNeeded(FeedKind.GLOBAL)
         session.onPage(PagePayload.failed(r.last<LoadFeedPayload>().requestId, Outcome.UNAVAILABLE, FeedKind.GLOBAL))

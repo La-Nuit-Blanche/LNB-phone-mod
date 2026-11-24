@@ -212,7 +212,7 @@ Then it calls the backend and maps the result to an `Outcome` (section 5.3).
 | `onRights` | Refreshes those players (4.2). |
 | `onNotification` | Drains the queue (6.1). |
 | `onConnected` | Drains the queue, refreshes every online player's state (sent to those who watch, with `available: OK`), and sends `reset` to the watchers: their caches are stale. |
-| `onDisconnected` | Sends the watchers `state` with `available: UNAVAILABLE` (or `DISABLED`), keeping their last `PlayerState`: the app shows "Connection lost" over what is loaded (art direction 9.12). |
+| `onDisconnected` | Sends the watchers `state` with `available: UNAVAILABLE` (or `DISABLED`) and no `PlayerState`: each client keeps its own, which may be newer than the server's copy (dots cleared since); the app shows "Connection lost" over what is loaded (art direction 9.12). Told again at each refusal as switched off, it adds no new snackbar. |
 
 ### 4.5 When the site is away or Feed is off
 

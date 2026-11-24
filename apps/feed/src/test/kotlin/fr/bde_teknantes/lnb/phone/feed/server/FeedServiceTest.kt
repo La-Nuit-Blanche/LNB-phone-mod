@@ -27,6 +27,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.contents.TranslatableContents
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -134,11 +135,12 @@ class FeedServiceTest {
     @Test
     fun `a lost stream tells the watchers, and a reconnection drains, refreshes and resets`() {
         open(CAMILLE)
-        val before = host.received<StatePayload>(CAMILLE).last().state
+        assertNotNull(host.received<StatePayload>(CAMILLE).last().state)
         backend.setOffline(true)
         val lost = host.received<StatePayload>(CAMILLE).last()
         assertEquals(Availability.UNAVAILABLE, lost.available)
-        assertEquals(before, lost.state)
+        // The availability alone: the client keeps the state it has, which may be newer than the server's copy.
+        assertNull(lost.state)
 
         backend.setOffline(false)
         assertEquals(1, host.received<ResetPayload>(CAMILLE).size)
