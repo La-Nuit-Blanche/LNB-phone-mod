@@ -39,8 +39,9 @@ import java.util.concurrent.atomic.AtomicLong
  * The mod's own [SiteBackend] and [FeedEvents] against a **running** LNB website, through every call of the backend
  * interface, and the contract's test vectors (`docs/feed-mod.md` 13) on the real site rather than the memory backend.
  *
- * Not part of the normal build: it runs only when `FEED_LIVE_SITE` is set, by hand, against a local site whose
- * database it empties between checks. `TESTING.md` ("Feed against a local website") says how to seed that site:
+ * Not part of the normal build: it runs only with `FEED_LIVE_CHECK=1` and `FEED_LIVE_SITE` set, by hand, against a local
+ * site whose database it empties between checks (`FEED_LIVE_SITE` alone, which the `site-*` captures use too, isn't
+ * enough). `TESTING.md` ("Feed against a local website") says how to seed that site:
  *
  * - `FEED_LIVE_SITE`: the site's base URL (`http://localhost:3010`);
  * - `FEED_LIVE_TOKEN`: its `WARDEN_SERVER_SECRET`;
@@ -48,8 +49,9 @@ import java.util.concurrent.atomic.AtomicLong
  *   for the browser's routes and the admin's;
  * - `FEED_LIVE_DB`: the site's database in the Compose PostgreSQL (`lnb_c1`), emptied of Feed's rows between checks.
  *
- * `./gradlew :apps:feed:test --tests '*LiveSiteCheck*'`. A failure here is a disagreement between the mod and the site.
+ * `FEED_LIVE_CHECK=1 ./gradlew :apps:feed:test --tests '*LiveSiteCheck*'`. A failure here is a disagreement between the mod and the site.
  */
+@EnabledIfEnvironmentVariable(named = "FEED_LIVE_CHECK", matches = "1")
 @EnabledIfEnvironmentVariable(named = "FEED_LIVE_SITE", matches = "https?://.+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
@@ -637,6 +639,7 @@ class LiveSiteCheck {
         } finally {
             stream.stop()
             flagQuietly("feed", true)
+            flagQuietly("feed.serverApi", true)
         }
     }
 
