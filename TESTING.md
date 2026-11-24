@@ -488,7 +488,7 @@ leave the window alone anyway: it opens on the desktop for about a minute.
 
 | Scenario | Shows | Needs |
 |---|---|---|
-| `root` | Announcements with its pinned posts, Global, the pill with its arrow and without it, an announcement's banner and the dot on its tab, landing from that banner, the connection lost, Feed unavailable, Feed switched off, writing paused (a like refused with the reason), then English at GUI scale 2 and 4 | the memory backend with the sample seed |
+| `root` | Announcements with its pinned posts, Global, the pill with its arrow and without it, an announcement's banner and the dot on its tab, landing from that banner, the connection lost, Feed unavailable and Feed switched off (on Announcements, and on Global with no compose button over the block), writing paused (a like refused with the reason), then English at GUI scale 2 and 4 | the memory backend with the sample seed |
 | `guest` | the guest's look: no compose button, a like refused, the thread's strip, a refused reply | `Visiteur_42` under `memory.guests`, which `captureUser` defaults to for this scenario |
 | `thread` | a thread from its card, the reply composer collapsed, hovered, expanded and typed into, a reply to a reply, sending, an own reply deleted, the no-replies row, landing on a reply from its notification, deleting an own post | the sample seed |
 | `compose` | Compose as a player (typing, the counter's colours, over the limit, anonymous, sending, posted, a failure, the closed draft kept) and as an announcer (the destination, anonymous), pinning (tooltip, the replace dialog, the group), then English at GUI scale 2 | the sample seed; the scenario makes Camille an announcer itself, through the backend |

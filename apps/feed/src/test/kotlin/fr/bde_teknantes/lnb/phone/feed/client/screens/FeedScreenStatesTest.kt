@@ -31,10 +31,12 @@ import fr.bde_teknantes.lnb.phone.testing.PhoneTester
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertInstanceOf
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.lwjgl.glfw.GLFW
 import java.time.ZoneOffset
 
 /**
@@ -293,6 +295,55 @@ class FeedScreenStatesTest {
         t.clientTicks(1)
         t.frame()
         assertEquals(loads + 1, r.all<LoadFeedPayload>().size)
+    }
+
+    @Test
+    fun `the unavailable and switched-off blocks stand alone, with no compose button to see, click or focus`() {
+        // Global for a player, Annonces for an announcer: both have the button over a list.
+        for ((tab, state) in listOf(FeedKind.GLOBAL to FeedFixtures.PLAYER, FeedKind.ANNOUNCEMENTS to ANNOUNCER)) {
+            for (outcome in listOf(Outcome.UNAVAILABLE, Outcome.DISABLED)) {
+                tester?.close()
+                val rec = FeedFixtures.Recorder()
+                val t = PhoneTester { FeedScreen(rec.session, strings, tab, fromHome = true, zone = ZoneOffset.UTC) }
+                tester = t
+                rec.state(state)
+                rec.session.onPage(PagePayload.failed(rec.all<LoadFeedPayload>().last { it.feed == tab }.requestId, outcome, tab))
+                t.frame()
+                val words = "$tab $outcome"
+                assertTrue(t.shows("error.retry"), words)
+                assertEquals(0, t.fabs(), words)
+                // Where the button would be: nothing to click.
+                t.click(220f, 334f)
+                t.tick(4)
+                assertInstanceOf(FeedScreen::class.java, t.screen, words)
+                // The keyboard reaches the tabs and Retry, never a hidden button: Enter on every focus stop.
+                repeat(4) {
+                    t.key(GLFW.GLFW_KEY_TAB)
+                    t.frame()
+                }
+                assertInstanceOf(FeedScreen::class.java, t.screen, words)
+                // Back and loaded: the button is over the list again.
+                rec.state(state)
+                t.tick()
+                val request = rec.all<LoadFeedPayload>().last { it.feed == tab }.requestId
+                rec.session.onPage(PagePayload(request, Outcome.OK, tab, emptyList(), posts(2, tab), null))
+                t.frame()
+                assertEquals(1, t.fabs(), words)
+            }
+        }
+    }
+
+    @Test
+    fun `over a loaded list, the compose button stays while Connection lost shows`() {
+        val t = open(FeedKind.GLOBAL)
+        r.state(FeedFixtures.PLAYER)
+        answer(FeedKind.GLOBAL, posts(2))
+        t.frame()
+        r.state(FeedFixtures.PLAYER, available = Availability.UNAVAILABLE)
+        t.tick(2)
+        t.frame()
+        assertTrue(t.showsStart("feed.conn"))
+        assertEquals(1, t.fabs())
     }
 
     @Test

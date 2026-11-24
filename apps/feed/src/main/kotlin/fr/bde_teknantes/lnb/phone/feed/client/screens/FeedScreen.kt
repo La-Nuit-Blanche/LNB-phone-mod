@@ -247,7 +247,9 @@ class FeedScreen(
             if (session.revision != synced || cards.values.any { it.isCollapsed }) sync(anchor = true)
             tabs.setUnread(FeedKind.ANNOUNCEMENTS.ordinal, session.isUnread(FeedKind.ANNOUNCEMENTS))
             tabs.setUnread(FeedKind.GLOBAL.ordinal, session.isUnread(FeedKind.GLOBAL))
-            fab.visible = session.canCompose(kind)
+            // The unavailable and switched-off blocks stand alone (9.12): no compose button over them, which hidden is
+            // neither clickable nor focusable. Over a loaded list with `Connexion perdue` it stays.
+            fab.visible = session.canCompose(kind) && mode != Mode.BLOCK
             block?.button?.loading = feed.retrying
             if (mode != Mode.LIST && mode != Mode.EMPTY) {
                 pill.show(false)

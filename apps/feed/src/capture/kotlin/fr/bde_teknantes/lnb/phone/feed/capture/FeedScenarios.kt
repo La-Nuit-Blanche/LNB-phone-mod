@@ -111,6 +111,12 @@ object FeedScenarios {
         // 9.12: opened with nothing loaded, the site away; then Feed switched off.
         reopenFresh()
         shot("12_unavailable")
+        // Global, where a player has the compose button over a list: the block alone, no button over it.
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        mouseTo(AWAY_X, 200)
+        waitTicks(2)
+        shot("12_unavailable_global")
         backend {
             it.setOffline(false)
             it.setDisabled(true)
@@ -118,6 +124,11 @@ object FeedScenarios {
         waitTicks(10)
         reopenFresh()
         shot("13_disabled")
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        mouseTo(AWAY_X, 200)
+        waitTicks(2)
+        shot("13_disabled_global")
 
         // 9.11: writing switched off: no compose button; a heart says why.
         backend {
