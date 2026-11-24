@@ -17,7 +17,7 @@ object FeedScenarios {
         "guest" -> { { guest() } }
         "thread" -> { { with(WriteScenarios) { thread() } } }
         "compose" -> { { with(WriteScenarios) { compose() } } }
-        else -> null
+        else -> SiteScenarios.get(name)
     }
 
     private const val AWAY_X = -20

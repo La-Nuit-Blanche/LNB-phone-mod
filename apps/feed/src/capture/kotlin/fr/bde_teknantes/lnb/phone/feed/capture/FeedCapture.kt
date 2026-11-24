@@ -11,7 +11,11 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.MouseHandler
 import net.minecraft.client.Screenshot
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen
+import net.minecraft.client.gui.screens.ConnectScreen
+import net.minecraft.client.gui.screens.DisconnectedScreen
 import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.client.multiplayer.resolver.ServerAddress
 import net.minecraft.client.tutorial.TutorialSteps
 import net.minecraft.core.registries.Registries
 import net.minecraft.sounds.SoundSource
@@ -88,9 +92,11 @@ object FeedCapture {
         script(Script())
         outDir = (System.getProperty("lnbphone_feed.capture.dir")?.takeIf { it.isNotBlank() }?.let(Path::of) ?: Path.of("captures", "feed")).absolute()
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post::class.java) { tick() }
+        // Scenarios against a real site and server wait for restarts: -PcaptureWatchdog gives them longer.
+        val watchdogSeconds = System.getProperty("lnbphone_feed.capture.watchdog")?.toLongOrNull() ?: 360L
         Thread({
-            Thread.sleep(360_000)
-            FeedMod.LOGGER.error("Feed capture still running after 6 minutes: killing the client")
+            Thread.sleep(watchdogSeconds * 1000)
+            FeedMod.LOGGER.error("Feed capture still running after {} seconds: killing the client", watchdogSeconds)
             Runtime.getRuntime().halt(3)
         }, "lnbphone_feed-capture-watchdog").apply {
             isDaemon = true
@@ -188,6 +194,76 @@ object FeedCapture {
                     }, TitleScreen())
                 }
                 mc.level != null && mc.player != null && mc.screen == null
+            }
+        }
+
+        /**
+         * Joins the dedicated server at [address] (`host:port`) and waits until in its world. A refused or lost
+         * connection is tried again every 5 seconds, so a step can wait for a server that is restarting.
+         */
+        fun joinServer(address: String) {
+            var begun = false
+            var retryAt = 0
+            var ticks = 0
+            add {
+                val mc = Minecraft.getInstance()
+                ticks++
+                if (mc.screen is DisconnectedScreen && begun) {
+                    begun = false
+                    retryAt = ticks + 100
+                    mc.setScreen(TitleScreen())
+                }
+                if (!begun && ticks >= retryAt && mc.level == null) {
+                    begun = true
+                    // No "social interactions" toast on joining a server for the first time.
+                    mc.options.joinedFirstServer = true
+                    FeedMod.LOGGER.info("Feed capture joining {}", address)
+                    ConnectScreen.startConnecting(TitleScreen(), mc, ServerAddress.parseString(address), ServerData("LNB Feed", address, ServerData.Type.OTHER), false, null)
+                }
+                mc.level != null && mc.player != null && mc.screen == null
+            }
+        }
+
+        /** Leaves the server for the title screen, as the pause menu's Disconnect does. */
+        fun leaveServer() = add {
+            val mc = Minecraft.getInstance()
+            mc.level?.let {
+                it.disconnect()
+                mc.disconnect(TitleScreen())
+            }
+            mc.level == null
+        }
+
+        /** Waits until [condition], or [ticks] at most, then goes on, logging that it gave up on [what]. */
+        fun waitUntil(ticks: Int, what: String, condition: () -> Boolean) {
+            var left = ticks
+            add {
+                when {
+                    condition() -> true
+                    --left <= 0 -> {
+                        FeedMod.LOGGER.warn("Feed capture gave up waiting for {}", what)
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+
+        /**
+         * Asks the run's orchestrator for [name] (a file `req-<name>` in `-Dlnbphone_feed.capture.control`) and waits
+         * until it answers (`done-<name>`): restarting the site or the server, which the client can't do itself.
+         */
+        fun control(name: String) {
+            var asked = false
+            add {
+                val dir = Path.of(System.getProperty("lnbphone_feed.capture.control") ?: error("No -Dlnbphone_feed.capture.control"))
+                if (!asked) {
+                    asked = true
+                    Files.deleteIfExists(dir.resolve("done-$name"))
+                    Files.writeString(dir.resolve("req-$name"), "")
+                    FeedMod.LOGGER.info("Feed capture asked the orchestrator for {}", name)
+                }
+                Files.exists(dir.resolve("done-$name"))
             }
         }
 

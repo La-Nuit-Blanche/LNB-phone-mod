@@ -95,10 +95,15 @@ neoForge {
             taskBefore(prepareCapture)
             val scenario = providers.gradleProperty("capture").getOrElse("root")
             systemProperty("lnbphone_feed.capture", scenario)
-            systemProperty("lnbphone_feed.memory.clock", "sample")
+            // The sample's fixed clock, except against a real site and server (-PcaptureServer), whose posts have real times.
+            if (!providers.gradleProperty("captureServer").isPresent) systemProperty("lnbphone_feed.memory.clock", "sample")
             providers.gradleProperty("captureDir").orNull?.let { systemProperty("lnbphone_feed.capture.dir", it) }
             providers.gradleProperty("captureLang").orNull?.let { systemProperty("lnbphone_feed.capture.lang", it) }
             providers.gradleProperty("captureScale").orNull?.let { systemProperty("lnbphone_feed.capture.scale", it) }
+            // The site-* scenarios (SiteScenarios): the dedicated server to join, the orchestrator's folder, a longer watchdog.
+            providers.gradleProperty("captureServer").orNull?.let { systemProperty("lnbphone_feed.capture.server", it) }
+            providers.gradleProperty("captureControl").orNull?.let { systemProperty("lnbphone_feed.capture.control", it) }
+            providers.gradleProperty("captureWatchdog").orNull?.let { systemProperty("lnbphone_feed.capture.watchdog", it) }
             val user = providers.gradleProperty("captureUser").getOrElse(if (scenario == "guest") "Visiteur_42" else "Cam_Roux")
             val (width, height) = providers.gradleProperty("captureSize").getOrElse("1280x960").split("x")
             programArguments.addAll("--username", user, "--width", width, "--height", height)
