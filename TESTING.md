@@ -525,6 +525,7 @@ real times.
 | `site-outage` | a plain player | Feed off under an open Feed, the switched-off block and its Retry, the site killed under a loaded list and started again |
 | `site-return` | a plain player | the badge for a reply made while the server was stopped, then the announcer role given and taken in the admin |
 | `site-flags` | a plain player | timed, with no click: `feed` and `feed.serverApi` switched off and on under an open Feed, the switched-off block coming back by itself, the site killed and started, a reply while offline, the server restarted |
+| `site-dots` | a plain player | Global's dot cleared while Feed is off, watched over two minutes of refusals (a shot every 4 seconds: the dot stays out, no snackbar), Feed back by itself, then a player joining while Feed is off |
 | `site-moderator` | a Warden admin | the round, more and pin buttons, the author line of an anonymous post, `/feed announcer` and its answers |
 | `site-announcer` | an announcer | the round and pin buttons, `/feed` unknown |
 | `site-guest` | a username with no LNB account | no round button, a heart refused |
