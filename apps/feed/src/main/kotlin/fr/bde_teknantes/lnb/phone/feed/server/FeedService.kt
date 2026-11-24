@@ -102,13 +102,15 @@ class FeedService(val backend: FeedBackend, val host: FeedHost, sink: FeedNotifi
     fun handleOpen(player: UUID) {
         watchers += player
         // Past a limit (the player's own, or the whole server's when many open Feed at once, from the same
-        // notification say), the site isn't asked: the player gets "unavailable" with the last state known, and the
-        // client's retry, about every 15 seconds, takes over.
-        if (!limits.tryStart(player, PlayerLimits.Kind.READ)) return host.send(player, StatePayload(Availability.UNAVAILABLE, rights.state(player)))
+        // notification say), the site isn't asked: the player gets "unavailable", and the client's retry, about every
+        // 15 seconds, takes over.
+        if (!limits.tryStart(player, PlayerLimits.Kind.READ)) return host.send(player, StatePayload(Availability.UNAVAILABLE, null))
         rights.refresh(player).thenAccept { result ->
             limits.finish(player)
-            // On success the state went to the player as a watcher; otherwise they keep the last one, with the reason.
-            if (result !is BackendResult.Ok) host.send(player, StatePayload(availabilityOf(result), rights.state(player)))
+            // On success the state went to the player as a watcher; otherwise the reason alone. The client keeps the
+            // state it has, which may be newer than this server's copy (a tab's dot cleared since): the copy, sent
+            // with each of the client's retries, put that dot back every 15 seconds while Feed was off.
+            if (result !is BackendResult.Ok) host.send(player, StatePayload(availabilityOf(result), null))
         }
     }
 

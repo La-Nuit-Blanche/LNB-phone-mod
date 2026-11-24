@@ -15,7 +15,7 @@ import fr.bde_teknantes.lnb.phone.feed.network.ThreadPayload
  * [FeedClient.session], which the screens read.
  */
 object FeedClientPayloads {
-    /** Availability and the player's state: rights, `me`, the tab dots (or the last state, while the site is away). */
+    /** Availability and the player's state: rights, `me`, the tab dots (none while the site is away: the last stays). */
     fun onState(payload: StatePayload) = FeedClient.session.onState(payload)
 
     /** A feed page, answering `load_feed` with the same request ID. */

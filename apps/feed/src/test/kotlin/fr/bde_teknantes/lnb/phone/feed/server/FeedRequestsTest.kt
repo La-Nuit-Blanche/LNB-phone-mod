@@ -26,6 +26,7 @@ import fr.bde_teknantes.lnb.phone.feed.server.backend.ThreadPage
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -300,17 +301,18 @@ class FeedRequestsTest {
     }
 
     @Test
-    fun `open while the site is away answers its availability with the last state`() {
+    fun `open while the site is away answers its availability alone`() {
         service.handleOpen(camille)
-        val known = host.received<StatePayload>(camille).last().state
+        assertNotNull(host.received<StatePayload>(camille).last().state)
+        // The server's copy may be older than the client's own (a tab's dot cleared since): it isn't sent back.
         backend.auto = { call -> if (call.name == "player") BackendResult.Unavailable("down") else null }
         service.handleOpen(camille)
-        assertEquals(StatePayload(Availability.UNAVAILABLE, known), host.received<StatePayload>(camille).last())
+        assertEquals(StatePayload(Availability.UNAVAILABLE, null), host.received<StatePayload>(camille).last())
         backend.auto = { call -> if (call.name == "player") BackendResult.Disabled("feed") else null }
         service.handleOpen(camille)
-        assertEquals(StatePayload(Availability.DISABLED, known), host.received<StatePayload>(camille).last())
+        assertEquals(StatePayload(Availability.DISABLED, null), host.received<StatePayload>(camille).last())
 
-        // Someone whose state was never read gets no state at all, only the reason.
+        // Someone whose state was never read gets the same: only the reason.
         val newcomer = UUID(1, 9)
         host.online += newcomer
         service.handleOpen(newcomer)
@@ -331,7 +333,7 @@ class FeedRequestsTest {
         assertEquals(ResultPayload(5, Outcome.RATE_LIMITED, retryAfter = 1), answer(camille, 5))
         assertEquals(4, backend.calls("page").size)
         assertEquals(2, backend.calls("player").size, "the open past the limit asked nothing (only the join's read)")
-        assertEquals(StatePayload(Availability.UNAVAILABLE, service.rights.state(camille)), host.received<StatePayload>(camille).last(), "and is answered")
+        assertEquals(StatePayload(Availability.UNAVAILABLE, null), host.received<StatePayload>(camille).last(), "and is answered, with the availability alone")
         assertTrue(backend.calls("markFeedSeen").isEmpty())
 
         // Another player isn't held up.
@@ -408,13 +410,13 @@ class FeedRequestsTest {
     }
 
     @Test
-    fun `opens past the reads' burst ask the site nothing, and answer unavailable with the last state`() {
+    fun `opens past the reads' burst ask the site nothing, and answer unavailable alone`() {
         for (i in 1..25) service.handleOpen(camille)
         assertEquals(1 + 19, backend.calls("player").count { it.arg<UUID>(0) == camille }, "the join's read and 19 opens: 20 reads")
         val states = host.received<StatePayload>(camille)
         val refused = states.filter { it.available == Availability.UNAVAILABLE }
         assertEquals(6, refused.size, "each open past the limit is answered, so the client's retry takes over")
-        assertTrue(refused.all { it.state == service.rights.state(camille) && it.state != null }, "with the last state known")
+        assertTrue(refused.all { it.state == null }, "the availability alone: the client keeps its own state")
         assertTrue(service.isWatcher(camille))
     }
 
