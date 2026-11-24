@@ -12,6 +12,7 @@ import net.minecraft.client.MouseHandler
 import net.minecraft.client.Screenshot
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen
 import net.minecraft.client.gui.screens.ConnectScreen
+import net.minecraft.client.gui.screens.DeathScreen
 import net.minecraft.client.gui.screens.DisconnectedScreen
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.multiplayer.ServerData
@@ -219,6 +220,11 @@ object FeedCapture {
                     mc.options.joinedFirstServer = true
                     FeedMod.LOGGER.info("Feed capture joining {}", address)
                     ConnectScreen.startConnecting(TitleScreen(), mc, ServerAddress.parseString(address), ServerData("LNB Feed", address, ServerData.Type.OTHER), false, null)
+                }
+                // A player who died on the server (its mobs) joins on the death screen: respawn.
+                if (mc.screen is DeathScreen) {
+                    mc.player?.respawn()
+                    mc.setScreen(null)
                 }
                 mc.level != null && mc.player != null && mc.screen == null
             }

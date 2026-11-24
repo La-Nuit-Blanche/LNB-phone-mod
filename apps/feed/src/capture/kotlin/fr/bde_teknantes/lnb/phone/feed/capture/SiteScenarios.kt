@@ -40,6 +40,7 @@ object SiteScenarios {
         "site-banned" -> { { banned() } }
         "site-outage" -> { { outage() } }
         "site-return" -> { { comeBack() } }
+        "site-flags" -> { { flags() } }
         else -> null
     }
 
@@ -373,6 +374,119 @@ object SiteScenarios {
         waitTicks(10)
         away()
         shot("r04_announcer_taken_in_admin")
+    }
+
+    private val marks = HashMap<String, Long>()
+
+    /** Starts the clock [name], for [elapsed]. */
+    private fun FeedCapture.Script.mark(name: String) = run { marks[name] = System.nanoTime() }
+
+    /** Logs how long since [mark] of [name], in seconds: the timings the run reports. */
+    private fun FeedCapture.Script.elapsed(name: String, what: String) = run {
+        val ms = (System.nanoTime() - (marks[name] ?: error("No mark $name"))) / 1_000_000
+        FeedMod.LOGGER.info("Feed capture timing: {} after {} s", what, "%.1f".format(java.util.Locale.ROOT, ms / 1000.0))
+    }
+
+    /**
+     * As Camille R., timed, with no click: `feed` and then `feed.serverApi` switched off and on under an open Feed (the
+     * site closes the server's stream, the mod retries every minute); the switched-off block on Global coming back by
+     * itself; the site killed and started; a reply while offline; the server restarted.
+     */
+    private fun FeedCapture.Script.flags() {
+        join()
+        openPhone()
+        openFeedAndWait()
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        away()
+        shot("e01_global_loaded")
+        var camPost: UUID? = null
+        run { camPost = session.feed(FeedKind.GLOBAL).posts.mapNotNull(session::post).firstOrNull { it.mine }?.id }
+
+        for ((key, n) in listOf("feed" to 2, "feed.serverApi" to 4)) {
+            mark(key)
+            flag(key, false)
+            waitUntil(600, "the open Feed told $key is off") { session.availability != FeedAvailability.OK }
+            elapsed(key, "$key off: the open Feed lost its connection")
+            waitUntil(600, "the open Feed told it is switched off") { session.availability == FeedAvailability.DISABLED }
+            elapsed(key, "$key off: the open Feed is told it is switched off")
+            waitTicks(10)
+            away()
+            shot("e0${n}_${key.replace('.', '_')}_off_open_feed")
+            mark("$key on")
+            flag(key, true)
+            waitUntil(2400, "Feed back after $key") { session.availability == FeedAvailability.OK }
+            elapsed("$key on", "$key on: the open Feed is back, no click")
+            waitTicks(30)
+            away()
+            shot("e0${n + 1}_${key.replace('.', '_')}_on_again")
+        }
+
+        // Opened afresh while off: the switched-off block on Global, no compose button over it; back by itself.
+        flag("feed", false)
+        waitUntil(600, "the open Feed told it is switched off") { session.availability == FeedAvailability.DISABLED }
+        reopenFresh()
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        away()
+        shot("e06_disabled_block_global")
+        mark("block")
+        flag("feed", true)
+        waitUntil(2400, "the block's list back") { session.feed(FeedKind.GLOBAL).posts.isNotEmpty() }
+        elapsed("block", "feed on: the switched-off block replaced by the list, no click")
+        waitTicks(30)
+        away()
+        shot("e07_block_back_no_click")
+
+        // The site killed and started again under the loaded list.
+        mark("kill")
+        control("kill-site")
+        waitUntil(1200, "the connection lost") { session.availability == FeedAvailability.UNAVAILABLE }
+        elapsed("kill", "site killed: Connexion perdue")
+        waitTicks(10)
+        away()
+        shot("e08_site_killed")
+        control("start-site")
+        mark("site up")
+        waitUntil(2400, "Feed back after the site's restart") { session.availability == FeedAvailability.OK }
+        elapsed("site up", "site answering again: Feed back")
+        waitTicks(40)
+        away()
+        shot("e09_site_back")
+
+        // A reply in the browser while Camille is away.
+        key(GLFW.GLFW_KEY_ESCAPE)
+        waitTicks(10)
+        leaveServer()
+        waitTicks(40)
+        replyAs("lea", { camPost }, "Réponse pendant ton absence, deuxième tour.")
+        waitTicks(200)
+        joinServer(server)
+        waitTicks(80)
+        openPhone()
+        away()
+        run { FeedMod.LOGGER.info("Feed capture: Feed's badge after the login: {}", CaptureHooks.unreadCount(Feed.APP_ID)) }
+        shot("e10_badge_after_offline_reply")
+        openFeedAndWait()
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        away()
+        shot("e11_marker_after_offline_reply")
+
+        // The dedicated server restarted under the player.
+        mark("restart")
+        control("restart-server")
+        elapsed("restart", "server restarted (Done)")
+        joinServer(server)
+        waitTicks(60)
+        elapsed("restart", "joined again")
+        openPhone()
+        openFeedAndWait()
+        click(GLOBAL_TAB_X, 22)
+        waitTicks(20)
+        away()
+        shot("e12_after_server_restart")
+        log("after the server's restart")
     }
 
     /** The Retry button of the unavailable and switched-off blocks, in viewport dp. */
