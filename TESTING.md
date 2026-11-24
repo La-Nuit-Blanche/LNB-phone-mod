@@ -379,8 +379,9 @@ PostgreSQL up, and this repository built.
    accounts (`LeaBuilds`, `Lea_Alt`), an announcer (`Kael_Builder`), a Warden admin (`Admin_Lune`), a banned player
    (`Sam_D`), a second plain player for the browser (`MikaPvP`), a site admin with no account for the flags, and a guest
    with no account at all (`Visitor42`).
-4. **Flags.** As the site admin, `PATCH /api/admin/flags/feed` with `{"enabled":true}` (`feed.serverApi`,
-   `feed.writing` and `feed.live` follow it). This also clears the site's flag cache at once; a change made in the
+4. **Flags.** As the site admin, `PATCH /api/admin/flags/feed` with `{"enabled":true}` (`feed.serverApi` and
+   `feed.writing` follow it; `feed.live`, the browser's live updates, is seeded off on its own and switched on
+   separately, and the game doesn't need it). This also clears the site's flag cache at once; a change made in the
    database takes up to 10 seconds. Browser calls need the session cookie and an `Origin` of the site.
 5. **Posts.** Through the routes, not the database, so that events and notifications go out: the server's
    `POST /api/feed/server/posts` with the secret, or the browser's `/api/feed/posts` with a cookie. The site's limits
@@ -534,11 +535,12 @@ real times.
 vectors (text, idempotency, anonymity by viewer, pages, pins, unread dots and markers), the notification queue and its
 pages, the command's calls, the flags, and the stream with each event made through the browser's routes,
 `Last-Event-ID` after a dropped connection, the stream's opening ping (at once, with no `id`), and the stream closed by
-the site when `feed` or `feed.serverApi` goes off, refused while off and made again once it is back. It is skipped unless `FEED_LIVE_SITE` is
-set, and empties Feed's tables in the database it is given:
+the site when `feed` or `feed.serverApi` goes off, refused while off and made again once it is back. It is skipped
+unless both `FEED_LIVE_CHECK=1` and `FEED_LIVE_SITE` are set (the second alone, which the capture runs use, is not enough), and empties Feed's tables in the
+database it is given:
 
 ```sh
-FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_TOKEN=<WARDEN_SERVER_SECRET> FEED_LIVE_DB=lnb_c1 \
+FEED_LIVE_CHECK=1 FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_TOKEN=<WARDEN_SERVER_SECRET> FEED_LIVE_DB=lnb_c1 \
 FEED_LIVE_COOKIES='{"camille": "...", ...}' ./gradlew :apps:feed:test --tests '*LiveSiteCheck*'
 ```
 
