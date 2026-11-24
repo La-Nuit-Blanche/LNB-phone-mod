@@ -205,10 +205,9 @@ Warden's `auth.mode = "OFF"` so that both accounts may join. A is an operator: i
 (the website's roles are not there). B is a plain player. The sample posts are dated from the server's start, and
 nothing is kept when it stops.
 
-Items 39 to 43 need the website: a site with the `feed` flag on, Warden's `api.url` and `api.token` set in
-`lnbwarden-server.toml` (with `auth.mode` at `required` or `optional`), `backend.kind = "site"`, and the Minecraft
-accounts of A and B linked to LNB accounts. The LNB website's repository says how to run it locally. Item 44 needs no
-website: it checks Feed with `backend.kind = "site"` where the site can't be called.
+Items 39 to 43, and the end of item 38, need the website: "Feed against a local website", after item 49, says how to
+run one with people of every kind and point the server at it, as it was done the first time (November 2026). Item 44
+needs no website: it checks Feed with `backend.kind = "site"` where the site can't be called.
 
 30. **Start.** The server and both clients start without an error. The server log has the warning `Feed uses its memory
     backend (sample seed): nothing is kept, for development only`, which is expected here. The mod list shows "LNB
@@ -285,35 +284,51 @@ website: it checks Feed with `backend.kind = "site"` where the site can't be cal
     no error in either log. Start it again and join: Feed opens afresh on Announcements and shows the new server's
     content (in memory mode the sample again: what was posted is gone, and the announcers added by command with it),
     never a post or draft of the last visit. A notification that was delivered before the stop is still on the phone.
-    With the site backend, redo it: the posts are still there, and a notification the site queued while the server was
-    down is delivered when it is back (item 40).
-39. **The website: posts made in the browser.** Signed in on the website with the LNB account of A, post, reply and like
-    from the browser. With Feed open on A's phone, the post appears at the top of Global within a few seconds (or behind
-    the pill), and the counts move with no reload. A post written in the game appears on the website's Feed page. A reply
-    written in the browser to a post of B's notifies B in the game, with the same banner as item 33. An announcement
-    written in the browser by an announcer notifies the players in the game, the author excepted.
-40. **The website: a player who was offline.** B leaves. In the browser, an account other than B's replies to a post of B's
-    and an announcer posts an announcement; B joins: Feed's icon shows a badge `2`, with no banner and no sound at
-    login; opening Feed clears it and the reply and announcement are where the badge's targets said. Redo it with the
-    Minecraft server stopped while the browser posts, then started: the notifications arrive within a few minutes of its
-    start (a reconnection drains the queue at once), exactly once each.
-41. **The website: the site off.** With Feed open on B's phone, stop the site (or block its address). B's list stays,
-    readable, with "Connection lost" and "Retry". A Feed opened afresh shows "Feed unavailable". Joining the Minecraft
-    server is as quick as ever, and its log says once that the site is unreachable instead of once for every call, and
-    once that the event stream is disconnected. Start the site: within about a minute (the stream retries between 1 and
-    30 seconds) Feed catches up, `Connected to LNB's Feed event stream` is in the log, and posts made meanwhile show
-    without the list jumping, behind the pill if B has scrolled.
-42. **The website: Feed off, writing off.** Switch the `feed` flag off on the site: a Feed opened afresh shows "Feed is
-    switched off" with "Retry", an open one shows "Connection lost"; switch it on: Feed recovers within a minute (the
-    stream retries every 60 seconds while the site answers that it is off). Switch `feed.writing` off: the site sends no
-    event for it, so a Feed opened afterwards has no round buttons and the strip reads "Writing is paused", and a Feed
-    already open learns of it from its next post, reply or like, refused with "Writing is paused". A moderator keeps the
-    more buttons and an announcer the pin buttons, as in item 37. Switch it on: a Feed opened afterwards has them back.
-43. **The website: roles.** Give B the announcer role on the website's People page: the round button on "Announcements"
-    appears on B's phone within a second, with no new login; take it away: it goes. `/feed announcer add` and `remove`
-    work from the server's console and for an `admin` or `warden-admin` account in game; for an operator who is not a
-    moderator on the site, `/feed` is absent, and from a command block or `execute as` it is refused. A moderator deletes
-    anyone's post and sees the author of an anonymous one, in game and in the admin.
+    With the site backend, redo it (stop the server with `stop` in its console, or over RCON): the client is back on the
+    title screen with no error, the server is up again in about 25 seconds, and once joined Feed shows the site's posts,
+    yours included. Its log says `Feed uses LNB's website` at the start and `Connected to LNB's Feed event stream` about
+    25 seconds later: the site sends nothing on a quiet stream before its first ping, so that wait is expected.
+39. **The website: posts made in the browser.** B, a plain player, has Feed open on Global at the top. Another person,
+    in the browser, posts: the post is at the top of B's Global within two seconds, highlighted. They reply to a post of
+    B's: B gets the banner "Nouvelle réponse", "Mika L. : …" (the name as the site gives it), and the reply count and the
+    unseen-replies dot move. A third person likes it: the count moves. An announcer posts an announcement and pins it from
+    the browser: B gets its banner, and the pinned group on "Annonces" holds it. The first person deletes their post: it
+    leaves B's Global. A post B writes in Compose appears on the website's Feed page. Names read as the site gives them:
+    "Camille R." with the handle `@Cam_Roux`, a person who hides their real name as `SteveBuilds` with no handle, a second
+    linked account as "Léa B." with `@Lea_Alt`, an announcer with the violet badge, an anonymous post as "Anonyme".
+40. **The website: a player who was offline.** B leaves. In the browser, another person replies to a post of B's; B joins:
+    Feed's icon shows a badge `1`, with no banner and no sound at login, and B's post carries the unseen-replies dot.
+    Redo it with the Minecraft server stopped while the browser replies, then started: the site's queue is empty within
+    a few seconds of `Done` (the server drains it when it starts, before its stream connects), and B finds the badge `1`
+    at login, exactly once. Players who have played on the world but are offline get every notification the server
+    drains, a checker's own runs included: start from a world whose `data/lnbphone_notifications.dat` holds nothing old
+    if the count matters.
+41. **The website: the site off.** With Feed open on Global on B's phone, kill the site's process. B's list stays,
+    readable, with "Connexion perdue" and "Réessayer" within a second. A Feed opened afresh shows "Feed unavailable".
+    Joining the Minecraft server is as quick as ever. The server's log has one line for each new reason the stream is
+    down (`closed`, then `ConnectException`, then `HTTP 503` while the site starts again), not one for each retry, and
+    Warden's `LNB's API is unreachable` once, then `reachable again` once. Start the site: B's Feed is back within about
+    15 seconds of the site answering (the client's own retry), with no click, and `Connected to LNB's Feed event stream`
+    follows about 25 seconds after that.
+42. **The website: Feed off, writing off.** Switch the `feed` flag off on the site (`/admin/settings/flags`, or the
+    admin's `PATCH /api/admin/flags/feed`). A Feed opened afresh shows "Feed désactivé" with "Réessayer". A Feed already
+    open changes nothing: the site sends no event for a flag and keeps the server's stream open, so it learns of it only
+    from its next action, which says "Action impossible". Switch it on: the switched-off block stays until "Réessayer"
+    is pressed, which loads the list at once; an open Feed never noticed. Switch `feed.writing` off: a Feed opened
+    afterwards has no round button, and a heart says "Écriture suspendue"; a Feed already open learns of it from its
+    next post, reply or like. A moderator keeps the more buttons and an announcer the pin buttons, as in item 37. Switch
+    it on: a Feed opened afterwards has them back.
+43. **The website: roles.** With Feed open on "Annonces", give B the announcer role on the website (the Person page's
+    switch, or `PUT /api/feed/admin/announcers/<user>`): the round button appears on B's phone within two seconds, with
+    no new login; take it away: it goes. A Warden admin in game has the round button on "Annonces", a more button on
+    every post, the pin button on announcements, and the line "Auteur : …" on an anonymous post; the chat offers
+    `/feed announcer`, whose answers read "Annonceurs : Kael M. (Kael_Builder)", "Cam_Roux peut désormais publier des
+    annonces.", "Cam_Roux ne peut plus publier d'annonces.", "Admin_Lune est modérateur : …" and "Visitor42 n'a pas de
+    compte LNB.". An announcer who is not a moderator has the round button and the pin buttons, and `/feed` is an
+    unknown command for them. A username with no LNB account reads with no round button, and a heart says "Compte LNB
+    requis"; a Warden-banned player (who can only join while `auth.mode` is `off`) reads, and a heart says "Écriture
+    bloquée (sanction)". Not yet tried: an operator who is no moderator, a command block, `execute as`, and the
+    console.
 44. **Single-player, and a site that is not set up.** With `backend.kind = "site"` in a single-player world, Feed opens on
     "Feed unavailable", the log says `Feed calls LNB's website from dedicated servers only`, and the site's access log
     shows no call from that game. With `api.url` or `api.token` blank on a dedicated server, Feed is unavailable and the
@@ -337,6 +352,43 @@ website: it checks Feed with `backend.kind = "site"` where the site can't be cal
     person choose, on the website, which posts: a post shows the name chosen on the site. Change the real-name setting on
     the site ("show my real name" off): the cards in game, old ones included, show the username alone, with no handle,
     after the next load. Delete the LNB account from the admin: its posts, replies and likes leave the open feeds.
+
+### Feed against a local website
+
+How the first run against the real site was done (November 2026); the scripts are small and live outside the
+repositories. You need the website's repository with its `node_modules` and its `.env`, Docker with its Compose
+PostgreSQL up, and this repository built.
+
+1. **A database of its own.** `docker exec lnb-website-postgres-1 psql -U lnb -d lnb -c 'create database lnb_c1'`.
+2. **The site on a port of its own.** Copy the site's `.env` to a file outside the repository with `DATABASE_URL` ending
+   in `/lnb_c1` and `BETTER_AUTH_URL=http://localhost:3010`, then, in the website's checkout,
+   `pnpm exec nuxt dev --port 3010 --dotenv <that file>`. The migrations apply at the first request; a cold start takes
+   about a minute and a half, a warm one half a minute.
+3. **People.** Insert them in `lnb_c1` as the site's own dev seeds do: a `user` row each (`role` null, `feed-announcer`,
+   `warden-admin` or `admin`), a `warden_player` row (`show_real_name` true or false), a `minecraft_account` row per
+   linked account whose `uuid` is the offline UUID of the username (`UUID.nameUUIDFromBytes("OfflinePlayer:" + name)`),
+   a `warden_ban` row for the banned one, and a `session` row each with a known token, whose cookie
+   `better-auth.session_token` is the token, a dot and its HMAC-SHA256 with `BETTER_AUTH_SECRET` in base64, URL-encoded.
+   The first run had a plain player who shows their name (`Cam_Roux`), one who hides it (`SteveBuilds`), one with two
+   accounts (`LeaBuilds`, `Lea_Alt`), an announcer (`Kael_Builder`), a Warden admin (`Admin_Lune`), a banned player
+   (`Sam_D`), a second plain player for the browser (`MikaPvP`), a site admin with no account for the flags, and a guest
+   with no account at all (`Visitor42`).
+4. **Flags.** As the site admin, `PATCH /api/admin/flags/feed` with `{"enabled":true}` (`feed.serverApi`,
+   `feed.writing` and `feed.live` follow it). This also clears the site's flag cache at once; a change made in the
+   database takes up to 10 seconds. Browser calls need the session cookie and an `Origin` of the site.
+5. **Posts.** Through the routes, not the database, so that events and notifications go out: the server's
+   `POST /api/feed/server/posts` with the secret, or the browser's `/api/feed/posts` with a cookie. The site's limits
+   (3 posts a minute and 15 an hour per account) are in its memory: restarting it resets them.
+6. **The Minecraft server.** In `apps/feed/run/config` (keep a copy of the memory setup first):
+   `lnbphone_feed-server.toml` with `kind = "site"`, `lnbwarden-server.toml` with `url = "http://localhost:3010"`, the
+   site's `WARDEN_SERVER_SECRET` as `token` and `mode = "OFF"`. With `off`, Warden calls nothing and lets anyone join
+   under any name, which is what lets a scripted client be each person in turn; Feed still calls the site. What that
+   leaves untested is Warden's own part: the device link, a banned player refused at the door, a kick on unlink or ban,
+   and `optional` mode's guests. `enable-rcon=true` with a port and a password in `server.properties` lets a script
+   stop it cleanly. Then `./gradlew :apps:feed:runServer -Pserver_port=25591`.
+7. **The checks.** The live check (below, "Feed's automated checks") drives the mod's own `SiteBackend` and stream
+   through every route; it empties Feed's tables, so seed the posts again after it. The `site-*` capture scenarios play
+   a client on the server, as each person.
 
 ## Automated checks
 
@@ -442,6 +494,47 @@ leave the window alone anyway: it opens on the desktop for about a minute.
 | `compose` | Compose as a player (typing, the counter's colours, over the limit, anonymous, sending, posted, a failure, the closed draft kept) and as an announcer (the destination, anonymous), pinning (tooltip, the replace dialog, the group), then English at GUI scale 2 | the sample seed; the scenario makes Camille an announcer itself, through the backend |
 
 `FeedScenarios.kt` and `WriteScenarios.kt` are in `apps/feed/src/capture/`, a source set the jar never holds; a new
-scenario is added to `FeedScenarios.get`. What the captures can't check: the website backend, a second player, a
-dedicated server, the sounds, scales above 4, the real skins, and how it feels in the hand. That is what items 30 to 49
+scenario is added to `FeedScenarios.get`.
+
+**Against the website.** `SiteScenarios.kt` holds scenarios that join a dedicated server running on the site backend
+("Feed against a local website") instead of opening a world, as the person `-PcaptureUser` names, and do what other
+people do through the site's browser routes, with the session cookies of `FEED_LIVE_COOKIES` (a JSON object, `root` the
+site admin) on the site `FEED_LIVE_SITE`:
+
+```sh
+FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_COOKIES='{"mika": "better-auth.session_token=...", ...}' \
+./gradlew :apps:feed:runCapture -Pcapture=site-player -PcaptureUser=Cam_Roux -PcaptureServer=localhost:25591 \
+    -PcaptureControl=<folder> -PcaptureWatchdog=1500 -PcaptureDir=<absolute directory>
+```
+
+What a client can't do, killing and starting the site or restarting the server, it asks for by writing
+`req-<kill-site|start-site|restart-server>` in the `captureControl` folder and waiting for `done-<same>`: a small script
+beside the run does it, by the processes' own IDs. The fixed clock is off for these runs, since the site's posts have
+real times.
+
+| Scenario | As | Shows |
+|---|---|---|
+| `site-player` | a plain player | the site's content, a post made in game read back in the browser, a post, reply, like, pin and deletion from the browser reaching the open phone, writing off and on, Feed off and on, the site killed and started, a reply while offline, the server restarted |
+| `site-outage` | a plain player | Feed off under an open Feed, the switched-off block and its Retry, the site killed under a loaded list and started again |
+| `site-return` | a plain player | the badge for a reply made while the server was stopped, then the announcer role given and taken in the admin |
+| `site-moderator` | a Warden admin | the round, more and pin buttons, the author line of an anonymous post, `/feed announcer` and its answers |
+| `site-announcer` | an announcer | the round and pin buttons, `/feed` unknown |
+| `site-guest` | a username with no LNB account | no round button, a heart refused |
+| `site-banned` | a Warden-banned player | a heart refused for the ban |
+
+**The live check.** `LiveSiteCheck` (in `apps/feed/src/test/.../backend/site/`) runs the mod's own `SiteBackend` and
+`FeedEvents` against a running site: every route of the backend interface and every outcome, the contract's test
+vectors (text, idempotency, anonymity by viewer, pages, pins, unread dots and markers), the notification queue and its
+pages, the command's calls, the flags, and the stream with each event made through the browser's routes,
+`Last-Event-ID` after a dropped connection and the feature switched off and on. It is skipped unless `FEED_LIVE_SITE` is
+set, and empties Feed's tables in the database it is given:
+
+```sh
+FEED_LIVE_SITE=http://localhost:3010 FEED_LIVE_TOKEN=<WARDEN_SERVER_SECRET> FEED_LIVE_DB=lnb_c1 \
+FEED_LIVE_COOKIES='{"camille": "...", ...}' ./gradlew :apps:feed:test --tests '*LiveSiteCheck*'
+```
+
+It takes about four minutes, most of it waiting out the site's rate limits, and prints how long the stream took to
+connect (about 25 seconds: the site's first ping). What the captures can't check: a second player in the game, the sounds, scales
+above 4, the real skins, Warden's authentication, and how it feels in the hand. That is what items 30 to 49
 are for.
